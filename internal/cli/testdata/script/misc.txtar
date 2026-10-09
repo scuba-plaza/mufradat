@@ -1,0 +1,15 @@
+exec mufradat version
+stdout '^mufradat '
+exec mufradat version --json
+stdout '"version"'
+
+exec mufradat licenses
+stdout 'MIT License'
+stdout 'CC BY-SA 4.0'
+stdout 'SIL OPEN FONT LICENSE'
+
+! exec mufradat --nonsense
+stderr 'unknown flag'
+
+exec mufradat completion zsh
+stdout 'compdef'

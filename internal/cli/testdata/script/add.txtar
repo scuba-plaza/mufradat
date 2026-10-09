@@ -1,0 +1,33 @@
+exec mufradat init ws
+
+env FAKE_CLAUDE_MODE=ok
+exec mufradat -C ws add 2 --dry-run
+stdout '^1\tفِي\tprep$'
+stdout '^2\tمِنْ\tprep$'
+stderr 'would write 2 notes'
+! exists ws/notes.jsonl.tmp
+! exists claude-calls
+
+exec mufradat -C ws add 2
+stderr 'writing 2 notes with Claude Code \(sonnet, medium effort'
+stderr '\[2/2\]'
+stderr 'wrote 2 notes in 1 request'
+stdout '^n_[a-z2-7]{12}\tفِي\tmeaning of فِي$'
+grep 'model=sonnet effort=medium' claude-args.log
+grep -count=2 '"origin":"ranked"' ws/notes.jsonl
+grep '"rank":1,' ws/notes.jsonl
+grep '"example":"قَرَأَ \[الْوَلَدُ\] الْكِتَابَ فِي الْبَيْتِ."' ws/notes.jsonl
+grep -count=1 '"calls":1' ws/state/usage.jsonl
+
+exec mufradat -C ws status
+stdout 'add .*2 notes \(2 of the'
+
+exec mufradat -C ws add 1 --json
+stdout '"lemma": "عَلَى"'
+stdout '"calls": 1'
+exec mufradat -C ws add 1 --dry-run
+stdout '^4\t'
+
+exec mufradat -C ws build
+stderr '3 notes, 6 cards'
+

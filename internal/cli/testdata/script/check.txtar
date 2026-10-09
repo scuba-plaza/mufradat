@@ -1,0 +1,91 @@
+env SOURCE_DATE_EPOCH=1700000000
+
+exec mufradat init ws
+cp notes.jsonl ws/notes.jsonl
+
+! exec mufradat -C ws check
+stderr 'not set up'
+stderr 'hint: run `mufradat -C .*ws setup`'
+
+exec mufradat -C ws status
+stdout 'check .*not set up'
+
+exec mufradat -C ws doctor
+stdout 'warn  vowel checking'
+
+exec mufradat setup
+stderr 'ready: Python 3.13.0, installed with uv'
+grep 'uv pip install .*--require-hashes' sidecar.log
+grep 'camel_data morphology-db-msa-r13' sidecar.log
+grep 'camel_data disambig-bert-unfactored-msa' sidecar.log
+grep '^selftest$' sidecar.log
+! grep '^serve$' sidecar.log
+
+exec mufradat -C ws doctor
+stdout 'ok    vowel checking +managed environment: Python 3.13.0, camel-tools 1.6.0'
+
+exec mufradat -C ws status
+stdout 'check .*2 notes not checked yet'
+stdout 'next: mufradat -C .*ws check'
+
+exec mufradat -C ws check
+stdout 'n_aaaaaaaaaaaa'
+stdout 'الْبَيْتِ'
+stdout 'major'
+stderr '2 notes checked: 6 new, 0 remembered'
+stderr '1 notes with major flags'
+grep -count=1 '^serve$' sidecar.log
+grep -count=1 '^check 6$' sidecar.log
+
+exec mufradat -C ws check --json
+stdout '"major": 1'
+stdout '"unchecked": 0'
+stdout '"kind": "diacritics"'
+grep -count=1 '^serve$' sidecar.log
+
+! exec mufradat -C ws check --strict
+stderr '1 note with major flags'
+exec mufradat -C ws check
+
+exec mufradat -C ws status
+stdout 'check .*every note is checked'
+stdout 'review .*1 notes with open flags \(1 major, 0 minor\)'
+
+exec mufradat -C ws build
+stderr 'check::diacritics: 1'
+! stderr 'check::unverified'
+
+cp notes_edited.jsonl ws/notes.jsonl
+exec mufradat -C ws status
+stdout 'check .*1 notes not checked yet'
+exec mufradat -C ws check
+stderr '2 notes checked: 1 new, 5 remembered'
+grep -count=1 '^check 1$' sidecar.log
+grep -count=2 '^serve$' sidecar.log
+
+cp dismissed.jsonl ws/decisions.jsonl
+exec mufradat -C ws status
+stdout 'review .*no open flags'
+exec mufradat -C ws check --strict
+exec mufradat -C ws build
+! stderr 'check::diacritics'
+
+exec mufradat -C ws check --force
+stderr '2 notes checked: 6 new, 0 remembered'
+
+exec mufradat -C ws config set verify.enabled off
+! exec mufradat -C ws check
+stderr 'turned off'
+exec mufradat -C ws status
+stdout 'check .*turned off'
+exec mufradat -C ws build
+! stderr 'check::'
+
+-- notes.jsonl --
+{"id":"n_aaaaaaaaaaaa","seq":1,"rank":3,"origin":"ranked","lemma":"كِتَاب","pos":"noun","gender":"m","forms":[{"label":"pl.","ar":"كُتُب"}],"english":"book","example":"قَرَأْتُ [الْكِتَابَ] فِي الْبَيْتِ.","example_en":"I read the book at home.","created":"2023-11-14T22:13:20Z","updated":"2023-11-14T22:13:20Z"}
+{"id":"n_bbbbbbbbbbbb","seq":2,"rank":1,"origin":"ranked","lemma":"قَلَم","pos":"noun","gender":"m","forms":[{"label":"pl.","ar":"أَقْلَام"}],"english":"pen","example":"أُرِيدُ [قَلَمًا] جَدِيدًا.","example_en":"I want a new pen.","created":"2023-11-14T22:13:20Z","updated":"2023-11-14T22:13:21Z"}
+-- notes_edited.jsonl --
+{"id":"n_aaaaaaaaaaaa","seq":1,"rank":3,"origin":"ranked","lemma":"كِتَاب","pos":"noun","gender":"m","forms":[{"label":"pl.","ar":"كُتُب"}],"english":"book","example":"قَرَأْتُ [الْكِتَابَ] فِي الْبَيْتِ.","example_en":"I read the book at home.","created":"2023-11-14T22:13:20Z","updated":"2023-11-14T22:13:20Z"}
+{"id":"n_bbbbbbbbbbbb","seq":2,"rank":1,"origin":"ranked","lemma":"قَلَم","pos":"noun","gender":"m","forms":[{"label":"pl.","ar":"أَقْلَام"}],"english":"pen","example":"أُرِيدُ [قَلَمًا] كَبِيرًا.","example_en":"I want a big pen.","created":"2023-11-14T22:13:20Z","updated":"2023-11-14T22:13:21Z"}
+-- dismissed.jsonl --
+{"kind":"dismiss_issue","note":"n_aaaaaaaaaaaa","key":"الْبَيْتِ","at":"2023-11-15T00:00:00Z"}

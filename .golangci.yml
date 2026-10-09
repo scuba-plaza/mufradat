@@ -1,0 +1,95 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - depguard
+    - forbidigo
+    - gocritic
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*bufio.Writer).Write
+        - (*bufio.Writer).WriteByte
+        - (*bufio.Writer).WriteRune
+        - (*bufio.Writer).WriteString
+        - (hash.Hash).Write
+        - io.WriteString(hash.Hash)
+    staticcheck:
+      checks:
+        - all
+        - -ST1000
+        - -ST1003
+        - -ST1016
+        - -ST1020
+        - -ST1021
+        - -ST1022
+        - -QF1001
+    depguard:
+      rules:
+        domain-stays-pure:
+          list-mode: lax
+          files:
+            - "**/internal/note/**"
+            - "**/internal/tashkeel/**"
+            - "**/internal/status/**"
+            - "**/internal/morph/**"
+            - "!$test"
+          deny:
+            - pkg: net/http
+              desc: pure packages do not talk to the network
+            - pkg: os/exec
+              desc: start subprocesses through internal/proc
+        subprocesses-only-through-proc:
+          list-mode: lax
+          files:
+            - "**/internal/**"
+            - "!**/internal/proc/**"
+            - "!$test"
+          deny:
+            - pkg: os/exec
+              desc: start subprocesses through internal/proc
+    forbidigo:
+      forbid:
+        - pattern: ^os\.Getenv$
+          msg: read the environment through env.Env.Getenv
+        - pattern: ^os\.LookupEnv$
+          msg: read the environment through env.Env.Getenv
+        - pattern: ^os\.Environ$
+          msg: read the environment through env.Env.Getenv
+        - pattern: ^os\.Exit$
+          msg: only main may exit
+        - pattern: ^log\.(Print|Fatal|Panic)
+          msg: report through ui.Reporter or slog
+  exclusions:
+    presets:
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - forbidigo
+      - path: ^cmd/
+        linters:
+          - forbidigo
+          - depguard
+      - path: internal/env/
+        linters:
+          - forbidigo
+      - path: internal/proc/
+        linters:
+          - forbidigo
+
+formatters:
+  enable:
+    - gofmt

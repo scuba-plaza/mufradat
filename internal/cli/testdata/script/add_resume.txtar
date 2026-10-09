@@ -1,0 +1,39 @@
+exec mufradat init ws
+exec mufradat -C ws config set author.batch_size 1
+exec mufradat -C ws config set author.concurrency 1
+
+rm -f claude-calls
+env FAKE_CLAUDE_MODE=limit-after-1
+! exec mufradat -C ws add 3
+stderr 'usage limit reached'
+stderr 'hint: your Claude plan.s usage limit was reached and resets at'
+stderr 'to write the rest, run: mufradat -C .*ws add 2'
+stdout '\tفِي\t'
+grep -count=1 '"lemma"' ws/notes.jsonl
+
+env FAKE_CLAUDE_MODE=ok
+exec mufradat -C ws add 2
+stderr 'wrote 2 notes'
+grep -count=3 '"lemma"' ws/notes.jsonl
+grep '"rank":1,' ws/notes.jsonl
+grep '"rank":2,' ws/notes.jsonl
+grep '"rank":3,' ws/notes.jsonl
+
+env FAKE_CLAUDE_MODE=garbage
+! exec mufradat -C ws add 1
+stderr 'claude failed:.*this is not json'
+stderr '1 note could not be written'
+stderr 'hint: run mufradat -C .*ws add 1 to try again'
+grep -count=3 '"lemma"' ws/notes.jsonl
+
+rm claude-calls
+env FAKE_CLAUDE_MODE=bad-first
+exec mufradat -C ws add 1
+stderr 'wrote 1 note in 2 requests'
+grep -count=4 '"lemma"' ws/notes.jsonl
+
+rm claude-calls
+env FAKE_CLAUDE_MODE=switch-pos
+exec mufradat -C ws add ماء --pos noun
+stderr 'wrote 1 note in 2 requests'
+grep '"pos":"noun"' ws/notes.jsonl

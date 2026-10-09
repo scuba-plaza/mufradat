@@ -1,0 +1,48 @@
+exec mufradat init ws
+cp notes.jsonl ws/notes.jsonl
+
+env FAKE_SIDECAR_MODE=missing-lib
+! exec mufradat setup
+stderr 'libstdc\+\+'
+stderr 'hint: .*LD_LIBRARY_PATH'
+! exec mufradat -C ws check
+stderr 'not set up'
+env FAKE_SIDECAR_MODE=
+
+exec mufradat setup
+stderr 'ready: Python 3.13.0, installed with uv'
+grep -count=2 '^uv venv' sidecar.log
+grep -count=1 'camel_data morphology-db-msa-r13' sidecar.log
+
+exec mufradat setup
+stderr 'already installed'
+grep -count=2 '^uv venv' sidecar.log
+grep -count=2 '^selftest$' sidecar.log
+
+exec mufradat setup --force
+grep -count=3 '^uv venv' sidecar.log
+grep -count=3 '^selftest$' sidecar.log
+grep -count=1 'camel_data morphology-db-msa-r13' sidecar.log
+
+env FAKE_SIDECAR_MODE=missing-lib
+! exec mufradat -C ws doctor
+stdout 'FAIL  vowel checking'
+stdout 'hint: .*LD_LIBRARY_PATH'
+env FAKE_SIDECAR_MODE=
+
+env FAKE_SIDECAR_MODE=crash
+! exec mufradat -C ws check
+stderr 'vowel checking failed'
+stderr 'stopped unexpectedly'
+env FAKE_SIDECAR_MODE=
+exec mufradat -C ws check
+stderr '2 notes checked: 4 new, 2 remembered'
+
+! exec mufradat setup --force --python nosuchpython
+stderr 'no suitable Python found'
+exec mufradat -C ws doctor
+stdout 'ok    vowel checking'
+
+-- notes.jsonl --
+{"id":"n_aaaaaaaaaaaa","seq":1,"rank":3,"origin":"ranked","lemma":"كِتَاب","pos":"noun","gender":"m","forms":[{"label":"pl.","ar":"كُتُب"}],"english":"book","example":"قَرَأْتُ [الْكِتَابَ] فِي الْبَيْتِ.","example_en":"I read the book at home.","created":"2023-11-14T22:13:20Z","updated":"2023-11-14T22:13:20Z"}
+{"id":"n_bbbbbbbbbbbb","seq":2,"rank":1,"origin":"ranked","lemma":"قَلَم","pos":"noun","gender":"m","forms":[{"label":"pl.","ar":"أَقْلَام"}],"english":"pen","example":"أُرِيدُ [قَلَمًا] جَدِيدًا.","example_en":"I want a new pen.","created":"2023-11-14T22:13:20Z","updated":"2023-11-14T22:13:21Z"}

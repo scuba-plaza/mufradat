@@ -1,0 +1,54 @@
+exec mufradat init ws
+env FAKE_CLAUDE_MODE=ok
+
+! exec mufradat -C ws add ماء
+stderr '1 word needs a choice'
+stderr 'ماء#1  مَاء  noun'
+stderr 'ماء#2  مَاءَ  verb'
+stderr 'hint: choose with --entry'
+! exists claude-calls
+
+! exec mufradat -C ws add ماء عين --pick 1
+stderr '--pick works with exactly one word'
+! exec mufradat -C ws add ماء --entry ماء
+stderr 'is not WORD#N'
+! exec mufradat -C ws add ماء --pos banana
+stderr '--pos "banana" must be one of'
+
+exec mufradat -C ws add ماء --entry 'ماء#2'
+stdout '\tمَاءَ\tmeaning of مَاءَ$'
+grep -count=1 '"origin":"named"' ws/notes.jsonl
+grep '"lemma":"مَاءَ"' ws/notes.jsonl
+! grep '"rank"' ws/notes.jsonl
+
+exec mufradat -C ws add ماء --pos noun
+stdout '\tمَاء\t'
+grep -count=2 '"origin":"named"' ws/notes.jsonl
+
+exec mufradat -C ws add كتاب --entry 'كتاب#1'
+grep '"rank":333,' ws/notes.jsonl
+exec mufradat -C ws add كتاب --yes
+stderr 'كِتَاب is already in the deck'
+stderr 'nothing to add'
+
+! exec mufradat -C ws add كلمةغيرموجودة
+stderr 'no Modern Standard Arabic entry matches: كلمةغيرموجودة'
+
+exec mufradat -C ws add علم --yes
+stdout '\tعَلِمَ\t'
+
+exec mufradat -C ws add -f words.txt --yes
+stderr 'writing 2 notes'
+grep '"lemma":"عَيْن"' ws/notes.jsonl
+
+exec mufradat -C ws add كتاب، سيارة --yes
+stderr 'كِتَاب is already in the deck'
+grep '"lemma":"سَيَّارَة"' ws/notes.jsonl
+
+exec mufradat -C ws status
+stdout 'add .*7 notes \(6 of the'
+
+-- words.txt --
+# words I met this week
+عين   # eye
+قلم

@@ -1,0 +1,40 @@
+! exec mufradat bogus
+stderr 'unknown command'
+
+! exec mufradat doctor
+stdout 'FAIL  workspace'
+stderr 'hint: fix the failed checks'
+
+exec mufradat init
+stdout 'mufradat/default'
+exists home/.local/share/mufradat/default/mufradat.toml
+exists home/.local/share/mufradat/default/audio
+exists home/.local/share/mufradat/default/state
+
+! exec mufradat init
+stderr 'already a workspace'
+
+exec mufradat init --git proj/deck
+exists proj/deck/mufradat.toml
+grep 'state/' proj/deck/.gitignore
+
+mkdir proj/deck/sub/dir
+cd proj/deck/sub/dir
+exec mufradat config path
+stdout 'workspace    .*proj/deck \(current directory\)'
+
+cd $WORK
+env MUFRADAT_WORKSPACE=$WORK/proj/deck
+exec mufradat config path
+stdout 'proj/deck \(environment\)'
+
+env MUFRADAT_WORKSPACE=
+exec mufradat -C proj/deck config path
+stdout 'proj/deck \(flag\)'
+
+exec mufradat -C nowhere config path
+stdout 'workspace    none'
+
+! exec mufradat -C nowhere config get
+stderr 'no workspace at'
+stderr 'hint: run `mufradat init`'

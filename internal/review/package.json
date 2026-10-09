@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test jstest/*.test.js",
+    "check": "tsc -p ."
+  }
+}

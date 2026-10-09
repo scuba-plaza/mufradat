@@ -1,0 +1,97 @@
+.compare-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  height: auto;
+}
+
+.compare {
+  flex: 1;
+  width: min(960px, 100%);
+  margin: 0 auto;
+  padding: 24px 28px 40px;
+}
+
+.compare .sample-text {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: baseline;
+  margin-bottom: 22px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.compare .sample-text .kind {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+.compare .sample-text .ar {
+  font-size: 1.5rem;
+  line-height: 1.7;
+}
+
+.compare .tier {
+  margin: 22px 0 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.compare .voice {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.compare .voice + .voice {
+  margin-top: 6px;
+}
+
+.compare .voice.current {
+  border-color: var(--audio);
+  box-shadow: inset 3px 0 0 var(--audio);
+}
+
+.compare .voice .name {
+  color: var(--strong);
+}
+
+.compare .voice .gender {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.compare .plays {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.compare .plays .small.playing {
+  border-color: var(--audio);
+  color: var(--audio);
+}
+
+.compare .voice .use.small {
+  border-color: var(--audio);
+  color: var(--audio);
+}
+
+.compare-status {
+  position: sticky;
+  bottom: 0;
+  padding: 11px 28px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}

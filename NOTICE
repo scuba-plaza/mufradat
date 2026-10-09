@@ -1,0 +1,29 @@
+mufradat
+
+Code: MIT License (see LICENSE).
+
+Data shipped in this program (everything under data/ except embed.go) is
+licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+It is derived from the following sources; see data/SOURCES.md for how each one
+is used and how to rebuild the data.
+
+  Wiktionary, via kaikki.org (https://kaikki.org/dictionary/Arabic/),
+  CC BY-SA 4.0. Glosses, headword forms, genders, roots and inflected spellings
+  derive from it. Extracted with wiktextract (Tatu Ylonen, LREC 2022).
+
+  OpenSubtitles frequency list by Hermit Dave
+  (https://github.com/hermitdave/FrequencyWords), CC BY-SA 4.0. Used to order
+  words.
+
+  CAMeL Arabic Frequency Lists (Khalifa, Inoue, Alhafni, Baimukan, Bouamor and
+  Habash, 2021; https://github.com/CAMeL-Lab/Camel_Arabic_Frequency_Lists),
+  CC BY-SA 4.0. Used to order words.
+
+Bundled font:
+
+  Scheherazade New by SIL International (https://software.sil.org/scheherazade/),
+  SIL Open Font License 1.1 (see `mufradat licenses`).
+
+Verification uses CAMeL Tools (MIT) and CATT (https://github.com/abjadai/catt),
+which are installed separately by `mufradat setup` and are not distributed
+with this program.

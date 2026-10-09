@@ -1,0 +1,4 @@
+{"name":"Wiktionary Arabic (kaikki.org)","url":"https://kaikki.org/dictionary/Arabic/kaikki.org-dictionary-Arabic.jsonl","file":"kaikki-ar.jsonl","sha256":"81a86fb9e25b8bae2f3097c05d1a8c5fcdc56dd89dbb2b96d62565d4fcab519c","bytes":521119592}
+{"name":"OpenSubtitles frequency list","url":"https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/ar/ar_50k.txt","file":"subtitles-ar-50k.txt","sha256":"bbe98b4b92902b392bdefa2e555a108fdb42a5dd79d261674be5ab666229e19f","bytes":805779}
+{"name":"CAMeL MSA frequency list","url":"https://github.com/CAMeL-Lab/Camel_Arabic_Frequency_Lists/releases/download/v1.0/MSA_freq_lists.tsv.zip","file":"camel-msa-top.tsv","sha256":"072b4ab7202c2d8cd33d5308deee7163456a0052932ffe11765ea33292703915","bytes":3772108}
+{"name":"CAMeL Tools MLE analysis of the frequency lists","file":"camel-lemmas.tsv","sha256":"1e836fecc79cc4421a1b9d7047356c896c69a337e4fb6a86c55d4e42edd24c51","bytes":5589390}

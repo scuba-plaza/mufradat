@@ -1,0 +1,21 @@
+exec mufradat init ws
+exec mufradat -C ws config get audio.voice
+stdout 'ar-XA-Chirp3-HD-Achernar'
+
+exec mufradat -C ws config set author.model haiku
+exec mufradat -C ws config get author.model
+stdout '^haiku$'
+grep 'model = ' ws/mufradat.toml
+
+! exec mufradat -C ws config set audio.rate 9
+stderr 'outside 0.25 to 2'
+! exec mufradat -C ws config set nonsense 1
+stderr 'unknown key'
+
+exec mufradat -C ws config set google.credentials_file /keys/g.json
+exists home/.config/mufradat/config.toml
+! grep 'credentials_file' ws/mufradat.toml
+
+exec mufradat -C ws config get
+stdout 'author.model = haiku'
+stdout 'google.credentials_file = /keys/g.json'
