@@ -30,7 +30,7 @@ identical bytes; set SOURCE_DATE_EPOCH to pin the note modification times.`,
 			}
 			r := a.Reporter()
 			sum := plan.Summary
-			r.Event("%d notes, %d cards (%d production), %d audio clips", sum.Notes, sum.Cards, sum.Production, sum.AudioFiles)
+			r.Event("%d notes, %d cards (%d production), %d audio clips with %s", sum.Notes, sum.Cards, sum.Production, sum.AudioFiles, plan.Voice.Describe())
 			if sum.MissingAudio > 0 {
 				r.Warn("%d clips are missing; run `%s audio`", sum.MissingAudio, a.CommandPrefix())
 			}

@@ -82,3 +82,34 @@ func TestUncheckedHidesReview(t *testing.T) {
 		t.Errorf("review = %+v", got)
 	}
 }
+
+func TestTheAudioStepNamesTheProviderAndVoiceItSpeaksWith(t *testing.T) {
+	s := snap()
+	s.AudioVoice = "ar-XA-Chirp3-HD-Achernar (google, rate 0.9)"
+	if got := stepOf(Compute(s), "audio").Detail; got != "30 clips with ar-XA-Chirp3-HD-Achernar (google, rate 0.9)" {
+		t.Errorf("done: %q", got)
+	}
+	s.ClipsMissing = 4
+	if got := stepOf(Compute(s), "audio").Detail; got != "4 of 30 clips missing with ar-XA-Chirp3-HD-Achernar (google, rate 0.9)" {
+		t.Errorf("missing: %q", got)
+	}
+	s.AudioVoice = ""
+	if got := stepOf(Compute(s), "audio").Detail; got != "4 of 30 clips missing" {
+		t.Errorf("without a voice: %q", got)
+	}
+}
+
+func TestAudioThatCannotBeMadeSendsYouToTheSetupOfTheProviderInUse(t *testing.T) {
+	for _, c := range []struct{ setup, want string }{
+		{"auth mistral --import FILE", "mufradat auth mistral --import FILE"},
+		{"auth google --import KEY.json", "mufradat auth google --import KEY.json"},
+		{"", "mufradat audio"},
+	} {
+		s := snap()
+		s.ClipsMissing, s.AudioReady, s.AudioReason, s.AudioSetup = 4, false, "no key", c.setup
+		step := stepOf(Compute(s), "audio")
+		if step.Status != Skipped || step.Detail != "no key" || step.Command != c.want {
+			t.Errorf("setup %q: %+v, want command %q", c.setup, step, c.want)
+		}
+	}
+}

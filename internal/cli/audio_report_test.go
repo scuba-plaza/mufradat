@@ -86,12 +86,3 @@ func TestClipFailuresAreListedCappedAndSummarisedByKind(t *testing.T) {
 		}
 	}
 }
-
-func TestTheVoiceInUseIsDescribedWithItsRateOnlyWhenThereIsOne(t *testing.T) {
-	if got := describeVoice(clips.Voice{Provider: "mistral", Name: "voice_479"}); got != "voice_479 (mistral)" {
-		t.Errorf("%q", got)
-	}
-	if got := describeVoice(clips.Voice{Provider: "google", Name: "ar-XA-Chirp3-HD-Achernar", Rate: 0.9}); got != "ar-XA-Chirp3-HD-Achernar (google, rate 0.9)" {
-		t.Errorf("%q", got)
-	}
-}

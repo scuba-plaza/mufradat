@@ -10,6 +10,8 @@ stderr 'with ar-XA-Chirp3-HD-Achernar \(google, rate 0.9\)'
 exits 3 mufradat -C ws audio
 stderr 'no Google credentials found'
 stderr 'auth google --import KEY.json'
+exec mufradat -C ws status --json
+stdout '"command": "mufradat -C .*ws auth google --import KEY.json"'
 
 ! exec mufradat auth google --import missing.json
 stderr 'missing.json does not exist'
@@ -23,7 +25,7 @@ exec mufradat auth google
 stdout 'imported key'
 
 exec mufradat -C ws status
-stdout 'audio .*6 of 6 clips missing'
+stdout 'audio .*6 of 6 clips missing with ar-XA-Chirp3-HD-Achernar \(google, rate 0.9\)'
 stdout 'next: mufradat -C .*ws audio'
 
 exec mufradat -C ws voices list --json
@@ -46,11 +48,11 @@ stderr '6 clips wanted, 6 present, 0 to make'
 grep -count=6 'ar-XA-Chirp3-HD-Achernar' synth-calls.log
 
 exec mufradat -C ws build
-stderr '2 notes, 4 cards \(2 production\), 6 audio clips'
+stderr '2 notes, 4 cards \(2 production\), 6 audio clips with ar-XA-Chirp3-HD-Achernar \(google, rate 0.9\)'
 ! stderr 'clips are missing'
 
 exec mufradat -C ws status
-stdout 'audio .*6 clips'
+stdout 'audio .*6 clips with ar-XA-Chirp3-HD-Achernar \(google, rate 0.9\)'
 stdout 'build .*arabic-msa-core\.apkg'
 
 exec mufradat -C ws config set google.voice ar-XA-Wavenet-A

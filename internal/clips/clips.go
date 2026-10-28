@@ -26,6 +26,13 @@ func (v Voice) Named(name string) Voice {
 	return v
 }
 
+func (v Voice) Describe() string {
+	if v.Rate == 0 {
+		return v.Name + " (" + v.Provider + ")"
+	}
+	return v.Name + " (" + v.Provider + ", rate " + strconv.FormatFloat(v.Rate, 'f', -1, 64) + ")"
+}
+
 type Field string
 
 const (

@@ -7,11 +7,16 @@ stderr 'with voice_479 \(mistral\)'
 ! stderr 'rate'
 ! exists ws/audio/synth
 mistral-calls 0
+exec mufradat -C ws status
+stdout 'audio .*6 of 6 clips missing with voice_479 \(mistral\)'
 
 env MISTRAL_API_KEY=
 exits 3 mufradat -C ws audio
 stderr 'no Mistral API key found'
 stderr 'hint: set MISTRAL_API_KEY, or save the key in a file and run `mufradat -C .*ws auth mistral --import FILE`'
+exec mufradat -C ws status --json
+stdout 'no Mistral API key'
+stdout '"command": "mufradat -C .*ws auth mistral --import FILE"'
 env MISTRAL_API_KEY=wrong-key
 exits 3 mufradat -C ws audio --limit 1
 stderr 'hint: check the key with `mufradat -C .*ws doctor`'
@@ -39,7 +44,7 @@ stderr '6 clips wanted, 6 present, 0 to make'
 exec mufradat -C ws config set audio.rate 0.9
 
 exec mufradat -C ws build
-stderr '2 notes, 4 cards \(2 production\), 6 audio clips'
+stderr '2 notes, 4 cards \(2 production\), 6 audio clips with voice_479 \(mistral\)'
 
 exec mufradat -C ws config set audio.provider google
 exec mufradat -C ws audio --dry-run

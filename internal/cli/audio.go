@@ -61,7 +61,7 @@ func runAudio(ctx context.Context, a *app.App, dryRun bool, limit int) error {
 	plan := clips.NewPlan(set.Study(), voice, cs.Has)
 	r := a.Reporter()
 	r.Event("%d clips wanted, %d present, %d to make (%d characters) with %s",
-		plan.Wanted, plan.Present, len(plan.Missing), plan.Chars, describeVoice(voice))
+		plan.Wanted, plan.Present, len(plan.Missing), plan.Chars, voice.Describe())
 	if len(plan.Missing) == 0 {
 		return nil
 	}
@@ -144,13 +144,6 @@ func blockedClips(n int) string {
 
 func blockedHint(a *app.App) string {
 	return fmt.Sprintf("edit those notes, or use the Google provider with `%s config set audio.provider google`", a.CommandPrefix())
-}
-
-func describeVoice(v clips.Voice) string {
-	if v.Rate > 0 {
-		return fmt.Sprintf("%s (%s, rate %g)", v.Name, v.Provider, v.Rate)
-	}
-	return fmt.Sprintf("%s (%s)", v.Name, v.Provider)
 }
 
 func hasVoice(voices []clips.VoiceInfo, name string) bool {

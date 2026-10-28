@@ -195,3 +195,18 @@ func TestKeysListsOnlyClipFiles(t *testing.T) {
 		t.Fatalf("keys %v, %v", keys, err)
 	}
 }
+
+func TestAVoiceDescribesItselfWithItsProviderAndOnlyAGoogleRate(t *testing.T) {
+	for _, c := range []struct {
+		voice Voice
+		want  string
+	}{
+		{Voice{Provider: "mistral", Name: "voice_479"}, "voice_479 (mistral)"},
+		{Voice{Provider: "google", Name: "ar-XA-Chirp3-HD-Achernar", Rate: 0.9}, "ar-XA-Chirp3-HD-Achernar (google, rate 0.9)"},
+		{Voice{Provider: "google", Name: "ar-XA-Wavenet-A", Rate: 1}, "ar-XA-Wavenet-A (google, rate 1)"},
+	} {
+		if got := c.voice.Describe(); got != c.want {
+			t.Errorf("Describe() = %q, want %q", got, c.want)
+		}
+	}
+}

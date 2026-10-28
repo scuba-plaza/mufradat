@@ -109,6 +109,7 @@ func (a *App) Vocabulary() (*vocab.Checker, error) {
 
 type BuildPlan struct {
 	Package     *apkg.Package
+	Voice       clips.Voice
 	Summary     deck.Summary
 	Fingerprint string
 	OutPath     string
@@ -177,7 +178,7 @@ func (a *App) PlanBuild(outOverride string) (BuildPlan, error) {
 	if out == "" {
 		out = filepath.Join(ws.OutDir(), deck.Slug(cfg.DeckName)+".apkg")
 	}
-	return BuildPlan{Package: pkg, Summary: sum, Fingerprint: fp, OutPath: out}, nil
+	return BuildPlan{Package: pkg, Voice: voice, Summary: sum, Fingerprint: fp, OutPath: out}, nil
 }
 
 func (a *App) WriteBuild(plan BuildPlan) error {
@@ -277,12 +278,14 @@ func (a *App) fillAudio(snap *status.Snapshot, set *note.Set) error {
 		return err
 	}
 	plan := clips.NewPlan(set.Study(), voice, cs.Has)
+	snap.AudioVoice = voice.Describe()
 	snap.ClipsWanted = plan.Wanted
 	snap.ClipsMissing = len(plan.Missing)
 	reason := a.audioNotReady()
 	snap.AudioReady = reason == "" || len(plan.Missing) == 0
 	if !snap.AudioReady {
 		snap.AudioReason = reason
+		snap.AudioSetup = audioSetupCommand(voice.Provider)
 	}
 	return nil
 }
@@ -310,4 +313,11 @@ func (a *App) audioNotReady() string {
 		return "no Mistral API key"
 	}
 	return err.Error()
+}
+
+func audioSetupCommand(provider string) string {
+	if provider == config.ProviderGoogle {
+		return "auth google --import KEY.json"
+	}
+	return "auth mistral --import FILE"
 }
