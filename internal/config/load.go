@@ -133,7 +133,11 @@ func SetFile(path, key, value string) error {
 	if err := check.Validate(); err != nil {
 		return fmt.Errorf("%s: %w", key, err)
 	}
-	return fsutil.WriteFileAtomic(path, out, 0o644)
+	perm := os.FileMode(0o644)
+	if check.Mistral.APIKey != "" {
+		perm = 0o600
+	}
+	return fsutil.WriteFileAtomic(path, out, perm)
 }
 
 func assign(tree map[string]any, path []string, v any) {

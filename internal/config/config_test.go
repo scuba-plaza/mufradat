@@ -277,3 +277,33 @@ func TestSecretKeysAreMasked(t *testing.T) {
 		t.Errorf("Mask of an empty value = %q", got)
 	}
 }
+
+func TestAFileThatHoldsTheMistralKeyIsReadableByItsOwnerOnly(t *testing.T) {
+	mode := func(path string) os.FileMode {
+		t.Helper()
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return info.Mode().Perm()
+	}
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := SetFile(path, "audio.provider", "google"); err != nil {
+		t.Fatal(err)
+	}
+	if got := mode(path); got != 0o644 {
+		t.Errorf("a file without a secret keeps the ordinary mode: %v", got)
+	}
+	if err := SetFile(path, "mistral.api_key", "sk-test-key"); err != nil {
+		t.Fatal(err)
+	}
+	if got := mode(path); got != 0o600 {
+		t.Errorf("a file with the API key in it must be private: %v", got)
+	}
+	if err := SetFile(path, "audio.provider", "mistral"); err != nil {
+		t.Fatal(err)
+	}
+	if got := mode(path); got != 0o600 {
+		t.Errorf("changing another setting must not make the key public again: %v", got)
+	}
+}
