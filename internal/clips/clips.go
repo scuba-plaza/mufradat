@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -109,6 +108,5 @@ func (s *Store) Keys() ([]string, error) {
 		keys = append(keys, strings.TrimSuffix(d.Name(), ".mp3"))
 		return nil
 	})
-	slices.Sort(keys)
 	return keys, err
 }

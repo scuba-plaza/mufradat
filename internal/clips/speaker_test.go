@@ -41,10 +41,11 @@ func TestVoiceInfoMatchesAnySpellingTheUserMayHaveWritten(t *testing.T) {
 			t.Errorf("%q should not match", s)
 		}
 	}
-	if !(VoiceInfo{Ref: "ar-XA-Wavenet-A"}).Is("ar-XA-Wavenet-A") {
+	google := VoiceInfo{Ref: "ar-XA-Wavenet-A", Name: "ar-XA-Wavenet-A"}
+	if !google.Is("ar-XA-Wavenet-A") {
 		t.Error("a voice without aliases still matches its own reference")
 	}
-	if (VoiceInfo{Ref: "ar-XA-Wavenet-A"}).Is("ar-xa-wavenet-a") {
+	if google.Is("ar-xa-wavenet-a") {
 		t.Error("references are case sensitive; only the display name is matched loosely")
 	}
 }

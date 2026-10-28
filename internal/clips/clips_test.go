@@ -25,8 +25,21 @@ func TestKeyDependsOnProviderVoiceRateAndText(t *testing.T) {
 			t.Errorf("changing the %s must change the key", name)
 		}
 	}
-	if len(base) != keyLength {
-		t.Errorf("key length = %d", len(base))
+}
+
+func TestKeysAreStableBecauseSavedClipsAreFoundByThem(t *testing.T) {
+	cases := []struct {
+		voice Voice
+		text  string
+		want  string
+	}{
+		{Voice{Provider: "mistral", Name: "voice_479"}, "كِتَاب", "zmyf4b53zsvjn7qi"},
+		{Voice{Provider: "google", Name: "ar-XA-Chirp3-HD-Achernar", Rate: 0.9}, "كِتَاب", "cyuluc46y2sc46fx"},
+	}
+	for _, tc := range cases {
+		if got := Key(tc.voice, tc.text); got != tc.want {
+			t.Errorf("Key(%+v) = %s, want %s", tc.voice, got, tc.want)
+		}
 	}
 }
 
@@ -162,5 +175,23 @@ func TestSwitchingProviderAndBackFindsTheOriginalClips(t *testing.T) {
 	}
 	if got := mustRead(t, s.Path(Key(google, "x"))); got != "clip-google" {
 		t.Errorf("switching back returned %q", got)
+	}
+}
+
+func TestKeysListsOnlyClipFiles(t *testing.T) {
+	dir := t.TempDir()
+	store := NewStore(dir)
+	key := Key(Voice{Provider: "mistral", Name: "v"}, "x")
+	if err := store.Put(key, []byte("audio")); err != nil {
+		t.Fatal(err)
+	}
+	for _, stray := range []string{filepath.Join(dir, key[:2], key+".mp3.tmp"), filepath.Join(dir, "notes.txt")} {
+		if err := os.WriteFile(stray, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	keys, err := store.Keys()
+	if err != nil || !slices.Equal(keys, []string{key}) {
+		t.Fatalf("keys %v, %v", keys, err)
 	}
 }

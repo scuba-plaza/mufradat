@@ -4,9 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/scuba-plaza/mufradat/internal/note"
 )
@@ -231,5 +235,78 @@ func TestIsBlockedLooksThroughWrappedErrors(t *testing.T) {
 	}
 	if IsBlocked(errors.New("flagged")) || IsBlocked(nil) {
 		t.Error("only errors that say they are blocks count")
+	}
+}
+
+type barrierSynth struct {
+	need    int
+	mu      sync.Mutex
+	arrived int
+	release chan struct{}
+}
+
+func (b *barrierSynth) Synthesize(ctx context.Context, item Item, v Voice) ([]byte, error) {
+	b.mu.Lock()
+	b.arrived++
+	if b.arrived == b.need {
+		close(b.release)
+	}
+	b.mu.Unlock()
+	select {
+	case <-b.release:
+		return []byte("audio"), nil
+	case <-time.After(2 * time.Second):
+		return nil, errors.New("the clips were not made at the same time")
+	}
+}
+
+func TestSynthesizeMakesAsManyClipsAtOnceAsAsked(t *testing.T) {
+	store := NewStore(t.TempDir())
+	v := Voice{Name: "v1"}
+	plan := NewPlan(notesFor("كِتَاب", "قَلَم", "بَيْت"), v, store.Has)
+	res, err := Synthesize(context.Background(), plan, store, &barrierSynth{need: 3, release: make(chan struct{})}, SynthOptions{Concurrency: 3})
+	if err != nil || res.Made != 3 || len(res.Failed) != 0 {
+		t.Fatalf("made %d, failed %v, err %v", res.Made, res.Failed, err)
+	}
+}
+
+type plainErr struct{ blocked, fatal bool }
+
+func (plainErr) Error() string   { return "refused" }
+func (e plainErr) Blocked() bool { return e.blocked }
+func (e plainErr) Fatal() bool   { return e.fatal }
+func failingEvery(e error) *fakeSynth {
+	return &fakeSynth{fail: map[string]error{"كِتَاب": e, "قَلَم": e, "بَيْت": e}}
+}
+
+func TestSynthesizeTreatsErrorsThatDenyBeingBlockedOrFatalAsOrdinaryFailures(t *testing.T) {
+	store := NewStore(t.TempDir())
+	v := Voice{Name: "v1"}
+	plan := NewPlan(notesFor("كِتَاب", "قَلَم", "بَيْت"), v, store.Has)
+	synth := failingEvery(plainErr{})
+	res, err := Synthesize(context.Background(), plan, store, synth, SynthOptions{Concurrency: 1})
+	if err != nil {
+		t.Fatalf("an error that says it is not fatal must not stop the run: %v", err)
+	}
+	if len(res.Failed) != 3 || len(res.Blocked) != 0 || len(synth.calls) != 3 {
+		t.Fatalf("failed %d, blocked %d, attempted %d", len(res.Failed), len(res.Blocked), len(synth.calls))
+	}
+}
+
+func TestSynthesizeStopsWhenAClipCannotBeSaved(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "audio")
+	if err := os.WriteFile(dir, []byte("not a directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStore(dir)
+	v := Voice{Name: "v1"}
+	plan := NewPlan(notesFor("كِتَاب", "قَلَم", "بَيْت"), v, store.Has)
+	synth := &fakeSynth{}
+	res, err := Synthesize(context.Background(), plan, store, synth, SynthOptions{Concurrency: 1})
+	if err == nil || !strings.Contains(err.Error(), "saving ") || !strings.HasSuffix(strings.SplitN(err.Error(), ":", 2)[0], ".mp3") {
+		t.Fatalf("error %v should name the clip that could not be saved", err)
+	}
+	if len(synth.calls) != 1 || res.Made != 0 || len(res.Failed) != 0 {
+		t.Fatalf("attempted %d, made %d, failed %v: a full disk would fail every clip, so the run must stop", len(synth.calls), res.Made, res.Failed)
 	}
 }

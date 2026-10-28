@@ -31,7 +31,7 @@ func (v VoiceInfo) Is(s string) bool {
 			return true
 		}
 	}
-	return v.Name != "" && v.Name != v.Ref && strings.EqualFold(s, v.Name)
+	return v.Name != v.Ref && strings.EqualFold(s, v.Name)
 }
 
 type Speaker interface {
