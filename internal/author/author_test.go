@@ -384,13 +384,20 @@ func TestPinnedTargetRejectsAnotherEntry(t *testing.T) {
 
 func TestExampleLengthGate(t *testing.T) {
 	tg := Target{Draft: note.Note{Lemma: "كِتَاب", POS: note.Noun}}
-	short := note.Note{Lemma: "كِتَاب", POS: note.Noun, Example: "[كِتَابٌ] جَدِيدٌ."}
-	if err := Gate(tg, short); err == nil {
-		t.Fatal("two words accepted")
+	example := func(words int) note.Note {
+		return note.Note{Lemma: "كِتَاب", POS: note.Noun, Example: "[كِتَابٌ] " + strings.TrimSpace(strings.Repeat("جَدِيدٌ ", words-1)) + "."}
 	}
-	long := note.Note{Lemma: "كِتَاب", POS: note.Noun, Example: "[كِتَابٌ] " + strings.Repeat("جَدِيدٌ ", 12)}
-	if err := Gate(tg, long); err == nil {
-		t.Fatal("thirteen words accepted")
+	for words, ok := range map[int]bool{1: false, 2: false, 3: true, 4: true, 11: true, 12: true, 13: false, 20: false} {
+		err := Gate(tg, example(words))
+		if ok && err != nil {
+			t.Errorf("%d words rejected: %v", words, err)
+		}
+		if !ok && err == nil {
+			t.Errorf("%d words accepted", words)
+		}
+	}
+	if err := Gate(tg, example(2)); err == nil || err.Error() != "the example has 2 words; write 3 to 9" {
+		t.Errorf("the retry prompt must tell the model the target length: %v", err)
 	}
 	if err := Gate(tg, note.Note{Lemma: "كِتَاب", POS: note.Noun, Example: goodExample}); err != nil {
 		t.Fatal(err)
