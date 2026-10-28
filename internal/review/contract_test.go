@@ -204,3 +204,54 @@ func TestThePageAsksForTheRewriteButtonWithTheFlagTheServerSends(t *testing.T) {
 		t.Errorf("web/app.js never reads v.%s, so the Ask button would not appear", flag)
 	}
 }
+
+var (
+	jsTones   = regexp.MustCompile(`(?s)export const TONES = \{(.*?)\};`)
+	jsToneKey = regexp.MustCompile(`(\w+):\s*'\w+'`)
+	cssTone   = regexp.MustCompile(`\.tone-(\w+)\s*\{`)
+)
+
+func TestEveryToneTheServerSendsIsOneThePageKnowsAndStyles(t *testing.T) {
+	labels, err := os.ReadFile("web/labels.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := jsTones.FindSubmatch(labels)
+	if block == nil {
+		t.Fatal("web/labels.js has no TONES table")
+	}
+	known := map[string]bool{}
+	for _, m := range jsToneKey.FindAllSubmatch(block[1], -1) {
+		known[string(m[1])] = true
+	}
+	css, err := os.ReadFile("web/app.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	styled := map[string]bool{"info": true, "good": true}
+	for _, m := range cssTone.FindAllSubmatch(css, -1) {
+		styled[string(m[1])] = true
+	}
+
+	sent := map[string]bool{}
+	for _, file := range []string{"session.go", "server.go", "compare.go"} {
+		source, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range regexp.MustCompile(`(?:Tone:\s*|[nN]oticeTone\s*=\s*(?:[^,\n]*,\s*)?)"([a-z]+)"`).FindAllSubmatch(source, -1) {
+			sent[string(m[1])] = true
+		}
+	}
+	if len(sent) < 5 {
+		t.Fatalf("found only the tones %v in the Go sources; the pattern no longer matches how they are written", sent)
+	}
+	for tone := range sent {
+		if !known[tone] {
+			t.Errorf("the server sends the tone %q but web/labels.js TONES drops it, so the page shows it as info", tone)
+		}
+		if !styled[tone] {
+			t.Errorf("the server sends the tone %q but web/app.css has no .tone-%s rule", tone, tone)
+		}
+	}
+}

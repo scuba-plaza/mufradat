@@ -25,7 +25,7 @@ export const FIX_LABEL = { catt: "Use CATT's ending", camel: "Use CAMeL's ending
 export const PLAY_KEY = { word: 'w', forms: 'f', sentence: 's' };
 
 /** @type {Record<string, string>} */
-export const TONES = { info: 'info', good: 'good', bad: 'bad', mistral: 'mistral', audio: 'audio' };
+export const TONES = { info: 'info', good: 'good', bad: 'bad', warn: 'warn', mistral: 'mistral', audio: 'audio' };
 
 /**
  * @param {string | undefined} tone

@@ -55,10 +55,35 @@ test('editBody trims, drops empty forms and sends only editable fields', () => {
   });
 });
 
-test('labels', () => {
+test('metaOf joins the part of speech, gender, verb form and rank or origin', () => {
   assert.equal(metaOf({ pos: 'adj', gender: 'm', rank: 12 }), 'adjective · masc. · #12');
   assert.equal(metaOf({ pos: 'verb', verb_form: 'II', origin: 'named' }), 'verb · form II · named');
-  assert.equal(messageTone('good'), 'good');
-  assert.equal(messageTone('warn'), 'info');
+  assert.equal(metaOf({ pos: 'noun', gender: 'f', rank: 3 }), 'noun · fem. · #3');
+  assert.equal(metaOf({ pos: 'noun', gender: 'm+f', origin: 'ranked' }), 'noun · masc./fem. · ranked');
+  assert.equal(metaOf({ pos: 'noun', gender: 'x', rank: 1 }), 'noun · #1');
+  assert.equal(metaOf({ pos: 'banana' }), 'banana');
+  assert.equal(metaOf({ pos: 'prep', rank: 0, origin: 'named' }), 'preposition · named');
+});
+
+test('messageTone keeps every tone the server sends and shows anything else as info', () => {
+  for (const tone of ['info', 'good', 'bad', 'warn', 'mistral', 'audio']) {
+    assert.equal(messageTone(tone), tone);
+  }
+  assert.equal(messageTone('banana'), 'info');
+  assert.equal(messageTone(''), 'info');
   assert.equal(messageTone(undefined), 'info');
+});
+
+test('composeExample finds a word at the very start of a sentence that moved under it', () => {
+  const parts = { sentence: 'الْكِتَابَ جَدِيدٌ.', word: 'الْكِتَابَ', at: 7 };
+  assert.equal(composeExample(parts), '[الْكِتَابَ] جَدِيدٌ.');
+});
+
+test('editBody keeps half-filled forms and leaves the part of speech to the server to judge', () => {
+  const body = editBody(
+    { id: 'n_aaaaaaaaaaa2', rank: 0, origin: 'named', lemma: 'كِتَاب', pos: '', english: 'book', forms: [{ label: 'pl.', ar: '' }, { label: '', ar: 'كُتُب' }, { label: ' ', ar: ' ' }], example: '', example_en: '' },
+    '',
+  );
+  assert.deepEqual(body.forms, [{ label: 'pl.', ar: '' }, { label: '', ar: 'كُتُب' }]);
+  assert.equal(body.pos, '');
 });
