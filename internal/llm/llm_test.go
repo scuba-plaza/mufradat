@@ -113,9 +113,9 @@ func TestRecordingSinksUsageOnSuccessOnly(t *testing.T) {
 
 func TestUsageAddSumsCountersAndMergesModelsSorted(t *testing.T) {
 	var u Usage
-	u.Add(Usage{Calls: 1, Input: 5, CacheRead: 2, Models: []string{"b"}})
+	u.Add(Usage{Calls: 1, Input: 5, Output: 3, CacheRead: 2, Models: []string{"b"}})
 	u.Add(Usage{Calls: 2, Output: 7, CacheRead: 3, Models: []string{"a", "b"}})
-	want := Usage{Calls: 3, Input: 5, Output: 7, CacheRead: 5, Models: []string{"a", "b"}}
+	want := Usage{Calls: 3, Input: 5, Output: 10, CacheRead: 5, Models: []string{"a", "b"}}
 	if !reflect.DeepEqual(u, want) {
 		t.Fatalf("got %+v, want %+v", u, want)
 	}
@@ -164,5 +164,97 @@ func TestRetryableMeansTemporaryOnly(t *testing.T) {
 	}
 	if !AsAuth(fmt.Errorf("wrapped: %w", &AuthError{})) || AsAuth(&CallError{}) {
 		t.Error("AsAuth must see through wrapping and only match auth errors")
+	}
+}
+
+func TestRetryingDoesNotRetryOnceTheContextIsCancelled(t *testing.T) {
+	next := &scripted{errs: []error{&TransientError{"x"}, &TransientError{"x"}}}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	var waits []time.Duration
+	r := Retrying{Next: next, Attempts: 3, Backoff: time.Second, MaxWait: time.Minute, Sleep: noSleep(&waits)}
+	_, err := r.Complete(ctx, Request{})
+	var transient *TransientError
+	if !errors.As(err, &transient) || next.calls != 1 || len(waits) != 0 {
+		t.Fatalf("err %v, %d calls, waits %v: the original error must come back without a retry", err, next.calls, waits)
+	}
+}
+
+func TestRetryingAcceptsAWaitEqualToMaxWait(t *testing.T) {
+	next := &scripted{errs: []error{&RateLimitedError{RetryAfter: time.Minute}}}
+	var waits []time.Duration
+	r := Retrying{Next: next, Attempts: 2, Backoff: time.Second, MaxWait: time.Minute, Sleep: noSleep(&waits)}
+	if _, err := r.Complete(context.Background(), Request{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(waits) != 1 || waits[0] != time.Minute || next.calls != 2 {
+		t.Fatalf("waits %v, calls %d", waits, next.calls)
+	}
+}
+
+func TestRetryingBacksOffWhenARateLimitNamesNoWait(t *testing.T) {
+	next := &scripted{errs: []error{&RateLimitedError{Message: "slow down"}}}
+	var waits []time.Duration
+	r := Retrying{Next: next, Attempts: 2, Backoff: time.Second, MaxWait: time.Minute, Sleep: noSleep(&waits)}
+	if _, err := r.Complete(context.Background(), Request{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(waits) != 1 || waits[0] < time.Second || waits[0] > 1500*time.Millisecond {
+		t.Fatalf("waits %v, want the 1s backoff plus up to 500ms of jitter", waits)
+	}
+}
+
+func TestRetryingTellsOnWaitAboutEachRetry(t *testing.T) {
+	first, second := &TransientError{"a"}, &RateLimitedError{RetryAfter: 5 * time.Second, Message: "b"}
+	next := &scripted{errs: []error{first, second}}
+	var waits []time.Duration
+	var told []error
+	var toldWaits []time.Duration
+	r := Retrying{Next: next, Attempts: 3, Backoff: time.Second, MaxWait: time.Minute, Sleep: noSleep(&waits),
+		OnWait: func(d time.Duration, err error) { toldWaits = append(toldWaits, d); told = append(told, err) }}
+	if _, err := r.Complete(context.Background(), Request{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(told) != 2 || told[0] != error(first) || told[1] != error(second) || !reflect.DeepEqual(toldWaits, waits) {
+		t.Fatalf("told %v with waits %v, slept %v", told, toldWaits, waits)
+	}
+}
+
+func TestRecordingStoresUTCWholeSecondsAndReportsASinkFailure(t *testing.T) {
+	local := time.FixedZone("UTC+1", 3600)
+	now := time.Date(2026, 3, 4, 6, 6, 7, 900, local)
+	var got Record
+	rec := Recording{Next: &scripted{}, Now: func() time.Time { return now },
+		Sink: func(r Record) error { got = r; return nil }}
+	if _, err := rec.Complete(context.Background(), Request{}); err != nil {
+		t.Fatal(err)
+	}
+	if got.Time.Location() != time.UTC || got.Time.Nanosecond() != 0 || !got.Time.Equal(time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC)) {
+		t.Errorf("recorded %v", got.Time)
+	}
+
+	boom := errors.New("disk full")
+	failing := Recording{Next: &scripted{}, Now: func() time.Time { return now }, Sink: func(Record) error { return boom }}
+	resp, err := failing.Complete(context.Background(), Request{})
+	if !errors.Is(err, boom) {
+		t.Fatalf("a sink failure must be reported, got %v", err)
+	}
+	if resp.Usage.Calls != 1 {
+		t.Errorf("the answer is still returned with the failure: %+v", resp)
+	}
+}
+
+func TestRetryingSpreadsItsBackoffWithJitter(t *testing.T) {
+	r := Retrying{Backoff: time.Second}
+	seen := map[time.Duration]bool{}
+	for range 20 {
+		d := r.delay(1, &TransientError{})
+		if d < time.Second || d > 1500*time.Millisecond {
+			t.Fatalf("delay %v outside 1s..1.5s", d)
+		}
+		seen[d] = true
+	}
+	if len(seen) < 2 {
+		t.Error("twenty retries waited exactly the same time: clients would retry in lockstep")
 	}
 }
