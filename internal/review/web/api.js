@@ -40,10 +40,10 @@ export async function loadState(id) {
 }
 
 /**
- * @returns {Promise<{ voice: string, voices: import('./types.js').Voice[] }>}
+ * @returns {Promise<import('./types.js').VoiceList>}
  */
 export async function loadVoices() {
-  return /** @type {{ voice: string, voices: import('./types.js').Voice[] }} */ (await request('api/voices'));
+  return /** @type {import('./types.js').VoiceList} */ (await request('api/voices'));
 }
 
 /**
@@ -81,12 +81,10 @@ export function audioURL(id, kind) {
 }
 
 /**
- * @returns {Promise<{ voice: string, samples: import('./types.js').Sample[], voices: import('./types.js').Voice[] }>}
+ * @returns {Promise<import('./types.js').Comparison>}
  */
 export async function loadComparison() {
-  return /** @type {{ voice: string, samples: import('./types.js').Sample[], voices: import('./types.js').Voice[] }} */ (
-    await request('api/compare')
-  );
+  return /** @type {import('./types.js').Comparison} */ (await request('api/compare'));
 }
 
 /**

@@ -3,7 +3,7 @@ import { $, arabic, el, plural } from './dom.js';
 import { banner, cardView, flagView, notesWord, previewCard, proposalView, tally } from './cards.js';
 import { editBody, editorView } from './editor.js';
 import { composeExample, splitExample } from './example.js';
-import { FIX_LABEL, KEY_LABEL, PLAY_KEY, messageTone } from './labels.js';
+import { FIX_LABEL, KEY_LABEL, PLAY_KEY, messageTone, voiceName } from './labels.js';
 
 /**
  * @typedef {{
@@ -665,7 +665,7 @@ function clipsView(e) {
  * @returns {string}
  */
 function voiceLabel(v) {
-  const name = v.name.replace(/^ar-XA-/, '');
+  const name = voiceName(v);
   return v.gender ? name + ' · ' + v.gender.toLowerCase() : name;
 }
 

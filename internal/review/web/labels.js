@@ -46,3 +46,26 @@ export function metaOf(note) {
   parts.push(note.rank ? '#' + note.rank : note.origin || '');
   return parts.filter(Boolean).join(' · ');
 }
+
+/**
+ * @param {{ name: string, label?: string }} v
+ * @returns {string}
+ */
+export function voiceName(v) {
+  return v.label || v.name;
+}
+
+/**
+ * @param {import('./types.js').Voice[]} voices
+ * @returns {{ tier: string, voices: import('./types.js').Voice[] }[]}
+ */
+export function groupVoices(voices) {
+  const tiered = voices.some((v) => v.tier);
+  /** @type {Map<string, import('./types.js').Voice[]>} */
+  const groups = new Map();
+  for (const v of voices) {
+    const tier = v.tier || (tiered ? 'other' : '');
+    groups.set(tier, [...(groups.get(tier) || []), v]);
+  }
+  return [...groups].map(([tier, members]) => ({ tier, voices: members }));
+}

@@ -1,5 +1,5 @@
 import { $, arabic, el } from './dom.js';
-import { messageTone } from './labels.js';
+import { groupVoices, messageTone, voiceName } from './labels.js';
 import * as api from './api.js';
 
 /** @typedef {{ voice: string, samples: import('./types.js').Sample[], voices: import('./types.js').Voice[] }} Comparison */
@@ -76,14 +76,8 @@ function render() {
   const texts = el('section', 'sample-text');
   for (const s of view.samples) texts.append(el('span', 'kind', s.label), arabic('', [{ t: s.text }]));
   const children = [texts];
-  /** @type {Map<string, import('./types.js').Voice[]>} */
-  const tiers = new Map();
-  for (const v of view.voices) {
-    const tier = v.tier || 'other';
-    tiers.set(tier, [...(tiers.get(tier) || []), v]);
-  }
-  for (const [tier, voices] of tiers) {
-    children.push(el('h2', 'tier', tier));
+  for (const { tier, voices } of groupVoices(view.voices)) {
+    if (tier) children.push(el('h2', 'tier', tier));
     for (const v of voices) {
       const plays = el('div', 'plays');
       for (const s of view.samples) {
@@ -97,7 +91,7 @@ function render() {
       choose.disabled = v.name === view.voice;
       choose.addEventListener('click', () => use(v.name));
       children.push(el('div', 'voice' + (v.name === view.voice ? ' current' : ''),
-        el('span', 'name', v.name.replace(/^ar-XA-/, '') + (genderOf(v) ? ' · ' + genderOf(v) : '')), plays, choose));
+        el('span', 'name', voiceName(v) + (genderOf(v) ? ' · ' + genderOf(v) : '')), plays, choose));
     }
   }
   root.replaceChildren(...children);

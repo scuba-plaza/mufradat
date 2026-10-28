@@ -259,16 +259,19 @@ func (v reviewVoices) List(ctx context.Context) ([]review.VoiceOption, error) {
 	if err != nil {
 		return nil, v.app.SpeechFailure(err)
 	}
-	google := v.app.verifyConfig().Audio.Provider == config.ProviderGoogle
+	return voiceOptions(v.app.verifyConfig().Audio.Provider, voices), nil
+}
+
+func voiceOptions(provider string, voices []clips.VoiceInfo) []review.VoiceOption {
 	out := make([]review.VoiceOption, 0, len(voices))
 	for _, vi := range voices {
 		opt := review.VoiceOption{Name: vi.Ref, Label: vi.Name, Gender: vi.Gender}
-		if google {
+		if provider == config.ProviderGoogle {
 			opt.Label, opt.Tier = googleVoiceLabel(vi.Ref)
 		}
 		out = append(out, opt)
 	}
-	return out, nil
+	return out
 }
 
 func googleVoiceLabel(name string) (label, tier string) {
