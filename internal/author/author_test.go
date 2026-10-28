@@ -614,3 +614,80 @@ func TestVocabularyGateIsOffWithoutAllowRank(t *testing.T) {
 		t.Fatalf("res %+v err %v ceilings %v", res, err, vocabulary.ceilings)
 	}
 }
+
+func rankedWorld(t *testing.T, rows string, lemmas ...*lexicon.Lemma) (*note.Set, *ranking.List, *lexicon.Index) {
+	t.Helper()
+	list, err := ranking.Parse(strings.NewReader("rank\tid\tpos\tgloss\n" + rows))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return note.NewSet(nil), list, lexicon.NewIndex(lemmas)
+}
+
+func TestNextRankedOffersTheLastRankAndSkipsAnEntryItCannotDraft(t *testing.T) {
+	set, list, ix := rankedWorld(t, "1\tرَمْز\tsymbol\tsign\n2\tكِتَاب\tnoun\tbook\n3\tقَلَم\tnoun\tpen\n",
+		lemma(entry("رَمْز", "symbol", "sign")), lemma(entry("كِتَاب", "noun", "book")), lemma(entry("قَلَم", "noun", "pen")))
+	var got []string
+	for _, tg := range NextRanked(set, list, ix, 10) {
+		got = append(got, fmt.Sprintf("%d:%s", tg.Draft.Rank, tg.Draft.Lemma))
+	}
+	if strings.Join(got, " ") != "2:كِتَاب 3:قَلَم" {
+		t.Fatalf("targets %v: the entry with no usable part of speech is skipped and the last rank is offered", got)
+	}
+}
+
+func TestNextRankedShowsTheModelAtMostThreeUsableEntriesOfALemma(t *testing.T) {
+	main := entry("عَيْن", "noun", "eye")
+	other := entry("عَيْن", "verb", "to appoint")
+	third := entry("عَيْن", "adj", "chosen")
+	person := &lexicon.Entry{Title: "عين", Pos: "name", Canonical: "عَيْن", Senses: []lexicon.Sense{{Gloss: "Ayn", MSA: true}}}
+	dialect := &lexicon.Entry{Title: "عين", Pos: "noun", Canonical: "عَيْن", Senses: []lexicon.Sense{{Gloss: "spring (dialect)", MSA: false}}}
+	fourth := entry("عَيْن", "adv", "indeed")
+	set, list, ix := rankedWorld(t, "1\tعَيْن\tnoun\teye\n", &lexicon.Lemma{ID: "عَيْن", Entries: []*lexicon.Entry{main, person, other, dialect, third, fourth}})
+	targets := NextRanked(set, list, ix, 5)
+	if len(targets) != 1 {
+		t.Fatalf("targets %d", len(targets))
+	}
+	var pos []string
+	for _, e := range targets[0].Entries {
+		pos = append(pos, e.Pos)
+	}
+	if strings.Join(pos, ",") != "noun,verb,adj" {
+		t.Fatalf("entries shown to the model %v: names and non-MSA entries are left out and three is the most", pos)
+	}
+}
+
+func TestPickExamplesFillsUpWithEachNoteOnce(t *testing.T) {
+	notes := []note.Note{
+		{ID: "n_aaaaaaaaaaaa", Rank: 1, POS: note.Noun},
+		{ID: "n_bbbbbbbbbbbb", Rank: 2, POS: note.Noun},
+		{ID: "n_cccccccccccc", Rank: 3, POS: note.Verb},
+		{ID: "n_dddddddddddd", Rank: 4, POS: note.Noun},
+	}
+	var ids []string
+	for _, n := range PickExamples(notes, 4) {
+		ids = append(ids, n.ID)
+	}
+	if strings.Join(ids, ",") != "n_aaaaaaaaaaaa,n_bbbbbbbbbbbb,n_cccccccccccc,n_dddddddddddd" {
+		t.Fatalf("picked %v: every note appears once, in study order", ids)
+	}
+	if got := PickExamples(notes, 10); len(got) != 4 {
+		t.Fatalf("asking for more than there are gives %d", len(got))
+	}
+}
+
+func TestSelectorEntryNumbersStartAtOneAndMustExist(t *testing.T) {
+	w := newWorld(t)
+	cands := w.ix.Find("ماء")
+	if c, err := (Selector{Pick: 1}).Select("ماء", cands); err != nil || c.Main().Pos != "noun" {
+		t.Fatalf("--pick 1: %+v, %v", c.Main(), err)
+	}
+	if c, err := (Selector{Entries: map[string]int{"ماء": 1}}).Select("ماء", cands); err != nil || c.Main().Pos != "noun" {
+		t.Fatalf("--entry ماء#1: %+v, %v", c.Main(), err)
+	}
+	for n, want := range map[int]string{0: "ماء has 2 entries; there is no entry 0", 3: "ماء has 2 entries; there is no entry 3", -1: "ماء has 2 entries; there is no entry -1"} {
+		if _, err := (Selector{Entries: map[string]int{"ماء": n}}).Select("ماء", cands); err == nil || err.Error() != want {
+			t.Errorf("entry %d: %v, want %q", n, err, want)
+		}
+	}
+}
