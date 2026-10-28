@@ -13,6 +13,7 @@ import (
 	"github.com/scuba-plaza/mufradat/internal/fsutil"
 	"github.com/scuba-plaza/mufradat/internal/googleauth"
 	"github.com/scuba-plaza/mufradat/internal/lexicon"
+	"github.com/scuba-plaza/mufradat/internal/mistral"
 	"github.com/scuba-plaza/mufradat/internal/note"
 	"github.com/scuba-plaza/mufradat/internal/ranking"
 	"github.com/scuba-plaza/mufradat/internal/status"
@@ -42,7 +43,21 @@ func (a *App) Voice() (clips.Voice, error) {
 	if err != nil {
 		return clips.Voice{}, err
 	}
-	return clips.Voice{Name: cfg.Audio.Voice, Rate: cfg.Audio.Rate}, nil
+	switch cfg.Audio.Provider {
+	case config.ProviderGoogle:
+		return clips.Voice{Provider: config.ProviderGoogle, Name: cfg.Google.Voice, Rate: cfg.Audio.Rate}, nil
+	case config.ProviderMistral:
+		return clips.Voice{Provider: config.ProviderMistral, Name: cfg.Mistral.Voice}, nil
+	}
+	return clips.Voice{}, fmt.Errorf("audio.provider %q is not supported", cfg.Audio.Provider)
+}
+
+func (a *App) VoiceSetting() (string, error) {
+	cfg, err := a.Config()
+	if err != nil {
+		return "", err
+	}
+	return cfg.Audio.Provider + ".voice", nil
 }
 
 func (a *App) Ranking() (*ranking.List, error) {
@@ -264,13 +279,35 @@ func (a *App) fillAudio(snap *status.Snapshot, set *note.Set) error {
 	plan := clips.NewPlan(set.Study(), voice, cs.Has)
 	snap.ClipsWanted = plan.Wanted
 	snap.ClipsMissing = len(plan.Missing)
-	_, credErr := a.GoogleCredentials()
-	snap.AudioReady = credErr == nil || len(plan.Missing) == 0
+	reason := a.audioNotReady()
+	snap.AudioReady = reason == "" || len(plan.Missing) == 0
 	if !snap.AudioReady {
-		snap.AudioReason = "no Google credentials"
-		if !errors.Is(credErr, googleauth.ErrNone) {
-			snap.AudioReason = credErr.Error()
-		}
+		snap.AudioReason = reason
 	}
 	return nil
+}
+
+func (a *App) audioNotReady() string {
+	cfg, err := a.Config()
+	if err != nil {
+		return err.Error()
+	}
+	if cfg.Audio.Provider == config.ProviderGoogle {
+		_, err := a.GoogleCredentials()
+		switch {
+		case err == nil:
+			return ""
+		case errors.Is(err, googleauth.ErrNone):
+			return "no Google credentials"
+		}
+		return err.Error()
+	}
+	_, err = a.MistralKey()
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, mistral.ErrNoKey):
+		return "no Mistral API key"
+	}
+	return err.Error()
 }

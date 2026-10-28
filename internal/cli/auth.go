@@ -14,7 +14,40 @@ func newAuth(a *app.App) *cobra.Command {
 		Use:   "auth",
 		Short: "Set up the accounts the tool talks to",
 	}
-	cmd.AddCommand(newAuthGoogle(a))
+	cmd.AddCommand(newAuthMistral(a), newAuthGoogle(a))
+	return cmd
+}
+
+func newAuthMistral(a *app.App) *cobra.Command {
+	var importFile string
+	cmd := &cobra.Command{
+		Use:   "mistral",
+		Short: "Show or import the Mistral API key used for notes and audio",
+		Long: `Notes are written by Mistral, and so is the audio unless audio.provider is
+google. The key is looked for in this order: the MISTRAL_API_KEY environment
+variable, the mistral.api_key setting of the user config file (the key itself,
+not a file name), then the key imported with --import.
+
+--import copies the key from a file (surrounding whitespace such as a trailing
+newline is ignored) into the user config directory (mode 0600).`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if importFile != "" {
+				if err := a.ImportMistralKey(importFile); err != nil {
+					return failure.New(failure.ExitFailure, "pass a file that contains only the API key", err)
+				}
+				a.Reporter().Event("imported the Mistral API key")
+				return nil
+			}
+			key, err := a.MistralKey()
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(a.Env.Stdout, "%s\n", key.Source)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&importFile, "import", "", "copy the API key from this file into the user config directory")
 	return cmd
 }
 
@@ -23,9 +56,10 @@ func newAuthGoogle(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "google",
 		Short: "Show or import the Google Cloud credentials used for audio",
-		Long: `Audio comes from Google Cloud Text-to-Speech. Credentials are looked for in this
-order: GOOGLE_APPLICATION_CREDENTIALS, the google.credentials_file setting, the
-key imported with --import, then gcloud application default credentials.
+		Long: `Audio comes from Google Cloud Text-to-Speech when audio.provider is google.
+Credentials are looked for in this order: GOOGLE_APPLICATION_CREDENTIALS, the
+google.credentials_file setting, the key imported with --import, then gcloud
+application default credentials.
 
 --import copies a service-account key into the user config directory (mode
 0600) so it does not have to stay next to your other files.`,

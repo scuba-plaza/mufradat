@@ -295,10 +295,10 @@ func (s *session) use(id, ifRev string) (result, error) {
 	}
 	switch {
 	case e.proposal == nil:
-		return result{}, userErrorf("there is no suggestion from Claude Code for this note")
+		return result{}, userErrorf("there is no suggestion from Mistral for this note")
 	case e.proposalRev != n.Rev():
 		e.proposal, e.proposalRev = nil, ""
-		return result{}, userErrorf("the note changed after Claude Code wrote its suggestion; ask again")
+		return result{}, userErrorf("the note changed after Mistral wrote its suggestion; ask again")
 	}
 	ed := editOf(*e.proposal)
 	candidate := apply(n, ed)
@@ -309,7 +309,7 @@ func (s *session) use(id, ifRev string) (result, error) {
 	if err != nil {
 		return result{}, err
 	}
-	return result{Message: "✦ Saved Claude Code's version of " + after.Lemma + s.rechecking(), Tone: "claude", Show: s.nextOpen(id)}, nil
+	return result{Message: "✦ Saved Mistral's version of " + after.Lemma + s.rechecking(), Tone: "mistral", Show: s.nextOpen(id)}, nil
 }
 
 func (s *session) drop(id string) (result, error) {
@@ -409,11 +409,11 @@ func (s *session) ask(id string) (result, error) {
 	}
 	switch {
 	case s.deps.Rewriter == nil:
-		return result{}, userErrorf("Claude Code was not found; install it and log in with 'claude'")
+		return result{}, userErrorf("Mistral is not set up; set MISTRAL_API_KEY or run '%s auth mistral --import FILE'", s.deps.Prefix)
 	case e.asking:
 		return result{Show: id}, nil
 	case e.state == edited || e.state == rewritten:
-		return result{}, userErrorf("this note was changed in this review; undo the change to ask Claude Code about the earlier version")
+		return result{}, userErrorf("this note was changed in this review; undo the change to ask Mistral about the earlier version")
 	}
 	ctx, cancel := context.WithCancel(s.ctx)
 	e.request++
@@ -431,9 +431,9 @@ func (s *session) ask(id string) (result, error) {
 		cancel()
 		switch {
 		case err != nil:
-			e.notice, e.noticeTone = "Claude Code could not write a new version: "+err.Error(), "bad"
+			e.notice, e.noticeTone = "Mistral could not write a new version: "+err.Error(), "bad"
 		case sameContent(fresh, n):
-			e.notice, e.noticeTone = "Claude Code would keep this note as it is", "info"
+			e.notice, e.noticeTone = "Mistral would keep this note as it is", "info"
 		default:
 			e.proposal, e.proposalRev = &fresh, n.Rev()
 		}
@@ -452,7 +452,7 @@ func (s *session) stop(id string) (result, error) {
 		e.cancel()
 		e.asking = false
 	}
-	return result{Message: "Stopped asking Claude Code about " + n.Lemma, Show: id}, nil
+	return result{Message: "Stopped asking Mistral about " + n.Lemma, Show: id}, nil
 }
 
 func (s *session) remake(id, ifRev, kind string) (result, error) {

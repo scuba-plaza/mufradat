@@ -2,16 +2,8 @@ package llm
 
 import (
 	"errors"
-	"fmt"
 	"time"
 )
-
-type UsageLimitError struct {
-	ResetAt time.Time
-	Message string
-}
-
-func (e *UsageLimitError) Error() string { return "usage limit reached: " + e.Message }
 
 type RateLimitedError struct {
 	RetryAfter time.Duration
@@ -26,34 +18,18 @@ func (e *TransientError) Error() string { return "temporary failure: " + e.Messa
 
 type AuthError struct{ Message string }
 
-func (e *AuthError) Error() string { return "not signed in: " + e.Message }
+func (e *AuthError) Error() string { return "the service rejected the credentials: " + e.Message }
 
 type BadOutputError struct{ Message string }
 
 func (e *BadOutputError) Error() string { return "unusable answer: " + e.Message }
 
-type UnavailableError struct{ Err error }
-
-func (e *UnavailableError) Error() string { return fmt.Sprintf("backend unavailable: %v", e.Err) }
-
-func (e *UnavailableError) Unwrap() error { return e.Err }
-
 type CallError struct{ Message string }
 
 func (e *CallError) Error() string { return e.Message }
 
-func AsUsageLimit(err error) (*UsageLimitError, bool) {
-	var e *UsageLimitError
-	return e, errors.As(err, &e)
-}
-
 func AsAuth(err error) bool {
 	var e *AuthError
-	return errors.As(err, &e)
-}
-
-func AsUnavailable(err error) bool {
-	var e *UnavailableError
 	return errors.As(err, &e)
 }
 

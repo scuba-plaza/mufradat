@@ -17,7 +17,6 @@ import (
 	"github.com/scuba-plaza/mufradat/internal/prompt"
 	"github.com/scuba-plaza/mufradat/internal/review"
 	"github.com/scuba-plaza/mufradat/internal/tashkeel"
-	"github.com/scuba-plaza/mufradat/internal/tts"
 )
 
 const browserCommand = "xdg-open"
@@ -118,13 +117,13 @@ func (a *App) PrepareReview(ctx context.Context, opts ReviewOptions) (ReviewSetu
 	if rewriter, err := a.reviewRewriter(); err == nil {
 		setup.Deps.Rewriter = rewriter
 	} else {
-		a.Logger().Debug("asking Claude Code is not available", "error", err)
+		a.Logger().Debug("asking Mistral is not available", "error", err)
 	}
 	return setup, nil
 }
 
 func (a *App) reviewRewriter() (review.Rewriter, error) {
-	backend, err := a.Claude()
+	backend, err := a.LLM()
 	if err != nil {
 		return nil, err
 	}
@@ -222,13 +221,13 @@ func (r reviewAudio) Remake(ctx context.Context, n note.Note, kind string) error
 	if err != nil {
 		return err
 	}
-	client, err := r.app.TTS(ctx)
+	speaker, err := r.app.Speaker(ctx)
 	if err != nil {
 		return err
 	}
-	data, err := client.Synthesize(ctx, tts.Request{Text: it.Text, Voice: voice.Name, Rate: voice.Rate})
+	data, err := speaker.Synthesize(ctx, clips.SpeechRequest{Text: it.Text, Voice: voice.Name, Rate: voice.Rate})
 	if err != nil {
-		return r.app.TTSFailure(err)
+		return r.app.SpeechFailure(err)
 	}
 	return r.store.Put(it.Key, data)
 }
@@ -252,27 +251,32 @@ func (v reviewVoices) Current() string {
 }
 
 func (v reviewVoices) List(ctx context.Context) ([]review.VoiceOption, error) {
-	client, err := v.app.TTS(ctx)
+	speaker, err := v.app.Speaker(ctx)
 	if err != nil {
 		return nil, err
 	}
-	voices, err := client.Voices(ctx)
+	voices, err := speaker.Voices(ctx)
 	if err != nil {
-		return nil, v.app.TTSFailure(err)
+		return nil, v.app.SpeechFailure(err)
 	}
+	google := v.app.verifyConfig().Audio.Provider == config.ProviderGoogle
 	out := make([]review.VoiceOption, 0, len(voices))
 	for _, vi := range voices {
-		out = append(out, review.VoiceOption{Name: vi.Name, Gender: vi.Gender, Tier: voiceTier(vi.Name)})
+		opt := review.VoiceOption{Name: vi.Ref, Label: vi.Name, Gender: vi.Gender}
+		if google {
+			opt.Label, opt.Tier = googleVoiceLabel(vi.Ref)
+		}
+		out = append(out, opt)
 	}
 	return out, nil
 }
 
-func voiceTier(name string) string {
+func googleVoiceLabel(name string) (label, tier string) {
 	parts := strings.Split(name, "-")
 	if len(parts) >= 4 {
-		return parts[2]
+		return strings.Join(parts[2:], "-"), parts[2]
 	}
-	return ""
+	return name, ""
 }
 
 func (v reviewVoices) Set(name string) error {
@@ -280,7 +284,11 @@ func (v reviewVoices) Set(name string) error {
 	if err != nil {
 		return err
 	}
-	if err := config.SetFile(ws.ConfigFile(), "audio.voice", name); err != nil {
+	key, err := v.app.VoiceSetting()
+	if err != nil {
+		return err
+	}
+	if err := config.SetFile(ws.ConfigFile(), key, name); err != nil {
 		return err
 	}
 	v.app.InvalidateConfig()
@@ -288,23 +296,23 @@ func (v reviewVoices) Set(name string) error {
 }
 
 type voiceSampler struct {
-	app    *App
-	mu     sync.Mutex
-	client *tts.Client
+	app     *App
+	mu      sync.Mutex
+	speaker clips.Speaker
 }
 
-func (s *voiceSampler) speaker(ctx context.Context) (*tts.Client, error) {
+func (s *voiceSampler) speak(ctx context.Context) (clips.Speaker, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.client != nil {
-		return s.client, nil
+	if s.speaker != nil {
+		return s.speaker, nil
 	}
-	client, err := s.app.TTS(context.WithoutCancel(ctx))
+	speaker, err := s.app.Speaker(context.WithoutCancel(ctx))
 	if err != nil {
 		return nil, err
 	}
-	s.client = client
-	return client, nil
+	s.speaker = speaker
+	return speaker, nil
 }
 
 func (s *voiceSampler) Sample(ctx context.Context, voice, text string) (string, error) {
@@ -316,18 +324,18 @@ func (s *voiceSampler) Sample(ctx context.Context, voice, text string) (string, 
 	if err != nil {
 		return "", err
 	}
-	key := clips.Key(clips.Voice{Name: voice, Rate: current.Rate}, text)
+	key := clips.Key(current.Named(voice), text)
 	path := filepath.Join(ws.VoiceSamplesDir(), clips.FileName(key))
 	if fsutil.Exists(path) {
 		return path, nil
 	}
-	client, err := s.speaker(ctx)
+	speaker, err := s.speak(ctx)
 	if err != nil {
 		return "", err
 	}
-	data, err := client.Synthesize(ctx, tts.Request{Text: text, Voice: voice, Rate: current.Rate})
+	data, err := speaker.Synthesize(ctx, clips.SpeechRequest{Text: text, Voice: voice, Rate: current.Rate})
 	if err != nil {
-		return "", s.app.TTSFailure(err)
+		return "", s.app.SpeechFailure(err)
 	}
 	if err := fsutil.WriteFileAtomic(path, data, 0o644); err != nil {
 		return "", err

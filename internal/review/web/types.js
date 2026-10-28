@@ -34,7 +34,7 @@
 /** @typedef {{ total: number, kept: number, edited: number, rewritten: number, open: number }} Summary */
 /**
  * @typedef {{
- *   summary: Summary, next?: string, history: number, claude: boolean, audio: boolean, verify: boolean,
+ *   summary: Summary, next?: string, history: number, mistral: boolean, audio: boolean, verify: boolean,
  *   voice?: string, all: boolean, list: ListItem[], entry?: Entry
  * }} View
  */

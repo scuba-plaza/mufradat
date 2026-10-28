@@ -2,26 +2,31 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/scuba-plaza/mufradat/internal/config"
 	"github.com/scuba-plaza/mufradat/internal/doctor"
 	"github.com/scuba-plaza/mufradat/internal/failure"
 	"github.com/scuba-plaza/mufradat/internal/fsutil"
-	"github.com/scuba-plaza/mufradat/internal/proc"
+	"github.com/scuba-plaza/mufradat/internal/mistral"
 	"github.com/scuba-plaza/mufradat/internal/pyenv"
 )
 
 func (a *App) DoctorChecks() []doctor.Check {
-	return []doctor.Check{
+	checks := []doctor.Check{
 		{Name: "workspace", Run: a.checkWorkspace},
 		{Name: "configuration", Run: a.checkConfig},
-		{Name: "claude code", Run: a.checkClaude},
-		{Name: "google credentials", Run: a.checkGoogle},
-		{Name: "vowel checking", Run: a.checkVerify},
+		{Name: "mistral key", Run: a.checkMistral},
 	}
+	if a.verifyConfig().Audio.Provider == config.ProviderGoogle {
+		checks = append(checks, doctor.Check{Name: "google credentials", Run: a.checkGoogle})
+	}
+	return append(checks, doctor.Check{Name: "vowel checking", Run: a.checkVerify})
 }
 
 func (a *App) checkWorkspace(context.Context) doctor.Result {
@@ -40,23 +45,6 @@ func (a *App) checkConfig(context.Context) doctor.Result {
 		return doctor.Result{Status: doctor.Fail, Detail: err.Error()}
 	}
 	return doctor.Result{Status: doctor.OK, Detail: "valid"}
-}
-
-func (a *App) checkClaude(ctx context.Context) doctor.Result {
-	path, err := a.Env.Runner.LookPath("claude")
-	if err != nil {
-		return doctor.Result{
-			Status: doctor.Fail,
-			Detail: "`claude` is not on PATH",
-			Hint:   "install Claude Code (https://claude.com/claude-code) and log in; it writes the notes",
-		}
-	}
-	var out strings.Builder
-	err = a.Env.Runner.Run(ctx, proc.Cmd{Name: path, Args: []string{"--version"}, Stdout: &out})
-	if err != nil {
-		return doctor.Result{Status: doctor.Warn, Detail: path + " did not report a version"}
-	}
-	return doctor.Result{Status: doctor.OK, Detail: strings.TrimSpace(out.String())}
 }
 
 func (a *App) verifyConfig() config.Config {
@@ -106,4 +94,42 @@ func (a *App) checkVerify(ctx context.Context) doctor.Result {
 func firstLine(s string) string {
 	line, _, _ := strings.Cut(s, "\n")
 	return line
+}
+
+const keyCheckTimeout = 20 * time.Second
+
+func (a *App) checkMistral(ctx context.Context) doctor.Result {
+	cands, err := a.mistralCandidates()
+	if err != nil {
+		return doctor.Result{Status: doctor.Fail, Detail: err.Error()}
+	}
+	key, err := mistral.ResolveKey(cands)
+	switch {
+	case errors.Is(err, mistral.ErrNoKey):
+		return doctor.Result{
+			Status: doctor.Fail,
+			Detail: "no Mistral API key; notes cannot be written",
+			Hint:   fmt.Sprintf("set MISTRAL_API_KEY, or run `%s auth mistral --import FILE`", a.CommandPrefix()),
+		}
+	case err != nil:
+		return doctor.Result{Status: doctor.Fail, Detail: err.Error(), Hint: fmt.Sprintf("fix the key, or run `%s auth mistral --import FILE`", a.CommandPrefix())}
+	}
+	cfg := a.verifyConfig()
+	client := &mistral.Client{
+		BaseURL: cfg.Mistral.Endpoint, Key: key.Value,
+		HTTP: &http.Client{Transport: a.transport(), Timeout: keyCheckTimeout},
+	}
+	err = client.CheckKey(ctx)
+	var api *mistral.APIError
+	switch {
+	case err == nil:
+		return doctor.Result{Status: doctor.OK, Detail: fmt.Sprintf("accepted by Mistral (%s)", key.Source)}
+	case errors.As(err, &api) && api.Kind() == mistral.KindAuth:
+		return doctor.Result{
+			Status: doctor.Fail,
+			Detail: fmt.Sprintf("Mistral rejected the key from %s (%s)", key.Source, api.Message),
+			Hint:   fmt.Sprintf("set MISTRAL_API_KEY, or run `%s auth mistral --import FILE`", a.CommandPrefix()),
+		}
+	}
+	return doctor.Result{Status: doctor.Warn, Detail: fmt.Sprintf("could not check the key from %s with Mistral: %v", key.Source, err)}
 }

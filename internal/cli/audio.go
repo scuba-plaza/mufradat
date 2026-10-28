@@ -10,7 +10,6 @@ import (
 	"github.com/scuba-plaza/mufradat/internal/app"
 	"github.com/scuba-plaza/mufradat/internal/clips"
 	"github.com/scuba-plaza/mufradat/internal/failure"
-	"github.com/scuba-plaza/mufradat/internal/tts"
 )
 
 const maxListedFailures = 10
@@ -23,9 +22,11 @@ func newAudio(a *app.App) *cobra.Command {
 		Short: "Make the missing audio clips",
 		Long: `Make every audio clip the notes need that does not exist yet.
 
-Clips are named after the voice, speaking rate and spoken text, so changing the
-voice never reuses another voice's clips and changing it back finds them again.
-Clips are paid for: they are kept, never refreshed behind your back.`,
+Clips are named after the provider, voice, speaking rate and spoken text, so
+changing the provider or the voice never reuses another one's clips and
+changing back finds them again. Mistral takes no speaking rate, so audio.rate
+only applies to Google. Clips are paid for: they are kept, never refreshed
+behind your back.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runAudio(cmd.Context(), a, dryRun, limit)
@@ -59,8 +60,8 @@ func runAudio(ctx context.Context, a *app.App, dryRun bool, limit int) error {
 	}
 	plan := clips.NewPlan(set.Study(), voice, cs.Has)
 	r := a.Reporter()
-	r.Event("%d clips wanted, %d present, %d to make (%d characters) with %s at rate %g",
-		plan.Wanted, plan.Present, len(plan.Missing), plan.Chars, voice.Name, voice.Rate)
+	r.Event("%d clips wanted, %d present, %d to make (%d characters) with %s",
+		plan.Wanted, plan.Present, len(plan.Missing), plan.Chars, describeVoice(voice))
 	if len(plan.Missing) == 0 {
 		return nil
 	}
@@ -72,47 +73,82 @@ func runAudio(ctx context.Context, a *app.App, dryRun bool, limit int) error {
 		return nil
 	}
 
-	client, err := a.TTS(ctx)
+	speaker, err := a.Speaker(ctx)
 	if err != nil {
 		return err
 	}
-	voices, err := client.Voices(ctx)
+	voices, err := speaker.Voices(ctx)
 	if err != nil {
-		return a.TTSFailure(err)
+		return a.SpeechFailure(err)
 	}
 	if !hasVoice(voices, voice.Name) {
-		return failure.Newf(failure.ExitFailure, fmt.Sprintf("see the choices with `%s voices list`, then `%s config set audio.voice NAME`", a.CommandPrefix(), a.CommandPrefix()),
-			"the service has no Arabic voice named %q", voice.Name)
+		setting, err := a.VoiceSetting()
+		if err != nil {
+			return err
+		}
+		return failure.Newf(failure.ExitFailure, fmt.Sprintf("see the choices with `%s voices list`, then `%s config set %s NAME`", a.CommandPrefix(), a.CommandPrefix(), setting),
+			"the %s service has no Arabic voice named %q", voice.Provider, voice.Name)
 	}
 	cfg, err := a.Config()
 	if err != nil {
 		return err
 	}
-	res, err := clips.Synthesize(ctx, plan, cs, a.Speaker(client), clips.SynthOptions{
+	res, err := clips.Synthesize(ctx, plan, cs, clips.Speaking(speaker), clips.SynthOptions{
 		Concurrency: cfg.TTS.Concurrency,
 		Progress:    func(done, total int) { r.Progress("audio %d/%d", done, total) },
 	})
 	r.Done()
 	r.Event("made %d clips", res.Made)
 	if err != nil {
-		return a.TTSFailure(err)
+		return a.SpeechFailure(err)
 	}
-	if len(res.Failed) > 0 {
-		for i, f := range res.Failed {
+	return reportClipFailures(a, res)
+}
+
+func reportClipFailures(a *app.App, res clips.Result) error {
+	r := a.Reporter()
+	for _, group := range [][]clips.Failure{res.Failed, res.Blocked} {
+		for i, f := range group {
 			if i == maxListedFailures {
-				r.Warn("and %d more", len(res.Failed)-maxListedFailures)
+				r.Warn("and %d more", len(group)-maxListedFailures)
 				break
 			}
 			r.Warn("%s: %v", f.Item.Text, f.Err)
 		}
-		return failure.Newf(failure.ExitFailure, "run the command again to retry the failed clips", "%d clips failed", len(res.Failed))
+	}
+	failed, blocked := len(res.Failed), len(res.Blocked)
+	switch {
+	case failed > 0 && blocked > 0:
+		return failure.Newf(failure.ExitFailure, blockedHint(a)+"; run the command again to retry the others", "%d clips failed; %s", failed, blockedClips(blocked))
+	case blocked > 0:
+		return failure.Newf(failure.ExitFailure, blockedHint(a), "%s", blockedClips(blocked))
+	case failed > 0:
+		return failure.Newf(failure.ExitFailure, "run the command again to retry the failed clips", "%d clips failed", failed)
 	}
 	return nil
 }
 
-func hasVoice(voices []tts.VoiceInfo, name string) bool {
+func blockedClips(n int) string {
+	if n == 1 {
+		return "1 clip was blocked by Mistral's moderation"
+	}
+	return fmt.Sprintf("%d clips were blocked by Mistral's moderation", n)
+}
+
+func blockedHint(a *app.App) string {
+	return fmt.Sprintf("edit those notes, or use the Google provider with `%s config set audio.provider google`", a.CommandPrefix())
+}
+
+func describeVoice(v clips.Voice) string {
+	if v.Rate > 0 {
+		return fmt.Sprintf("%s (%s, rate %g)", v.Name, v.Provider, v.Rate)
+	}
+	return fmt.Sprintf("%s (%s)", v.Name, v.Provider)
+}
+
+func hasVoice(voices []clips.VoiceInfo, name string) bool {
 	for _, v := range voices {
-		if v.Name == name {
+		if v.Is(name) {
 			return true
 		}
 	}
@@ -124,8 +160,9 @@ func newAudioGC(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "gc",
 		Short: "Find clips no note needs any more",
-		Long: `List the clips that no note needs with the current voice and rate. That includes
-clips made with another voice, so they are only deleted with --delete.`,
+		Long: `List the clips that no note needs with the current provider, voice and rate.
+That includes clips made with another provider or voice, so they are only
+deleted with --delete.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st, err := a.Store()

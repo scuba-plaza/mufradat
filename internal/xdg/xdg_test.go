@@ -26,3 +26,13 @@ func TestEnvironmentOverridesAreHonouredWhenAbsolute(t *testing.T) {
 		t.Errorf("default workspace = %s", got)
 	}
 }
+
+func TestImportedKeysLiveInTheUserConfigDirectory(t *testing.T) {
+	d := New(func(string) string { return "" }, "/home/u")
+	if got := d.ImportedGoogleKey(); got != "/home/u/.config/mufradat/google-credentials.json" {
+		t.Errorf("google key = %s", got)
+	}
+	if got := d.ImportedMistralKey(); got != "/home/u/.config/mufradat/mistral-api-key" {
+		t.Errorf("mistral key = %s", got)
+	}
+}

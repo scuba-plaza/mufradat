@@ -12,11 +12,23 @@ stderr 'no notes'
 
 cp notes.jsonl ws/notes.jsonl
 
+env MISTRAL_API_KEY=
 exec mufradat -C ws status
 stdout 'add .*2 notes'
-stdout 'audio .*no Google credentials'
+stdout 'audio .*no Mistral API key'
 stdout 'build .*no package yet'
 stdout 'next: mufradat -C .*ws build'
+
+exec mufradat -C ws config set audio.provider google
+exec mufradat -C ws status
+stdout 'audio .*no Google credentials'
+exec mufradat -C ws config set audio.provider mistral
+
+env MISTRAL_API_KEY=fake-mistral-key
+exec mufradat -C ws status
+stdout 'audio .*6 of 6 clips missing'
+stdout 'next: mufradat -C .*ws audio'
+env MISTRAL_API_KEY=
 
 exec mufradat -C ws status --json
 stdout '"name": "audio"'

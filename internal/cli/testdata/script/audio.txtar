@@ -1,11 +1,13 @@
 exec mufradat init ws
 cp notes.jsonl ws/notes.jsonl
+exec mufradat -C ws config set audio.provider google
 
 exec mufradat -C ws audio --dry-run
 stderr '6 clips wanted, 0 present, 6 to make'
+stderr 'with ar-XA-Chirp3-HD-Achernar \(google, rate 0.9\)'
 ! exists ws/audio/synth
 
-! exec mufradat -C ws audio
+exits 3 mufradat -C ws audio
 stderr 'no Google credentials found'
 stderr 'auth google --import KEY.json'
 
@@ -20,14 +22,13 @@ exists home/.config/mufradat/google-credentials.json
 exec mufradat auth google
 stdout 'imported key'
 
-exec mufradat -C ws config set tts.endpoint $TTS_URL
-
 exec mufradat -C ws status
 stdout 'audio .*6 of 6 clips missing'
 stdout 'next: mufradat -C .*ws audio'
 
 exec mufradat -C ws voices list --json
-stdout '"name": "ar-XA-Wavenet-A"'
+stdout '"voice": "ar-XA-Wavenet-A"'
+stdout '"detail": "24 kHz"'
 stdout '"current": true'
 
 exec mufradat -C ws audio --limit 2
@@ -52,7 +53,7 @@ exec mufradat -C ws status
 stdout 'audio .*6 clips'
 stdout 'build .*arabic-msa-core\.apkg'
 
-exec mufradat -C ws config set audio.voice ar-XA-Wavenet-A
+exec mufradat -C ws config set google.voice ar-XA-Wavenet-A
 exec mufradat -C ws audio --dry-run
 stderr '6 clips wanted, 0 present, 6 to make'
 exec mufradat -C ws audio
@@ -60,10 +61,16 @@ stderr 'made 6 clips'
 exec mufradat -C ws status
 stdout 'build .*out of date'
 
-exec mufradat -C ws config set audio.voice ar-XA-Chirp3-HD-Achernar
+exec mufradat -C ws config set google.voice ar-XA-Chirp3-HD-Achernar
 exec mufradat -C ws audio
 stderr '6 clips wanted, 6 present, 0 to make'
 grep -count=6 'ar-XA-Wavenet-A' synth-calls.log
+
+exec mufradat -C ws config set audio.rate 1.2
+exec mufradat -C ws audio --dry-run
+stderr '6 clips wanted, 0 present, 6 to make'
+stderr 'rate 1.2'
+exec mufradat -C ws config set audio.rate 0.9
 
 exec mufradat -C ws audio gc
 stderr 'found 6 unused clips'
@@ -75,13 +82,13 @@ stderr 'found 0 unused clips'
 exec mufradat -C ws audio
 stderr '6 present, 0 to make'
 
-exec mufradat -C ws config set audio.voice ar-XA-Nope
-! exec mufradat -C ws audio
-stderr 'no Arabic voice named "ar-XA-Nope"'
-stderr 'voices list'
+exec mufradat -C ws config set google.voice ar-XA-Nope
+exits 1 mufradat -C ws audio
+stderr 'the google service has no Arabic voice named "ar-XA-Nope"'
+stderr 'hint: see the choices with `mufradat -C .*ws voices list`, then `mufradat -C .*ws config set google.voice NAME`'
 
-! exec mufradat -C ws config set tts.endpoint not-a-url
-stderr 'tts.endpoint'
+! exec mufradat -C ws config set google.endpoint not-a-url
+stderr 'google.endpoint "not-a-url" must be an http\(s\) URL'
 
 -- notes.jsonl --
 {"id":"n_aaaaaaaaaaaa","seq":1,"rank":3,"origin":"ranked","lemma":"كِتَاب","pos":"noun","gender":"m","forms":[{"label":"pl.","ar":"كُتُب"}],"english":"book","example":"قَرَأْتُ [الْكِتَابَ] فِي الْبَيْتِ.","example_en":"I read the book at home.","created":"2023-11-14T22:13:20Z","updated":"2023-11-14T22:13:20Z"}

@@ -14,13 +14,11 @@ type Request struct {
 }
 
 type Usage struct {
-	Calls      int      `json:"calls"`
-	Input      int64    `json:"input"`
-	Output     int64    `json:"output"`
-	CacheRead  int64    `json:"cache_read"`
-	CacheWrite int64    `json:"cache_write"`
-	CostUSD    float64  `json:"cost_usd,omitempty"`
-	Models     []string `json:"models,omitempty"`
+	Calls     int      `json:"calls"`
+	Input     int64    `json:"input"`
+	Output    int64    `json:"output"`
+	CacheRead int64    `json:"cache_read"`
+	Models    []string `json:"models,omitempty"`
 }
 
 func (u *Usage) Add(v Usage) {
@@ -28,8 +26,6 @@ func (u *Usage) Add(v Usage) {
 	u.Input += v.Input
 	u.Output += v.Output
 	u.CacheRead += v.CacheRead
-	u.CacheWrite += v.CacheWrite
-	u.CostUSD += v.CostUSD
 	for _, m := range v.Models {
 		if !slices.Contains(u.Models, m) {
 			u.Models = append(u.Models, m)

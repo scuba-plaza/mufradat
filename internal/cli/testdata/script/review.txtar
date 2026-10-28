@@ -10,7 +10,7 @@ stderr 'nothing to review'
 env FAKE_BROWSER=finish
 exec mufradat -C ws review --all
 stdout 'reviewing 2 notes at http://127.0.0.1:[0-9]+/[A-Z2-7]+/'
-stderr '2 notes: 0 marked right, 0 edited, 0 rewritten by Claude Code, 2 still open'
+stderr '2 notes: 0 marked right, 0 edited, 0 rewritten by Mistral, 2 still open'
 grep 'finish 200' browser.log
 exec mufradat -C ws config set verify.enabled auto
 
@@ -35,14 +35,14 @@ stderr 'nothing to review'
 rm ws/decisions.jsonl
 env FAKE_BROWSER=keep-undo
 exec mufradat -C ws review
-stderr '0 marked right, 0 edited, 0 rewritten by Claude Code, 1 still open'
+stderr '0 marked right, 0 edited, 0 rewritten by Mistral, 1 still open'
 grep 'undo 200' browser.log
 exec mufradat -C ws status
 stdout 'review .*1 notes with open flags \(1 major, 0 minor\)'
 
 env FAKE_BROWSER=edit
 exec mufradat -C ws review
-stderr '0 marked right, 1 edited, 0 rewritten by Claude Code, 1 still open'
+stderr '0 marked right, 1 edited, 0 rewritten by Mistral, 1 still open'
 stderr 'Next: `mufradat -C .*ws audio` makes clips for any changed text'
 grep 'save 200' browser.log
 grep 'settled' browser.log

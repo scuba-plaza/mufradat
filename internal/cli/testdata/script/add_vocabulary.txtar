@@ -1,18 +1,18 @@
 exec mufradat init ws
 
-env FAKE_CLAUDE_MODE=rare-first
+mistral-mode rare-first
 exec mufradat -C ws add 1
 stderr 'wrote 1 note in 2 requests'
 grep -count=1 'قَرَأَ \[الْوَلَدُ\] الْكِتَابَ فِي الْبَيْتِ' ws/notes.jsonl
 
-rm claude-calls
-env FAKE_CLAUDE_MODE=rare-always
+mistral-reset
+mistral-mode rare-always
 ! exec mufradat -C ws add 1
 stderr 'does not know yet: الطَّاوِلَةِ \(from طَاوِلَة, frequency rank 1602\)'
 stderr '1 note could not be written'
 grep -count=1 '"lemma"' ws/notes.jsonl
 
-rm claude-calls
+mistral-reset
 exec mufradat -C ws config set author.allow_rank 0
 exec mufradat -C ws add 1
 stderr 'wrote 1 note in 1 request'

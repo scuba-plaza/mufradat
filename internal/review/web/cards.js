@@ -99,7 +99,7 @@ function changeLine(kind, sign, list, rtl) {
  * @returns {HTMLElement}
  */
 export function proposalView(e) {
-  const side = el('section', 'side', el('h2', 'side-title claude', '✦ Claude Code suggests this version'));
+  const side = el('section', 'side', el('h2', 'side-title mistral', '✦ Mistral suggests this version'));
   for (const c of e.changes || []) {
     side.append(el('article', 'change', el('h3', null, c.label), changeLine('old', '−', c.old, c.rtl), changeLine('new', '+', c.new, c.rtl)));
   }
@@ -125,7 +125,7 @@ export function tally(s) {
   };
   add(s.kept, '✓', 'icon good', 'right as they were');
   add(s.edited, '✎', 'icon good', 'edited by you');
-  add(s.rewritten, '✦', 'icon claude', 'rewritten by Claude Code');
+  add(s.rewritten, '✦', 'icon mistral', 'rewritten by Mistral');
   add(s.open, '○', '', 'still open');
   return rows;
 }

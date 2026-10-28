@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/scuba-plaza/mufradat/internal/httpretry"
 	"io"
 	"net/http"
 	"net/url"
@@ -158,7 +159,7 @@ func (c *Client) do(ctx context.Context, method, path string, body []byte) ([]by
 		return nil, err
 	}
 	if resp.StatusCode/100 != 2 {
-		return nil, newAPIError(resp.StatusCode, raw, retryAfter(resp.Header, time.Now()))
+		return nil, newAPIError(resp.StatusCode, raw, httpretry.RetryAfter(resp.Header, time.Now()))
 	}
 	return raw, nil
 }

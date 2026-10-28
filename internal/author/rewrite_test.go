@@ -79,7 +79,7 @@ func TestRewriteGivesUpAfterTheAttempts(t *testing.T) {
 
 func TestRewriteDoesNotRetryAServiceFailure(t *testing.T) {
 	r, f := rewriterWith(func(call int, cards []prompt.Card) (json.RawMessage, error) {
-		return nil, &llm.CallError{Message: "claude exited"}
+		return nil, &llm.CallError{Message: "the service answered 400"}
 	})
 	_, err := r.Rewrite(context.Background(), existing(), "check it")
 	if !isCallError(err) || len(f.prompts) != 1 {

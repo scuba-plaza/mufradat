@@ -2,7 +2,10 @@ package llm
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -52,8 +55,8 @@ func TestRetryingGivesUpAfterAttempts(t *testing.T) {
 	}
 }
 
-func TestRetryingNeverRetriesUsageLimitOrAuth(t *testing.T) {
-	for _, e := range []error{&UsageLimitError{Message: "x"}, &AuthError{"x"}, &BadOutputError{"x"}, &CallError{"x"}} {
+func TestRetryingNeverRetriesAuthBadOutputOrCallErrors(t *testing.T) {
+	for _, e := range []error{&AuthError{"x"}, &BadOutputError{"x"}, &CallError{"x"}} {
 		next := &scripted{errs: []error{e, e}}
 		r := Retrying{Next: next, Attempts: 3, Backoff: time.Second, MaxWait: time.Minute, Sleep: noSleep(new([]time.Duration))}
 		if _, err := r.Complete(context.Background(), Request{}); !errors.Is(err, e) || next.calls != 1 {
@@ -108,11 +111,58 @@ func TestRecordingSinksUsageOnSuccessOnly(t *testing.T) {
 	}
 }
 
-func TestUsageAdd(t *testing.T) {
+func TestUsageAddSumsCountersAndMergesModelsSorted(t *testing.T) {
 	var u Usage
-	u.Add(Usage{Calls: 1, Input: 5, Models: []string{"b"}})
-	u.Add(Usage{Calls: 2, Output: 7, CostUSD: 0.5, Models: []string{"a", "b"}})
-	if u.Calls != 3 || u.Input != 5 || u.Output != 7 || u.CostUSD != 0.5 || len(u.Models) != 2 || u.Models[0] != "a" {
-		t.Fatalf("%+v", u)
+	u.Add(Usage{Calls: 1, Input: 5, CacheRead: 2, Models: []string{"b"}})
+	u.Add(Usage{Calls: 2, Output: 7, CacheRead: 3, Models: []string{"a", "b"}})
+	want := Usage{Calls: 3, Input: 5, Output: 7, CacheRead: 5, Models: []string{"a", "b"}}
+	if !reflect.DeepEqual(u, want) {
+		t.Fatalf("got %+v, want %+v", u, want)
+	}
+}
+
+func TestUsageHasNoVendorSpecificFields(t *testing.T) {
+	raw, err := json.Marshal(Usage{Calls: 1, Input: 2, Output: 3, CacheRead: 4, Models: []string{"m"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(raw) != `{"calls":1,"input":2,"output":3,"cache_read":4,"models":["m"]}` {
+		t.Fatalf("usage record changed shape: %s", raw)
+	}
+}
+
+func TestErrorTextsDescribeTheProblem(t *testing.T) {
+	cases := []struct {
+		err  error
+		want string
+	}{
+		{&AuthError{Message: "Unauthorized"}, "the service rejected the credentials: Unauthorized"},
+		{&RateLimitedError{Message: "slow down"}, "rate limited: slow down"},
+		{&TransientError{Message: "502"}, "temporary failure: 502"},
+		{&BadOutputError{Message: "cut off"}, "unusable answer: cut off"},
+		{&CallError{Message: "Invalid model: x"}, "Invalid model: x"},
+	}
+	for _, tc := range cases {
+		if got := tc.err.Error(); got != tc.want {
+			t.Errorf("%T: %q, want %q", tc.err, got, tc.want)
+		}
+	}
+}
+
+func TestRetryableMeansTemporaryOnly(t *testing.T) {
+	retry := []error{&TransientError{}, &RateLimitedError{}, fmt.Errorf("wrapped: %w", &TransientError{})}
+	stop := []error{&AuthError{}, &BadOutputError{}, &CallError{}, errors.New("plain"), nil}
+	for _, e := range retry {
+		if !Retryable(e) {
+			t.Errorf("%v should be retryable", e)
+		}
+	}
+	for _, e := range stop {
+		if Retryable(e) {
+			t.Errorf("%v should not be retryable", e)
+		}
+	}
+	if !AsAuth(fmt.Errorf("wrapped: %w", &AuthError{})) || AsAuth(&CallError{}) {
+		t.Error("AsAuth must see through wrapping and only match auth errors")
 	}
 }

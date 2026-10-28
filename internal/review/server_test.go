@@ -65,7 +65,7 @@ func TestStateListsEntriesAndTheOpenOne(t *testing.T) {
 	if v.Entry == nil || v.Entry.ID != idBook || v.Entry.Rev != h.rev(idBook) || len(v.Entry.Flags) != 2 {
 		t.Fatalf("entry = %+v", v.Entry)
 	}
-	if v.Claude || v.Audio || v.Verify || v.Summary.Open != 2 || v.Summary.Total != 2 {
+	if v.Mistral || v.Audio || v.Verify || v.Summary.Open != 2 || v.Summary.Total != 2 {
 		t.Errorf("optional features should be off: %+v", v)
 	}
 	if v := h.state("n_zzzzzzzzzzz2"); v.Entry != nil {
@@ -314,7 +314,7 @@ func TestAskProposesAndUseSavesTheSuggestion(t *testing.T) {
 	}
 
 	res := h.mustOK("use", idBook, map[string]any{"if_rev": e.Rev})
-	if !strings.Contains(res.Message, "Claude Code's version") || res.Tone != "claude" {
+	if !strings.Contains(res.Message, "Mistral's version") || res.Tone != "mistral" {
 		t.Errorf("result = %+v", res)
 	}
 	if got := h.note(idBook).Example; got != "قَرَأْتُ [الْكِتَابَ] فِي الْمَكْتَبَةِ." {
@@ -361,7 +361,7 @@ func TestAskOutcomesBecomeNotices(t *testing.T) {
 	rewriter := fakeRewriter(func(ctx context.Context, n note.Note, fb string) (note.Note, error) {
 		switch mode {
 		case "fail":
-			return note.Note{}, errors.New("claude is unavailable")
+			return note.Note{}, errors.New("the service is unavailable")
 		case "same":
 			return n, nil
 		}
@@ -372,7 +372,7 @@ func TestAskOutcomesBecomeNotices(t *testing.T) {
 
 	h.mustOK("ask", idBook, nil)
 	e := h.wait(idBook, func(e entryView) bool { return !e.Asking && e.Notice != "" })
-	if e.NoticeTone != "bad" || !strings.Contains(e.Notice, "claude is unavailable") || e.Proposal != nil {
+	if e.NoticeTone != "bad" || !strings.Contains(e.Notice, "the service is unavailable") || e.Proposal != nil {
 		t.Errorf("failure: %+v", e)
 	}
 	mode = "same"
@@ -391,10 +391,10 @@ func TestAskOutcomesBecomeNotices(t *testing.T) {
 	}
 }
 
-func TestAskWithoutClaudeSaysSo(t *testing.T) {
+func TestAskWithoutMistralSaysSo(t *testing.T) {
 	notes, issues := twoNotes()
 	h := newHarness(t, notes, issues, nil)
-	if code, res := h.post("ask", idBook, nil); code != http.StatusBadRequest || !strings.Contains(res.Message, "Claude Code was not found") {
+	if code, res := h.post("ask", idBook, nil); code != http.StatusBadRequest || !strings.Contains(res.Message, "Mistral is not set up") {
 		t.Errorf("ask = %d %+v", code, res)
 	}
 }

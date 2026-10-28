@@ -23,16 +23,18 @@ func newVoicesList(a *app.App) *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List the Arabic voices the service offers",
-		Args:  cobra.NoArgs,
+		Short: "List the Arabic voices of the audio provider",
+		Long: `List the Arabic voices the provider in audio.provider offers. The first column
+is what to put in google.voice or mistral.voice; * marks the voice in use.`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			client, err := a.TTS(cmd.Context())
+			speaker, err := a.Speaker(cmd.Context())
 			if err != nil {
 				return err
 			}
-			voices, err := client.Voices(cmd.Context())
+			voices, err := speaker.Voices(cmd.Context())
 			if err != nil {
-				return a.TTSFailure(err)
+				return a.SpeechFailure(err)
 			}
 			current, err := a.Voice()
 			if err != nil {
@@ -40,24 +42,29 @@ func newVoicesList(a *app.App) *cobra.Command {
 			}
 			if asJSON {
 				type row struct {
-					Name       string `json:"name"`
-					Gender     string `json:"gender"`
-					SampleRate int    `json:"sample_rate"`
-					Current    bool   `json:"current"`
+					Voice   string `json:"voice"`
+					Name    string `json:"name"`
+					Gender  string `json:"gender"`
+					Detail  string `json:"detail"`
+					Current bool   `json:"current"`
 				}
 				rows := make([]row, 0, len(voices))
 				for _, v := range voices {
-					rows = append(rows, row{v.Name, v.Gender, v.SampleRate, v.Name == current.Name})
+					rows = append(rows, row{v.Ref, v.Name, v.Gender, v.Detail, v.Is(current.Name)})
 				}
 				return writeJSON(a.Env.Stdout, rows)
 			}
 			rows := make([][]string, 0, len(voices))
 			for _, v := range voices {
 				mark := " "
-				if v.Name == current.Name {
+				if v.Is(current.Name) {
 					mark = "*"
 				}
-				rows = append(rows, []string{mark, v.Name, v.Gender, formatRate(v.SampleRate)})
+				name := v.Name
+				if name == v.Ref {
+					name = ""
+				}
+				rows = append(rows, []string{mark, v.Ref, name, v.Gender, v.Detail})
 			}
 			ui.Table(a.Env.Stdout, rows)
 			return nil
@@ -67,13 +74,6 @@ func newVoicesList(a *app.App) *cobra.Command {
 	return cmd
 }
 
-func formatRate(hz int) string {
-	if hz == 0 {
-		return ""
-	}
-	return fmt.Sprintf("%g kHz", float64(hz)/1000)
-}
-
 func newVoicesCompare(a *app.App) *cobra.Command {
 	var texts []string
 	var noOpen bool
@@ -81,9 +81,10 @@ func newVoicesCompare(a *app.App) *cobra.Command {
 		Use:   "compare",
 		Short: "Listen to the Arabic voices side by side and pick one",
 		Long: `Open a page in your browser, served only on this machine, where each Arabic voice
-of the service can say a word and a sentence from your notes. Clips are made
-when you press play and kept in the workspace, so hearing a voice twice costs
-nothing. 'Use this voice' saves it as audio.voice in the workspace.
+of the audio provider can say a word and a sentence from your notes. Clips are
+made when you press play and kept in the workspace, so hearing a voice twice
+costs nothing. 'Use this voice' saves it as google.voice or mistral.voice, for
+the provider in use, in the workspace.
 
 Clips already made keep their voice until you remake them in 'review'.`,
 		Args: cobra.NoArgs,
@@ -104,7 +105,8 @@ Clips already made keep their voice until you remake them in 'review'.`,
 				r.Event("press 'Done' on the page or Ctrl+C here when you have chosen")
 			})
 			if used != "" {
-				r.Event("audio.voice is now %s; `%s audio` makes the clips with it", used, a.CommandPrefix())
+				setting, _ := a.VoiceSetting()
+				r.Event("%s is now %s; `%s audio` makes the clips with it", setting, used, a.CommandPrefix())
 			} else {
 				r.Event("the voice was not changed")
 			}

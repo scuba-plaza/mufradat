@@ -8,39 +8,108 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"reflect"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"testing"
 	"time"
 )
 
-type recordingSleep struct{ waits []time.Duration }
-
-func (r *recordingSleep) sleep(_ context.Context, d time.Duration) error {
-	r.waits = append(r.waits, d)
-	return nil
+type route struct {
+	Method string
+	Path   string
+	Query  url.Values
+	Body   string
+	Status int
+	Reply  string
+	Header map[string]string
 }
 
-func retrying(sl *recordingSleep) *http.Client {
-	t := NewRetryTransport(http.DefaultTransport)
-	t.Sleep = sl.sleep
-	return &http.Client{Transport: t}
+type fake struct {
+	*httptest.Server
+	mu    sync.Mutex
+	calls map[string]int
 }
 
-func TestSynthesizeSendsExpectedRequest(t *testing.T) {
-	var got synthesizeRequest
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/text:synthesize" || r.Method != http.MethodPost {
-			t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
+func newFake(t *testing.T, routes ...route) *fake {
+	t.Helper()
+	f := &fake{calls: map[string]int{}}
+	f.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		key := r.Method + " " + r.URL.Path
+		f.mu.Lock()
+		f.calls[key]++
+		f.mu.Unlock()
+		for _, rt := range routes {
+			if rt.Method+" "+rt.Path != key {
+				continue
+			}
+			if !reflect.DeepEqual(nonNil(r.URL.Query()), nonNil(rt.Query)) {
+				t.Errorf("%s: query %v, want %v", key, r.URL.Query(), rt.Query)
+			}
+			raw, _ := io.ReadAll(r.Body)
+			if rt.Body == "" {
+				if len(raw) != 0 {
+					t.Errorf("%s: unexpected body %s", key, raw)
+				}
+			} else {
+				if got := r.Header.Get("Content-Type"); got != "application/json; charset=utf-8" {
+					t.Errorf("%s: Content-Type %q", key, got)
+				}
+				var got, want any
+				if err := json.Unmarshal(raw, &got); err != nil {
+					t.Errorf("%s: body is not JSON: %s", key, raw)
+				}
+				_ = json.Unmarshal([]byte(rt.Body), &want)
+				if !reflect.DeepEqual(got, want) {
+					t.Errorf("%s: body\n got  %s\n want %s", key, raw, rt.Body)
+				}
+			}
+			for k, v := range rt.Header {
+				w.Header().Set(k, v)
+			}
+			if rt.Status != 0 {
+				w.WriteHeader(rt.Status)
+			}
+			io.WriteString(w, rt.Reply)
+			return
 		}
-		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
-			t.Error(err)
-		}
-		json.NewEncoder(w).Encode(synthesizeResponse{AudioContent: base64.StdEncoding.EncodeToString([]byte("MP3DATA"))})
+		t.Errorf("unexpected request %s", key)
+		http.Error(w, "{}", http.StatusNotFound)
 	}))
-	defer srv.Close()
+	t.Cleanup(f.Close)
+	return f
+}
 
-	c := &Client{BaseURL: srv.URL, HTTP: srv.Client()}
+func nonNil(v url.Values) url.Values {
+	if v == nil {
+		return url.Values{}
+	}
+	return v
+}
+
+func (f *fake) count(method, path string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls[method+" "+path]
+}
+
+func synthBody(text, voice string, rate float64) string {
+	raw, _ := json.Marshal(map[string]any{
+		"input":       map[string]any{"text": text},
+		"voice":       map[string]any{"languageCode": "ar-XA", "name": voice},
+		"audioConfig": map[string]any{"audioEncoding": "MP3", "speakingRate": rate},
+	})
+	return string(raw)
+}
+
+func audioReply(data string) string {
+	return `{"audioContent":"` + base64.StdEncoding.EncodeToString([]byte(data)) + `"}`
+}
+
+func TestSynthesizeSendsTheDocumentedRequestAndDecodesTheAudio(t *testing.T) {
+	f := newFake(t, route{Method: "POST", Path: "/v1/text:synthesize", Body: synthBody("كِتَاب", "ar-XA-Test", 0.9), Reply: audioReply("MP3DATA")})
+	c := &Client{BaseURL: f.URL, HTTP: f.Client()}
 	audio, err := c.Synthesize(context.Background(), Request{Text: "كِتَاب", Voice: "ar-XA-Test", Rate: 0.9})
 	if err != nil {
 		t.Fatal(err)
@@ -48,150 +117,130 @@ func TestSynthesizeSendsExpectedRequest(t *testing.T) {
 	if string(audio) != "MP3DATA" {
 		t.Fatalf("audio %q", audio)
 	}
-	if got.Input.Text != "كِتَاب" || got.Voice.Name != "ar-XA-Test" || got.Voice.LanguageCode != "ar-XA" {
-		t.Fatalf("request %+v", got)
-	}
-	if got.AudioConfig.AudioEncoding != "MP3" || got.AudioConfig.SpeakingRate != 0.9 {
-		t.Fatalf("audio config %+v", got.AudioConfig)
-	}
 }
 
-func TestSynthesizeRejectsBadInput(t *testing.T) {
-	c := &Client{BaseURL: "http://unused.invalid", HTTP: http.DefaultClient}
-	if _, err := c.Synthesize(context.Background(), Request{Text: "  "}); err == nil {
-		t.Fatal("empty text accepted")
-	}
-	if _, err := c.Synthesize(context.Background(), Request{Text: strings.Repeat("ا", 3000)}); err == nil {
-		t.Fatal("oversized text accepted")
-	}
-}
-
-func TestRetryHonoursRetryAfterThenSucceeds(t *testing.T) {
-	var calls atomic.Int32
-	var bodies []string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		raw, _ := io.ReadAll(r.Body)
-		bodies = append(bodies, string(raw))
-		if calls.Add(1) < 3 {
-			w.Header().Set("Retry-After", "7")
-			http.Error(w, `{"error":{"message":"slow down","status":"RESOURCE_EXHAUSTED"}}`, http.StatusTooManyRequests)
-			return
-		}
-		json.NewEncoder(w).Encode(synthesizeResponse{AudioContent: base64.StdEncoding.EncodeToString([]byte("ok"))})
-	}))
-	defer srv.Close()
-
-	sl := &recordingSleep{}
-	c := &Client{BaseURL: srv.URL, HTTP: retrying(sl)}
+func TestSynthesizeKeepsATrailingSlashOutOfThePath(t *testing.T) {
+	f := newFake(t, route{Method: "POST", Path: "/v1/text:synthesize", Body: synthBody("x", "v", 1), Reply: audioReply("a")})
+	c := &Client{BaseURL: f.URL + "/", HTTP: f.Client()}
 	if _, err := c.Synthesize(context.Background(), Request{Text: "x", Voice: "v", Rate: 1}); err != nil {
 		t.Fatal(err)
 	}
-	if calls.Load() != 3 {
-		t.Fatalf("calls %d", calls.Load())
+}
+
+func TestSynthesizeRejectsBadInputWithoutCallingTheService(t *testing.T) {
+	f := newFake(t)
+	c := &Client{BaseURL: f.URL, HTTP: f.Client()}
+	if _, err := c.Synthesize(context.Background(), Request{Text: "  "}); err == nil || !strings.Contains(err.Error(), "empty") {
+		t.Fatalf("empty text: %v", err)
 	}
-	if len(sl.waits) != 2 || sl.waits[0] != 7*time.Second || sl.waits[1] != 7*time.Second {
-		t.Fatalf("waits %v", sl.waits)
+	if _, err := c.Synthesize(context.Background(), Request{Text: strings.Repeat("ا", 3000)}); err == nil || !strings.Contains(err.Error(), "at most 4500") {
+		t.Fatalf("oversized text: %v", err)
 	}
-	if bodies[0] == "" || bodies[0] != bodies[2] {
-		t.Fatalf("body was not replayed: %q vs %q", bodies[0], bodies[2])
+	if n := f.count("POST", "/v1/text:synthesize"); n != 0 {
+		t.Fatalf("service called %d times", n)
 	}
 }
 
-func TestRetryGivesUpAndReportsKind(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, `{"error":{"message":"busy","status":"UNAVAILABLE"}}`, http.StatusServiceUnavailable)
-	}))
-	defer srv.Close()
-
-	sl := &recordingSleep{}
-	c := &Client{BaseURL: srv.URL, HTTP: retrying(sl)}
-	_, err := c.Synthesize(context.Background(), Request{Text: "x", Voice: "v", Rate: 1})
-	var api *APIError
-	if !errors.As(err, &api) {
-		t.Fatalf("error %v", err)
-	}
-	if api.Kind() != KindTransient || api.Fatal() || !api.Retryable() {
-		t.Fatalf("kind %v", api.Kind())
-	}
-	if len(sl.waits) != 3 {
-		t.Fatalf("waits %v", sl.waits)
+func TestSynthesizeRejectsRepliesWithoutUsableAudio(t *testing.T) {
+	for name, reply := range map[string]string{
+		"empty":      `{"audioContent":""}`,
+		"missing":    `{}`,
+		"not base64": `{"audioContent":"%%%"}`,
+		"not json":   `<html>`,
+	} {
+		f := newFake(t, route{Method: "POST", Path: "/v1/text:synthesize", Body: synthBody("x", "v", 1), Reply: reply})
+		c := &Client{BaseURL: f.URL, HTTP: f.Client()}
+		if _, err := c.Synthesize(context.Background(), Request{Text: "x", Voice: "v", Rate: 1}); err == nil {
+			t.Errorf("%s: expected an error", name)
+		}
 	}
 }
 
-func TestErrorClassification(t *testing.T) {
+func TestErrorsAreClassifiedFromTheServiceReply(t *testing.T) {
 	cases := []struct {
-		status int
-		body   string
-		kind   Kind
-		fatal  bool
+		name    string
+		status  int
+		body    string
+		kind    Kind
+		fatal   bool
+		retry   bool
+		message string
 	}{
-		{401, `{"error":{"message":"bad token","status":"UNAUTHENTICATED"}}`, KindAuth, true},
-		{403, `{"error":{"message":"denied","status":"PERMISSION_DENIED"}}`, KindAuth, true},
-		{403, `{"error":{"message":"api off","status":"PERMISSION_DENIED","details":[{"reason":"SERVICE_DISABLED"}]}}`, KindQuota, true},
-		{429, `{"error":{"message":"quota","status":"RESOURCE_EXHAUSTED"}}`, KindRateLimited, false},
-		{400, `{"error":{"message":"bad voice","status":"INVALID_ARGUMENT"}}`, KindBadRequest, false},
-		{500, `oops`, KindTransient, false},
-		{404, `nope`, KindOther, false},
+		{"bad token", 401, `{"error":{"message":"bad token","status":"UNAUTHENTICATED"}}`, KindAuth, true, false, "bad token"},
+		{"permission denied", 403, `{"error":{"message":"denied","status":"PERMISSION_DENIED"}}`, KindAuth, true, false, "denied"},
+		{"api disabled", 403, `{"error":{"message":"api off","status":"PERMISSION_DENIED","details":[{"reason":"SERVICE_DISABLED"}]}}`, KindQuota, true, false, "api off"},
+		{"billing", 403, `{"error":{"message":"no billing","status":"PERMISSION_DENIED","details":[{"reason":"BILLING_DISABLED"}]}}`, KindQuota, true, false, "no billing"},
+		{"rate limited", 429, `{"error":{"message":"quota","status":"RESOURCE_EXHAUSTED"}}`, KindRateLimited, false, true, "quota"},
+		{"bad voice", 400, `{"error":{"message":"bad voice","status":"INVALID_ARGUMENT"}}`, KindBadRequest, false, false, "bad voice"},
+		{"server error", 500, `oops`, KindTransient, false, true, "oops"},
+		{"unavailable", 503, `{"error":{"message":"busy","status":"UNAVAILABLE"}}`, KindTransient, false, true, "busy"},
+		{"not found", 404, `nope`, KindOther, false, false, "nope"},
 	}
 	for _, tc := range cases {
-		e := newAPIError(tc.status, []byte(tc.body), 0)
-		if e.Kind() != tc.kind || e.Fatal() != tc.fatal {
-			t.Errorf("%d %s: kind %v fatal %v", tc.status, tc.body, e.Kind(), e.Fatal())
+		f := newFake(t, route{Method: "POST", Path: "/v1/text:synthesize", Body: synthBody("x", "v", 1), Status: tc.status, Reply: tc.body})
+		c := &Client{BaseURL: f.URL, HTTP: f.Client()}
+		_, err := c.Synthesize(context.Background(), Request{Text: "x", Voice: "v", Rate: 1})
+		var api *APIError
+		if !errors.As(err, &api) {
+			t.Errorf("%s: got %T %v", tc.name, err, err)
+			continue
+		}
+		if api.Kind() != tc.kind || api.Fatal() != tc.fatal || api.Retryable() != tc.retry || api.Status != tc.status {
+			t.Errorf("%s: kind %v fatal %v retryable %v status %d", tc.name, api.Kind(), api.Fatal(), api.Retryable(), api.Status)
+		}
+		if api.Message != tc.message {
+			t.Errorf("%s: message %q, want %q", tc.name, api.Message, tc.message)
 		}
 	}
 }
 
-func TestRetryDoesNotRetryClientErrors(t *testing.T) {
-	var calls atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls.Add(1)
-		http.Error(w, `{"error":{"message":"no","status":"UNAUTHENTICATED"}}`, http.StatusUnauthorized)
-	}))
-	defer srv.Close()
-
-	c := &Client{BaseURL: srv.URL, HTTP: retrying(&recordingSleep{})}
-	if _, err := c.Synthesize(context.Background(), Request{Text: "x", Voice: "v", Rate: 1}); err == nil {
-		t.Fatal("expected error")
+func TestErrorTextNamesTheServiceMessageAndStatus(t *testing.T) {
+	e := newAPIError(429, []byte(`{"error":{"message":"too fast","status":"RESOURCE_EXHAUSTED"}}`), 0)
+	if got := e.Error(); got != "text-to-speech: too fast (HTTP 429)" {
+		t.Errorf("Error() = %q", got)
 	}
-	if calls.Load() != 1 {
-		t.Fatalf("calls %d", calls.Load())
+	if got := newAPIError(503, nil, 0).Error(); got != "text-to-speech: Service Unavailable (HTTP 503)" {
+		t.Errorf("empty body: %q", got)
+	}
+	long := newAPIError(500, []byte(strings.Repeat("x", 500)), 0)
+	if len(long.Message) != 200 {
+		t.Errorf("long body kept %d bytes", len(long.Message))
 	}
 }
 
-func TestRetryStopsWhenContextIsCancelled(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "x", http.StatusServiceUnavailable)
-	}))
-	defer srv.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	tr := NewRetryTransport(http.DefaultTransport)
-	tr.Sleep = func(ctx context.Context, d time.Duration) error {
-		cancel()
-		return ctx.Err()
-	}
-	c := &Client{BaseURL: srv.URL, HTTP: &http.Client{Transport: tr}}
-	_, err := c.Synthesize(ctx, Request{Text: "x", Voice: "v", Rate: 1})
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("error %v", err)
+func TestRetryAfterHeaderIsCarriedOnTheError(t *testing.T) {
+	f := newFake(t, route{Method: "POST", Path: "/v1/text:synthesize", Body: synthBody("x", "v", 1), Status: 429, Reply: `{}`, Header: map[string]string{"Retry-After": "9"}})
+	c := &Client{BaseURL: f.URL, HTTP: f.Client()}
+	_, err := c.Synthesize(context.Background(), Request{Text: "x", Voice: "v", Rate: 1})
+	var api *APIError
+	if !errors.As(err, &api) || api.RetryAfter != 9*time.Second {
+		t.Fatalf("got %v", err)
 	}
 }
 
-func TestVoices(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("languageCode") != "ar-XA" {
-			t.Errorf("query %s", r.URL.RawQuery)
-		}
-		io.WriteString(w, `{"voices":[{"name":"ar-XA-Chirp3-HD-Achernar","ssmlGender":"FEMALE","naturalSampleRateHertz":24000,"languageCodes":["ar-XA"]},{"name":"ar-XA-Wavenet-A","ssmlGender":"FEMALE","naturalSampleRateHertz":24000,"languageCodes":["ar-XA"]}]}`)
-	}))
-	defer srv.Close()
-
-	voices, err := (&Client{BaseURL: srv.URL, HTTP: srv.Client()}).Voices(context.Background())
+func TestVoicesAskForArabicAndDecodeTheCatalogue(t *testing.T) {
+	f := newFake(t, route{Method: "GET", Path: "/v1/voices", Query: url.Values{"languageCode": {"ar-XA"}}, Reply: `{"voices":[
+		{"languageCodes":["ar-XA"],"name":"ar-XA-Chirp3-HD-Achernar","ssmlGender":"FEMALE","naturalSampleRateHertz":24000},
+		{"languageCodes":["ar-XA"],"name":"ar-XA-Wavenet-B","ssmlGender":"MALE","naturalSampleRateHertz":24000}]}`})
+	voices, err := (&Client{BaseURL: f.URL, HTTP: f.Client()}).Voices(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(voices) != 2 || voices[0].Name != "ar-XA-Chirp3-HD-Achernar" || voices[0].Gender != "female" || voices[0].SampleRate != 24000 {
+	want := []VoiceInfo{
+		{Name: "ar-XA-Chirp3-HD-Achernar", Gender: "female", SampleRate: 24000},
+		{Name: "ar-XA-Wavenet-B", Gender: "male", SampleRate: 24000},
+	}
+	if !reflect.DeepEqual(voices, want) {
 		t.Fatalf("voices %+v", voices)
+	}
+}
+
+func TestVoicesPropagateServiceErrors(t *testing.T) {
+	f := newFake(t, route{Method: "GET", Path: "/v1/voices", Query: url.Values{"languageCode": {"ar-XA"}}, Status: 401, Reply: `{"error":{"message":"expired","status":"UNAUTHENTICATED"}}`})
+	_, err := (&Client{BaseURL: f.URL, HTTP: f.Client()}).Voices(context.Background())
+	var api *APIError
+	if !errors.As(err, &api) || api.Kind() != KindAuth {
+		t.Fatalf("got %v", err)
 	}
 }
 
@@ -199,40 +248,21 @@ type countingWaiter struct{ n int }
 
 func (c *countingWaiter) Wait(context.Context) error { c.n++; return nil }
 
-func TestLimitIsAppliedPerRequest(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, `{"audioContent":"b2s="}`)
-	}))
-	defer srv.Close()
-
+func TestEveryRequestPassesTheLimiter(t *testing.T) {
+	f := newFake(t,
+		route{Method: "POST", Path: "/v1/text:synthesize", Body: synthBody("x", "v", 1), Reply: audioReply("a")},
+		route{Method: "GET", Path: "/v1/voices", Query: url.Values{"languageCode": {"ar-XA"}}, Reply: `{"voices":[]}`})
 	w := &countingWaiter{}
-	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Limit: w}
+	c := &Client{BaseURL: f.URL, HTTP: f.Client(), Limit: w}
 	for range 3 {
 		if _, err := c.Synthesize(context.Background(), Request{Text: "x", Voice: "v", Rate: 1}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if w.n != 3 {
-		t.Fatalf("waits %d", w.n)
+	if _, err := c.Voices(context.Background()); err != nil {
+		t.Fatal(err)
 	}
-}
-
-func TestRetryAfterParsing(t *testing.T) {
-	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
-	h := http.Header{}
-	if retryAfter(h, now) != 0 {
-		t.Fatal("empty header")
-	}
-	h.Set("Retry-After", "12")
-	if retryAfter(h, now) != 12*time.Second {
-		t.Fatal("seconds")
-	}
-	h.Set("Retry-After", now.Add(90*time.Second).Format(http.TimeFormat))
-	if d := retryAfter(h, now); d != 90*time.Second {
-		t.Fatalf("date %v", d)
-	}
-	h.Set("Retry-After", "garbage")
-	if retryAfter(h, now) != 0 {
-		t.Fatal("garbage")
+	if w.n != 4 {
+		t.Fatalf("limiter waited %d times, want 4", w.n)
 	}
 }

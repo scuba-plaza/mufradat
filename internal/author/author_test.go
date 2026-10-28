@@ -244,18 +244,16 @@ func TestCardThatNeverPassesIsReportedAndOthersSurvive(t *testing.T) {
 	}
 }
 
-func TestUsageLimitStopsTheRunAndKeepsWhatWasSaved(t *testing.T) {
+func TestAuthFailureStopsTheRunAndKeepsWhatWasSaved(t *testing.T) {
 	w := newWorld(t)
-	reset := time.Date(2026, 10, 8, 15, 0, 0, 0, time.UTC)
 	backend := &fakeLLM{answer: func(call int, cards []prompt.Card) (json.RawMessage, error) {
 		if call >= 1 {
-			return nil, &llm.UsageLimitError{ResetAt: reset, Message: "hit your limit"}
+			return nil, &llm.AuthError{Message: "Unauthorized"}
 		}
 		return finish(cards, nil), nil
 	}}
 	res, err := runAuthor(t, w, backend, NextRanked(w.load(t), w.list, w.ix, 3), Options{Batch: 1, Concurrency: 1, System: "s"})
-	limit, ok := llm.AsUsageLimit(err)
-	if !ok || !limit.ResetAt.Equal(reset) {
+	if !llm.AsAuth(err) {
 		t.Fatalf("err %v", err)
 	}
 	if len(res.Written) != 1 || len(res.Unwritten) != 2 || len(res.Failed) != 0 {
@@ -270,11 +268,32 @@ func TestUsageLimitStopsTheRunAndKeepsWhatWasSaved(t *testing.T) {
 	}
 }
 
+func TestRateLimitThatOutlastsTheRetriesStopsTheRunAndKeepsWhatWasSaved(t *testing.T) {
+	w := newWorld(t)
+	backend := &fakeLLM{answer: func(call int, cards []prompt.Card) (json.RawMessage, error) {
+		if call >= 1 {
+			return nil, &llm.RateLimitedError{RetryAfter: time.Hour, Message: "Rate limit exceeded"}
+		}
+		return finish(cards, nil), nil
+	}}
+	res, err := runAuthor(t, w, backend, NextRanked(w.load(t), w.list, w.ix, 3), Options{Batch: 1, Concurrency: 1, System: "s"})
+	var limited *llm.RateLimitedError
+	if !errors.As(err, &limited) || limited.RetryAfter != time.Hour {
+		t.Fatalf("err %v", err)
+	}
+	if len(res.Written) != 1 || len(res.Unwritten) != 2 || len(res.Failed) != 0 {
+		t.Fatalf("res written %d unwritten %d failed %d", len(res.Written), len(res.Unwritten), len(res.Failed))
+	}
+	if w.load(t).Len() != 1 {
+		t.Fatal("the finished note must be saved")
+	}
+}
+
 func TestOtherCallFailuresDoNotCancelOtherBatches(t *testing.T) {
 	w := newWorld(t)
 	backend := &fakeLLM{answer: func(call int, cards []prompt.Card) (json.RawMessage, error) {
 		if cards[0].Arabic == "كَتَبَ" {
-			return nil, &llm.CallError{Message: "claude: boom"}
+			return nil, &llm.CallError{Message: "boom"}
 		}
 		return finish(cards, nil), nil
 	}}

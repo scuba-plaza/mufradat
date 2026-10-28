@@ -139,8 +139,8 @@ func (a Author) Run(ctx context.Context, targets []Target, opts Options) (Result
 }
 
 func fatal(err error) bool {
-	_, limit := llm.AsUsageLimit(err)
-	return limit || llm.AsAuth(err) || llm.AsUnavailable(err)
+	var limited *llm.RateLimitedError
+	return llm.AsAuth(err) || errors.As(err, &limited)
 }
 
 func (a Author) runBatch(ctx context.Context, s *runState, batch []int, markHandled func(int)) error {

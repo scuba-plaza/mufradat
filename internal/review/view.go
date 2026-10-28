@@ -52,7 +52,7 @@ type stateView struct {
 	Summary Summary    `json:"summary"`
 	Next    string     `json:"next,omitempty"`
 	History int        `json:"history"`
-	Claude  bool       `json:"claude"`
+	Mistral bool       `json:"mistral"`
 	Audio   bool       `json:"audio"`
 	Verify  bool       `json:"verify"`
 	Voice   string     `json:"voice,omitempty"`
@@ -88,7 +88,7 @@ func (s *session) view(id string) (stateView, error) {
 	sum := s.count()
 	v := stateView{
 		Summary: sum, Next: NextSteps(sum, s.deps.Prefix), History: len(s.history),
-		Claude: s.deps.Rewriter != nil, Audio: s.deps.Audio != nil, Verify: s.deps.Verifier != nil,
+		Mistral: s.deps.Rewriter != nil, Audio: s.deps.Audio != nil, Verify: s.deps.Verifier != nil,
 		All: s.filter.All, List: []listView{},
 	}
 	if s.deps.Voices != nil {

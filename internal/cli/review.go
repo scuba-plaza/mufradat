@@ -21,7 +21,7 @@ differing letters highlighted. For each note you can
   enter  say the card is right, so its flags stay out of the next build
   1 2    add the missing ending CATT or CAMeL read, when that is the whole problem
   e      edit the note
-  c      ask Claude Code for a better version, and keep it or not
+  c      ask Mistral for a better version, and keep it or not
   w/f/s  listen to the word, the forms or the sentence
   u      undo your last decision
 
@@ -82,7 +82,7 @@ func runReview(cmd *cobra.Command, a *app.App, opts app.ReviewOptions, noOpen bo
 		}
 		r.Event("click 'Finish review' on the page or press Ctrl+C here when you are done")
 	})
-	r.Event("%s: %d marked right, %d edited, %d rewritten by Claude Code, %d still open", noun(sum.Total), sum.Kept, sum.Edited, sum.Rewritten, sum.Open)
+	r.Event("%s: %d marked right, %d edited, %d rewritten by Mistral, %d still open", noun(sum.Total), sum.Kept, sum.Edited, sum.Rewritten, sum.Open)
 	if next := review.NextSteps(sum, a.CommandPrefix()); next != "" {
 		r.Event("%s", next)
 	}

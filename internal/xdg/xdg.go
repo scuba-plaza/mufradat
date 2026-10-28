@@ -32,6 +32,8 @@ func (d Dirs) UserConfigFile() string { return filepath.Join(d.Config, "config.t
 
 func (d Dirs) ImportedGoogleKey() string { return filepath.Join(d.Config, "google-credentials.json") }
 
+func (d Dirs) ImportedMistralKey() string { return filepath.Join(d.Config, "mistral-api-key") }
+
 func (d Dirs) DefaultWorkspace() string { return filepath.Join(d.Data, "default") }
 
 func (d Dirs) PythonEnvs() string { return filepath.Join(d.Data, "pyenv") }

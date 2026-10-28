@@ -1,29 +1,29 @@
 exec mufradat init ws
 cp notes.jsonl ws/notes.jsonl
 exec mufradat auth google --import key.json
-exec mufradat -C ws config set tts.endpoint $TTS_URL
+exec mufradat -C ws config set audio.provider google
 
 env FAKE_BROWSER=compare
 exec mufradat -C ws voices compare
 stdout 'comparing voices at http://127.0.0.1:[0-9]+/[A-Z2-7]+/'
-stderr 'audio.voice is now ar-XA-Wavenet-A'
+stderr 'google.voice is now ar-XA-Wavenet-A'
 grep 'compare current=ar-XA-Chirp3-HD-Achernar voices=2 samples=4' browser.log
 grep 'sample word 200 MP3\[ar-XA-Wavenet-A\]كِتَاب' browser.log
 grep 'sample sentence 200 MP3\[ar-XA-Wavenet-A\]قَرَأْتُ الْكِتَابَ' browser.log
 grep -count=4 'ar-XA-Wavenet-A' synth-calls.log
 grep 'use 200' browser.log
-exec mufradat -C ws config get audio.voice
+exec mufradat -C ws config get google.voice
 stdout 'ar-XA-Wavenet-A'
 exec mufradat -C ws audio --dry-run
 stderr 'with ar-XA-Wavenet-A'
 
 rm browser.log
-exec mufradat -C ws config set audio.voice ar-XA-Chirp3-HD-Achernar
+exec mufradat -C ws config set google.voice ar-XA-Chirp3-HD-Achernar
 exec mufradat -C ws voices compare --text 'مَرْحَبًا'
 grep 'samples=1' browser.log
 grep -count=5 'ar-XA-Wavenet-A' synth-calls.log
 
-exec mufradat -C ws config set audio.voice ar-XA-Chirp3-HD-Achernar
+exec mufradat -C ws config set google.voice ar-XA-Chirp3-HD-Achernar
 exec mufradat -C ws voices compare
 grep -count=5 'ar-XA-Wavenet-A' synth-calls.log
 exists ws/state/voice-samples

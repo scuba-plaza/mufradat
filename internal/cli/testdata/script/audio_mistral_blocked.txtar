@@ -1,0 +1,27 @@
+exec mufradat init ws
+cp notes.jsonl ws/notes.jsonl
+
+exits 1 mufradat -C ws audio
+stderr '3 clips wanted, 0 present, 3 to make'
+stderr 'made 2 clips'
+stderr 'رَجُلٌ طَيِّبْ.*Content flagged by guardrails'
+stderr '1 clip was blocked by Mistral.s moderation'
+stderr 'hint: edit those notes, or use the Google provider with `mufradat -C .*ws config set audio.provider google`'
+! stderr 'key'
+! stderr 'doctor'
+grep -count=3 '^speech' mistral-requests.log
+
+exits 1 mufradat -C ws audio
+stderr '3 clips wanted, 2 present, 1 to make'
+stderr '1 clip was blocked'
+grep -count=4 '^speech' mistral-requests.log
+
+exec mufradat auth google --import key.json
+exec mufradat -C ws config set audio.provider google
+exec mufradat -C ws audio
+stderr 'made 3 clips'
+! stderr 'blocked'
+
+-- notes.jsonl --
+{"id":"n_aaaaaaaaaaaa","seq":1,"rank":3,"origin":"ranked","lemma":"كِتَاب","pos":"noun","gender":"m","forms":[],"english":"book","example":"","example_en":"","created":"2023-11-14T22:13:20Z","updated":"2023-11-14T22:13:20Z"}
+{"id":"n_bbbbbbbbbbbb","seq":2,"rank":1,"origin":"ranked","lemma":"قَلَم","pos":"noun","gender":"m","forms":[],"english":"pen","example":"أَبِي رَجُلٌ [طَيِّبٌ].","example_en":"My father is a good man.","created":"2023-11-14T22:13:20Z","updated":"2023-11-14T22:13:21Z"}

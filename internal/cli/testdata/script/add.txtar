@@ -1,23 +1,25 @@
 exec mufradat init ws
 
-env FAKE_CLAUDE_MODE=ok
 exec mufradat -C ws add 2 --dry-run
 stdout '^1\tفِي\tprep$'
 stdout '^2\tمِنْ\tprep$'
 stderr 'would write 2 notes'
 ! exists ws/notes.jsonl.tmp
-! exists claude-calls
+mistral-calls 0
 
 exec mufradat -C ws add 2
-stderr 'writing 2 notes with Claude Code \(sonnet, medium effort'
+stderr 'writing 2 notes with Mistral \(mistral-medium-latest, 10 per request\)'
 stderr '\[2/2\]'
-stderr 'wrote 2 notes in 1 request'
+stderr 'wrote 2 notes in 1 request; tokens: 100 input, 5 cached, 10 output'
 stdout '^n_[a-z2-7]{12}\tفِي\tmeaning of فِي$'
-grep 'model=sonnet effort=medium' claude-args.log
+mistral-calls 1
+grep 'chat model=mistral-medium-latest' mistral-requests.log
 grep -count=2 '"origin":"ranked"' ws/notes.jsonl
 grep '"rank":1,' ws/notes.jsonl
 grep '"example":"قَرَأَ \[الْوَلَدُ\] الْكِتَابَ فِي الْبَيْتِ."' ws/notes.jsonl
 grep -count=1 '"calls":1' ws/state/usage.jsonl
+grep '"input":100,"output":10,"cache_read":5,"models":\["mistral-medium-latest"\]' ws/state/usage.jsonl
+! grep 'cost' ws/state/usage.jsonl
 
 exec mufradat -C ws status
 stdout 'add .*2 notes \(2 of the'
@@ -28,6 +30,10 @@ stdout '"calls": 1'
 exec mufradat -C ws add 1 --dry-run
 stdout '^4\t'
 
-exec mufradat -C ws build
-stderr '3 notes, 6 cards'
+exec mufradat -C ws config set author.model mistral-small-latest
+exec mufradat -C ws add 1
+stderr 'with Mistral \(mistral-small-latest,'
+grep 'chat model=mistral-small-latest' mistral-requests.log
 
+exec mufradat -C ws build
+stderr '4 notes, 8 cards'

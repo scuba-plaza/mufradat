@@ -1,21 +1,61 @@
 exec mufradat init ws
-exec mufradat -C ws config get audio.voice
-stdout 'ar-XA-Chirp3-HD-Achernar'
-
-exec mufradat -C ws config set author.model haiku
+exec mufradat -C ws config get audio.provider
+stdout '^mistral$'
+exec mufradat -C ws config get google.voice
+stdout '^ar-XA-Chirp3-HD-Achernar$'
+exec mufradat -C ws config get mistral.voice
+stdout '^voice_479$'
 exec mufradat -C ws config get author.model
-stdout '^haiku$'
+stdout '^mistral-medium-latest$'
+
+exec mufradat -C ws config set author.model mistral-small-latest
+exec mufradat -C ws config get author.model
+stdout '^mistral-small-latest$'
 grep 'model = ' ws/mufradat.toml
 
 ! exec mufradat -C ws config set audio.rate 9
 stderr 'outside 0.25 to 2'
+! exec mufradat -C ws config set audio.provider azure
+stderr 'audio.provider "azure" must be mistral or google'
+! exec mufradat -C ws config set mistral.endpoint not-a-url
+stderr 'mistral.endpoint "not-a-url" must be an http\(s\) URL'
 ! exec mufradat -C ws config set nonsense 1
 stderr 'unknown key'
 
+! exec mufradat -C ws config set audio.voice x
+stderr 'unknown key'
+! exec mufradat -C ws config set tts.endpoint https://example.com
+stderr 'unknown key'
+! exec mufradat -C ws config set tts.quota_project p
+stderr 'unknown key'
+! exec mufradat -C ws config set author.backend x
+stderr 'unknown key'
+! exec mufradat -C ws config set author.effort high
+stderr 'unknown key'
+! exec mufradat -C ws config get audio.voice
+stderr 'unknown key'
+
 exec mufradat -C ws config set google.credentials_file /keys/g.json
-exists home/.config/mufradat/config.toml
+grep 'credentials_file = ./keys/g.json.' home/.config/mufradat/config.toml
 ! grep 'credentials_file' ws/mufradat.toml
 
+exec mufradat -C ws config set mistral.api_key sk-secret-1234
+stderr 'mistral.api_key = \(set\)'
+! stderr 'sk-secret-1234'
+grep 'api_key = .sk-secret-1234.' home/.config/mufradat/config.toml
+! grep 'api_key' ws/mufradat.toml
+
 exec mufradat -C ws config get
-stdout 'author.model = haiku'
+stdout 'author.model = mistral-small-latest'
 stdout 'google.credentials_file = /keys/g.json'
+stdout 'mistral.api_key = \(set\)'
+! stdout 'sk-secret-1234'
+exec mufradat -C ws config get mistral.api_key
+stdout '^\(set\)$'
+
+env MISTRAL_API_KEY=
+exec mufradat auth mistral
+stdout '^mistral.api_key$'
+env MISTRAL_API_KEY=fake-mistral-key
+exec mufradat auth mistral
+stdout '^MISTRAL_API_KEY$'

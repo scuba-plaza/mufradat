@@ -37,7 +37,7 @@ func newAdd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [N | WORD...]",
 		Short: "Write the next most common words, or the words you name",
-		Long: `Write notes with Claude Code and save each one as soon as it is finished.
+		Long: `Write notes with Mistral and save each one as soon as it is finished.
 
 Without words, add writes the N (default 10) most common words that have no
 note yet. With words, it writes exactly those: give them as arguments,
@@ -49,12 +49,13 @@ terminal. Without one, pick with --entry WORD#N, --pos, --pick N (a single
 word) or --yes (the first entry, which is the likeliest).
 
 The headword, forms, gender and root come from the shipped Wiktionary data.
-Claude writes the meaning, a hint where one is needed and a fully vowelled
-example from common words. It runs 'claude -p' with your own Claude Code login,
-so a Pro or Max plan is enough and no API key is needed.
+Mistral writes the meaning, a hint where one is needed and a fully vowelled
+example from common words. It needs a Mistral API key: set MISTRAL_API_KEY, or
+save the key in a file and run 'mufradat auth mistral --import FILE'.
 
-If a run stops early, for example at your plan's usage limit, every finished
-note is already saved and the message names the command that writes the rest.`,
+If a run stops early, for example when the service rate-limits you, every
+finished note is already saved and the message names the command that writes
+the rest.`,
 		Example: `  mufradat add                 the next 10 most common words
   mufradat add 25              the next 25
   mufradat add كتاب عين        these two words, asking about senses
@@ -70,7 +71,7 @@ note is already saved and the message names the command that writes the rest.`,
 	fl.StringArrayVar(&f.entries, "entry", nil, "take entry N of a word, written WORD#N (repeatable)")
 	fl.StringVar(&f.pos, "pos", "", "only consider entries of this part of speech")
 	fl.BoolVarP(&f.yes, "yes", "y", false, "never ask: take the first entry of every word")
-	fl.BoolVar(&f.dryRun, "dry-run", false, "show what would be written without calling Claude")
+	fl.BoolVar(&f.dryRun, "dry-run", false, "show what would be written without calling Mistral")
 	fl.BoolVar(&f.asJSON, "json", false, "print machine-readable output")
 	return cmd
 }
@@ -189,7 +190,7 @@ func runAdd(cmd *cobra.Command, a *app.App, args []string, f addFlags) error {
 		return nil
 	}
 
-	backend, err := a.Claude()
+	backend, err := a.LLM()
 	if err != nil {
 		return err
 	}
@@ -201,7 +202,7 @@ func runAdd(cmd *cobra.Command, a *app.App, args []string, f addFlags) error {
 	if err != nil {
 		return err
 	}
-	r.Event("writing %s with Claude Code (%s, %s effort, %d per request)", counted(len(targets), "note", "notes"), cfg.Author.Model, cfg.Author.Effort, cfg.Author.BatchSize)
+	r.Event("writing %s with Mistral (%s, %d per request)", counted(len(targets), "note", "notes"), cfg.Author.Model, cfg.Author.BatchSize)
 
 	res, runErr := au.Run(ctx, targets, author.Options{
 		Batch: cfg.Author.BatchSize, Concurrency: cfg.Author.Concurrency, System: system,

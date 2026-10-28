@@ -13,7 +13,7 @@ import (
 	"github.com/scuba-plaza/mufradat/internal/failure"
 )
 
-var userOnlyKeys = []string{"workspace", "google.credentials_file", "verify.python"}
+var userOnlyKeys = []string{"workspace", "google.credentials_file", "mistral.api_key", "verify.python"}
 
 func newConfig(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
@@ -42,7 +42,7 @@ func newConfigGet(a *app.App) *cobra.Command {
 				if err != nil {
 					return failure.Usage(err)
 				}
-				fmt.Fprintln(a.Env.Stdout, v)
+				fmt.Fprintln(a.Env.Stdout, shown(args[0], v))
 				return nil
 			}
 			flat, err := config.Flatten(cfg)
@@ -50,7 +50,7 @@ func newConfigGet(a *app.App) *cobra.Command {
 				return err
 			}
 			for _, k := range slices.Sorted(maps.Keys(flat)) {
-				fmt.Fprintf(a.Env.Stdout, "%s = %v\n", k, flat[k])
+				fmt.Fprintf(a.Env.Stdout, "%s = %v\n", k, shown(k, flat[k]))
 			}
 			return nil
 		},
@@ -79,7 +79,7 @@ func newConfigSet(a *app.App) *cobra.Command {
 				return failure.Usage(err)
 			}
 			a.InvalidateConfig()
-			a.Reporter().Event("%s = %s (%s)", key, value, target)
+			a.Reporter().Event("%s = %v (%s)", key, shown(key, value), target)
 			return nil
 		},
 	}
@@ -107,4 +107,11 @@ func newConfigPath(a *app.App) *cobra.Command {
 			return err
 		},
 	}
+}
+
+func shown(key string, value any) any {
+	if s, ok := value.(string); ok && config.IsSecret(key) {
+		return config.Mask(s)
+	}
+	return value
 }

@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/scuba-plaza/mufradat/internal/env"
 	"github.com/scuba-plaza/mufradat/internal/failure"
 	"github.com/scuba-plaza/mufradat/internal/llm"
+	"github.com/scuba-plaza/mufradat/internal/mistral"
 	"github.com/scuba-plaza/mufradat/internal/tts"
 )
 
@@ -23,25 +25,22 @@ func testApp(t *testing.T) *App {
 	})
 }
 
-func TestAuthorFailureExitCodes(t *testing.T) {
+func TestAuthorFailureExitCodesAndHints(t *testing.T) {
 	a := testApp(t)
-	reset := time.Date(2026, 10, 8, 15, 0, 0, 0, time.UTC)
 	cases := []struct {
 		name string
 		err  error
 		code int
 		hint string
 	}{
-		{"usage limit", &llm.UsageLimitError{ResetAt: reset, Message: "x"}, failure.ExitTemporary, "resets at"},
-		{"usage limit without time", &llm.UsageLimitError{Message: "x"}, failure.ExitTemporary, "run the command again later"},
-		{"busy", &llm.TransientError{Message: "overloaded"}, failure.ExitTemporary, "in a few minutes"},
-		{"rate limited", &llm.RateLimitedError{Message: "slow"}, failure.ExitTemporary, "in a few minutes"},
-		{"signed out", &llm.AuthError{Message: "login"}, failure.ExitNotSetUp, "sign in with `claude`"},
-		{"missing binary", &llm.UnavailableError{Err: errors.New("not found")}, failure.ExitNotSetUp, "install Claude Code"},
+		{"busy", &llm.TransientError{Message: "overloaded"}, failure.ExitTemporary, "the service is busy; the finished notes are saved"},
+		{"rate limited", &llm.RateLimitedError{Message: "slow"}, failure.ExitTemporary, "run the command again in a few minutes"},
+		{"bad key", &llm.AuthError{Message: "Unauthorized"}, failure.ExitNotSetUp, "auth mistral --import FILE"},
 		{"other", errors.New("boom"), failure.ExitFailure, ""},
+		{"call error", &llm.CallError{Message: "Invalid model: x"}, failure.ExitFailure, ""},
 	}
 	for _, tc := range cases {
-		got := a.AuthorFailure(tc.err)
+		got := a.AuthorFailure(fmt.Errorf("run: %w", tc.err))
 		if failure.Code(got) != tc.code {
 			t.Errorf("%s: exit code %d, want %d", tc.name, failure.Code(got), tc.code)
 		}
@@ -54,30 +53,66 @@ func TestAuthorFailureExitCodes(t *testing.T) {
 	}
 }
 
-func TestTTSFailureExitCodes(t *testing.T) {
+func TestSpeechFailureForGoogle(t *testing.T) {
 	a := testApp(t)
 	cases := []struct {
-		status int
-		body   string
-		code   int
+		name string
+		err  *tts.APIError
+		code int
+		hint string
 	}{
-		{401, `{"error":{"status":"UNAUTHENTICATED"}}`, failure.ExitNotSetUp},
-		{403, `{"error":{"status":"PERMISSION_DENIED","details":[{"reason":"SERVICE_DISABLED"}]}}`, failure.ExitTemporary},
-		{429, `{"error":{"status":"RESOURCE_EXHAUSTED"}}`, failure.ExitTemporary},
-		{503, `x`, failure.ExitTemporary},
-		{400, `{"error":{"status":"INVALID_ARGUMENT"}}`, failure.ExitFailure},
+		{"bad credentials", &tts.APIError{Status: 401, Reason: "UNAUTHENTICATED"}, failure.ExitNotSetUp, "auth google --import KEY.json"},
+		{"api disabled", &tts.APIError{Status: 403, Reason: "PERMISSION_DENIED SERVICE_DISABLED"}, failure.ExitTemporary, "google.quota_project"},
+		{"rate limited", &tts.APIError{Status: 429, Reason: "RESOURCE_EXHAUSTED"}, failure.ExitTemporary, "run the command again"},
+		{"outage", &tts.APIError{Status: 503}, failure.ExitTemporary, "run the command again"},
+		{"bad request", &tts.APIError{Status: 400, Reason: "INVALID_ARGUMENT"}, failure.ExitFailure, ""},
 	}
 	for _, tc := range cases {
-		err := &tts.APIError{Status: tc.status, Reason: tc.body}
-		if tc.status == 403 {
-			err.Reason = "PERMISSION_DENIED SERVICE_DISABLED"
+		got := a.SpeechFailure(fmt.Errorf("clip: %w", tc.err))
+		if failure.Code(got) != tc.code || !strings.Contains(failure.Hint(got), tc.hint) {
+			t.Errorf("%s: exit %d hint %q, want exit %d hint containing %q", tc.name, failure.Code(got), failure.Hint(got), tc.code, tc.hint)
 		}
-		if got := failure.Code(a.TTSFailure(err)); got != tc.code {
-			t.Errorf("HTTP %d: exit code %d, want %d", tc.status, got, tc.code)
+		if !errors.Is(got, tc.err) {
+			t.Errorf("%s: the original error is lost", tc.name)
 		}
 	}
+}
+
+func TestSpeechFailureForMistral(t *testing.T) {
+	a := testApp(t)
+	cases := []struct {
+		name string
+		err  error
+		code int
+		hint string
+	}{
+		{"bad key", &mistral.APIError{Status: 401, Message: "Unauthorized"}, failure.ExitNotSetUp, "auth mistral --import FILE"},
+		{"forbidden", &mistral.APIError{Status: 403, Message: "Forbidden"}, failure.ExitNotSetUp, "auth mistral --import FILE"},
+		{"rate limited", &mistral.APIError{Status: 429}, failure.ExitTemporary, "run the command again"},
+		{"outage", &mistral.APIError{Status: 502}, failure.ExitTemporary, "run the command again"},
+		{"unreachable", &mistral.APIError{Message: "could not reach the service"}, failure.ExitTemporary, "run the command again"},
+		{"moderation", &mistral.APIError{Status: 403, Type: "guardrail_violation", Code: "1920", Message: "flagged"}, failure.ExitFailure, "config set audio.provider google"},
+		{"unknown voice", &mistral.VoiceError{Voice: "voice_999"}, failure.ExitFailure, "config set mistral.voice NAME"},
+		{"validation", &mistral.APIError{Status: 422, Message: "bad"}, failure.ExitFailure, ""},
+	}
+	for _, tc := range cases {
+		got := a.SpeechFailure(fmt.Errorf("clip: %w", tc.err))
+		if failure.Code(got) != tc.code || !strings.Contains(failure.Hint(got), tc.hint) {
+			t.Errorf("%s: exit %d hint %q, want exit %d hint containing %q", tc.name, failure.Code(got), failure.Hint(got), tc.code, tc.hint)
+		}
+		if !errors.Is(got, tc.err) {
+			t.Errorf("%s: the original error is lost", tc.name)
+		}
+	}
+	if strings.Contains(failure.Hint(a.SpeechFailure(&mistral.APIError{Status: 403, Type: "guardrail_violation"})), "key") {
+		t.Error("a moderation block must never tell the user to check their key")
+	}
+}
+
+func TestSpeechFailurePassesUnrelatedErrorsThrough(t *testing.T) {
+	a := testApp(t)
 	plain := errors.New("disk full")
-	if a.TTSFailure(plain) != plain {
+	if a.SpeechFailure(plain) != plain {
 		t.Error("unrelated errors must pass through unchanged")
 	}
 }

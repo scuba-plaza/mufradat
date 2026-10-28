@@ -19,7 +19,7 @@
   --good: #9ece6a;
   --warn: #e0af68;
   --bad: #f7768e;
-  --claude: #e3956c;
+  --mistral: #e3956c;
   --audio: #7dcfff;
   --target: #ffd479;
   --on-accent: #15161e;
@@ -43,7 +43,7 @@
     --good: #2f7d32;
     --warn: #a15c00;
     --bad: #c62828;
-    --claude: #b4532a;
+    --mistral: #b4532a;
     --audio: #00739e;
     --target: #9a6700;
     --on-accent: #ffffff;
@@ -138,8 +138,8 @@ button {
   color: var(--good);
 }
 
-.counts .claude {
-  color: var(--claude);
+.counts .mistral {
+  color: var(--mistral);
 }
 
 .finish {
@@ -259,8 +259,8 @@ button {
   color: var(--good);
 }
 
-.icon.claude {
-  color: var(--claude);
+.icon.mistral {
+  color: var(--mistral);
 }
 
 .tone-bad {
@@ -275,8 +275,8 @@ button {
   --tone: var(--audio);
 }
 
-.tone-claude {
-  --tone: var(--claude);
+.tone-mistral {
+  --tone: var(--mistral);
 }
 
 .tone-good {
@@ -295,7 +295,7 @@ button {
   display: inline-block;
   width: 12px;
   height: 12px;
-  border: 2px solid var(--claude);
+  border: 2px solid var(--mistral);
   border-right-color: transparent;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -473,8 +473,8 @@ button {
 }
 
 .side-title.rewritten,
-.side-title.claude {
-  color: var(--claude);
+.side-title.mistral {
+  color: var(--mistral);
 }
 
 .side-note {
@@ -875,8 +875,8 @@ select:focus {
   color: var(--bad);
 }
 
-.message.claude {
-  color: var(--claude);
+.message.mistral {
+  color: var(--mistral);
 }
 
 .activity {
@@ -893,7 +893,7 @@ select:focus {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--claude);
+  color: var(--mistral);
 }
 
 .actions {
@@ -939,9 +939,9 @@ select:focus {
   font-weight: 620;
 }
 
-.action.primary.tone-claude {
-  background: var(--claude);
-  border-color: var(--claude);
+.action.primary.tone-mistral {
+  background: var(--mistral);
+  border-color: var(--mistral);
 }
 
 .action.primary kbd {

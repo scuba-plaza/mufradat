@@ -173,7 +173,7 @@ function announce(view) {
     if (!asked && !checked) continue;
     const where = item.id === here ? '' : ' (' + item.lemma + ')';
     if (asked && item.ready) {
-      say("✦ Claude Code's version of " + item.lemma + ' is ready' + where, 'claude');
+      say("✦ Mistral's version of " + item.lemma + ' is ready' + where, 'mistral');
     } else if (item.notice) {
       say(item.notice + where, messageTone(item.notice_tone));
     }
@@ -379,7 +379,7 @@ function actions() {
   }
   if (e.proposal) {
     list.push(
-      { key: 'y', label: 'Use this version', run: () => act('use'), primary: true, tone: 'claude' },
+      { key: 'y', label: 'Use this version', run: () => act('use'), primary: true, tone: 'mistral' },
       { key: 'n', label: 'Keep yours', run: () => act('drop') },
       { key: 'e', label: 'Edit it first', run: () => startEdit(true) },
     );
@@ -399,9 +399,9 @@ function actions() {
     });
     if (e.state === 'open' || e.state === 'kept') {
       if (e.asking) {
-        list.push({ key: 'esc', label: 'Stop Claude Code', run: () => act('stop'), tone: 'claude' });
-      } else if (v.claude) {
-        list.push({ key: 'c', label: 'Ask Claude', run: () => act('ask'), tone: 'claude' });
+        list.push({ key: 'esc', label: 'Stop Mistral', run: () => act('stop'), tone: 'mistral' });
+      } else if (v.mistral) {
+        list.push({ key: 'c', label: 'Ask Mistral', run: () => act('ask'), tone: 'mistral' });
       }
     }
   }
@@ -473,7 +473,7 @@ function renderTop() {
   const counts = [el('span', null, s.open + ' open')];
   if (s.kept) counts.push(el('span', 'good', '✓ ' + s.kept + ' right'));
   if (s.edited) counts.push(el('span', 'good', '✎ ' + s.edited + ' edited'));
-  if (s.rewritten) counts.push(el('span', 'claude', '✦ ' + s.rewritten + ' rewritten'));
+  if (s.rewritten) counts.push(el('span', 'mistral', '✦ ' + s.rewritten + ' rewritten'));
   $('counts').replaceChildren(...counts);
   $('fill').style.width = (s.total ? (100 * (s.total - s.open)) / s.total : 100) + '%';
   $('finish').hidden = state.finished;
@@ -487,10 +487,10 @@ function renderTop() {
  */
 function icon(item) {
   if (item.asking || item.checking) return el('span', 'icon spinner');
-  if (item.ready) return el('span', 'icon claude', '✦');
+  if (item.ready) return el('span', 'icon mistral', '✦');
   if (item.state === 'kept') return el('span', 'icon good', '✓');
   if (item.state === 'edited') return el('span', 'icon good', '✎');
-  if (item.state === 'rewritten') return el('span', 'icon claude', '✦');
+  if (item.state === 'rewritten') return el('span', 'icon mistral', '✦');
   return el('span', 'icon dot tone-' + item.tone);
 }
 
@@ -544,8 +544,8 @@ function renderStatus() {
     const here = v.list.find((x) => x.id === state.current && x.asking);
     const others = v.list.filter((x) => x.asking && x.id !== state.current).length;
     const checking = v.list.filter((x) => x.checking).length;
-    if (here) parts.push(el('span', 'asking', el('span', 'spinner'), 'Claude Code is writing a new version'));
-    if (others) parts.push(el('span', 'asking', el('span', 'spinner'), 'Claude Code is working on ' + plural(others, 'other note', 'other notes')));
+    if (here) parts.push(el('span', 'asking', el('span', 'spinner'), 'Mistral is writing a new version'));
+    if (others) parts.push(el('span', 'asking', el('span', 'spinner'), 'Mistral is working on ' + plural(others, 'other note', 'other notes')));
     if (checking) parts.push(el('span', 'asking', el('span', 'spinner'), 'Checking ' + plural(checking, 'change', 'changes') + ' again'));
   }
   $('activity').replaceChildren(...parts);
@@ -600,7 +600,7 @@ function flagsView(e) {
     open: e.flags.length ? plural(e.flags.length, 'flag', 'flags') + ' to look at' : 'Nothing is flagged on this note',
     kept: '✓ You marked this card as right',
     edited: '✎ You edited this note',
-    rewritten: "✦ You kept Claude Code's version",
+    rewritten: "✦ You kept Mistral's version",
   };
   side.append(el('h2', 'side-title ' + e.state, titles[e.state]));
   if (e.state === 'edited' || e.state === 'rewritten') {
@@ -613,9 +613,9 @@ function flagsView(e) {
       : 'Vowel checking is not available, so there are no flags to show.'));
   }
   if (e.asking) {
-    side.append(banner('claude', el('span', 'spinner'),
-      el('span', 'grow', 'Claude Code is writing a new version · ' + e.seconds + 's'),
-      actionButton({ key: 'esc', label: 'Stop', run: () => act('stop'), tone: 'claude' })));
+    side.append(banner('mistral', el('span', 'spinner'),
+      el('span', 'grow', 'Mistral is writing a new version · ' + e.seconds + 's'),
+      actionButton({ key: 'esc', label: 'Stop', run: () => act('stop'), tone: 'mistral' })));
   }
   if (e.checking) side.append(banner('info', el('span', 'spinner'), el('span', 'grow', 'Checking the change again…')));
   if (e.notice) side.append(banner(messageTone(e.notice_tone), el('span', 'grow', e.notice)));

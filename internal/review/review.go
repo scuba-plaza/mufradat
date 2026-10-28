@@ -45,6 +45,7 @@ type Audio interface {
 
 type VoiceOption struct {
 	Name   string `json:"name"`
+	Label  string `json:"label,omitempty"`
 	Tier   string `json:"tier,omitempty"`
 	Gender string `json:"gender,omitempty"`
 }

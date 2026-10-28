@@ -207,7 +207,7 @@ func describe(is verify.Issue, hl string) (string, []row, string) {
 			return "Only CATT reads this word with other vowels", rows, "CAMeL agrees with the card, so the card is most likely right."
 		}
 		rows = append(rows, word("CAMeL", is.CAMeL, camel))
-		return "CATT and CAMeL both read this word with other vowels", rows, "Check the vowels. If the card is right, the sentence can probably be read another way without vowel marks; Claude can suggest a clearer one."
+		return "CATT and CAMeL both read this word with other vowels", rows, "Check the vowels. If the card is right, the sentence can probably be read another way without vowel marks; Mistral can suggest a clearer one."
 	case verify.KindInvalid:
 		rows := []row{word("card", is.Word, nil), word("known", strings.Join(is.Known, "، "), nil)}
 		return "CAMeL does not know these vowels for this word", rows, "CAMeL's dictionary has the word, but not with these vowels. Compare with Wiktionary."

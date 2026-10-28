@@ -1,12 +1,11 @@
 exec mufradat init ws
-env FAKE_CLAUDE_MODE=ok
 
 ! exec mufradat -C ws add ماء
 stderr '1 word needs a choice'
 stderr 'ماء#1  مَاء  noun'
 stderr 'ماء#2  مَاءَ  verb'
 stderr 'hint: choose with --entry'
-! exists claude-calls
+mistral-calls 0
 
 ! exec mufradat -C ws add ماء عين --pick 1
 stderr '--pick works with exactly one word'
