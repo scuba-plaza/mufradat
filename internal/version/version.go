@@ -22,8 +22,13 @@ type Info struct {
 }
 
 func Get() Info {
-	info := Info{Version: Version, Commit: Commit, Date: Date, Go: runtime.Version(), OS: runtime.GOOS, Arch: runtime.GOARCH}
 	bi, ok := debug.ReadBuildInfo()
+	info := resolve(Info{Version: Version, Commit: Commit, Date: Date}, bi, ok)
+	info.Go, info.OS, info.Arch = runtime.Version(), runtime.GOOS, runtime.GOARCH
+	return info
+}
+
+func resolve(info Info, bi *debug.BuildInfo, ok bool) Info {
 	if !ok {
 		if info.Version == "" {
 			info.Version = "dev"
