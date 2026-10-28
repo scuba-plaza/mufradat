@@ -88,6 +88,7 @@ func TestRunSkipsVendoredDirectoriesAndReportsFindings(t *testing.T) {
 	write("ok.go", "package x\n")
 	write(".venv/lib/x.py", "# fine here\n")
 	write("testdata/x.go", "// fine here\n")
+	write("a/b/deep.go", "package x\n")
 	var stdout, stderr bytes.Buffer
 	if code := run([]string{dir}, &stdout, &stderr); code != 0 || stdout.Len() != 0 {
 		t.Fatalf("clean tree: %d %q %q", code, stdout.String(), stderr.String())
@@ -95,5 +96,20 @@ func TestRunSkipsVendoredDirectoriesAndReportsFindings(t *testing.T) {
 	write("bad.py", "x = 1\n# why\n")
 	if code := run([]string{dir}, &stdout, &stderr); code != 1 || !strings.Contains(stdout.String(), "bad.py:2:") || !strings.Contains(stderr.String(), "1 comments found") {
 		t.Fatalf("dirty tree: %d %q %q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestRunLooksInsideNestedDirectoriesAndInARootWithASkippedName(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "out")
+	deep := filepath.Join(root, "a", "b")
+	if err := os.MkdirAll(deep, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(deep, "deep.go"), []byte("package x\n// why\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{root}, &stdout, &stderr); code != 1 || !strings.Contains(stdout.String(), "deep.go:2:") {
+		t.Fatalf("a comment two directories down was missed: %d %q %q", code, stdout.String(), stderr.String())
 	}
 }
