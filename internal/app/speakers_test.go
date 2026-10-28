@@ -135,9 +135,11 @@ func TestTheGoogleSpeakerListsVoicesWithGenderAndSampleRate(t *testing.T) {
 
 type mistralFixture struct {
 	*httptest.Server
-	mu    sync.Mutex
-	speak map[string]any
-	auth  string
+	mu           sync.Mutex
+	speak        map[string]any
+	auth         string
+	speechStatus int
+	speechReply  string
 }
 
 func newMistralFixture(t *testing.T) *mistralFixture {
@@ -158,6 +160,14 @@ func newMistralFixture(t *testing.T) *mistralFixture {
 		f.speak = body
 		f.auth = r.Header.Get("Authorization")
 		f.mu.Unlock()
+		f.mu.Lock()
+		status, reply := f.speechStatus, f.speechReply
+		f.mu.Unlock()
+		if status != 0 {
+			w.WriteHeader(status)
+			fmt.Fprint(w, reply)
+			return
+		}
 		fmt.Fprint(w, `{"audio_data":"YQ=="}`)
 	})
 	f.Server = httptest.NewServer(mux)

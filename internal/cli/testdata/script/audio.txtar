@@ -79,6 +79,7 @@ exec mufradat -C ws audio gc --delete
 stderr 'deleted 6 unused clips'
 exec mufradat -C ws audio gc
 stderr 'found 0 unused clips'
+! stderr 'run again with --delete'
 exec mufradat -C ws audio
 stderr '6 present, 0 to make'
 
