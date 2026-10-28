@@ -28,6 +28,7 @@ type googleFixture struct {
 	mu        sync.Mutex
 	project   string
 	synthBody map[string]any
+	tokens    int
 }
 
 func newGoogleFixture(t *testing.T) *googleFixture {
@@ -36,6 +37,9 @@ func newGoogleFixture(t *testing.T) *googleFixture {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /token", func(w http.ResponseWriter, r *http.Request) {
 		io.Copy(io.Discard, r.Body)
+		f.mu.Lock()
+		f.tokens++
+		f.mu.Unlock()
 		fmt.Fprint(w, `{"access_token":"tok","token_type":"Bearer","expires_in":3600}`)
 	})
 	mux.HandleFunc("GET /v1/voices", func(w http.ResponseWriter, r *http.Request) {
@@ -140,6 +144,8 @@ type mistralFixture struct {
 	auth         string
 	speechStatus int
 	speechReply  string
+	voicesStatus int
+	voicesReply  string
 }
 
 func newMistralFixture(t *testing.T) *mistralFixture {
@@ -147,6 +153,14 @@ func newMistralFixture(t *testing.T) *mistralFixture {
 	f := &mistralFixture{}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v2/audio/voices", func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		status, reply := f.voicesStatus, f.voicesReply
+		f.mu.Unlock()
+		if status != 0 {
+			w.WriteHeader(status)
+			fmt.Fprint(w, reply)
+			return
+		}
 		fmt.Fprint(w, `{"data":[
 			{"id":"11111111-1111-4111-8111-111111111111","name":"Maryam","slug":"voice_479","languages":["ar"],"gender":"Female"},
 			{"id":"22222222-2222-4222-8222-222222222222","name":"Omar","slug":null,"languages":["ar-EG"],"gender":"male"},

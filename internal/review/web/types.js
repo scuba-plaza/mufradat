@@ -38,10 +38,10 @@
  *   voice?: string, all: boolean, list: ListItem[], entry?: Entry
  * }} View
  */
-/** @typedef {{ name: string, label?: string, tier?: string, gender?: string }} Voice */
+/** @typedef {{ provider?: string, name: string, label?: string, tier?: string, gender?: string }} Voice */
 /** @typedef {{ id: string, label: string, text: string }} Sample */
 /** @typedef {{ voice: string, voices: Voice[] }} VoiceList */
-/** @typedef {{ voice: string, samples: Sample[], voices: Voice[] }} Comparison */
+/** @typedef {{ provider: string, voice: string, samples: Sample[], voices: Voice[], notices: string[] }} Comparison */
 /** @typedef {{ message?: string, tone?: string, show?: string, conflict?: boolean }} Result */
 /** @typedef {{ sentence: string, word: string, at: number }} Parts */
 /** @typedef {{ key: string, label: string, run: () => unknown, primary?: boolean, tone?: string, push?: boolean, nav?: boolean, arabic?: string }} Action */

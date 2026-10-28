@@ -29,7 +29,9 @@ env FAKE_BROWSER=compare
 exec mufradat -C ws voices compare
 stdout 'comparing voices at http://127.0.0.1:[0-9]+/[A-Z2-7]+/'
 stderr 'mistral.voice is now 33333333-3333-4333-8333-333333333333'
-grep 'compare current=voice_479 voices=2 samples=4' browser.log
+grep 'compare current=mistral/voice_479 voices=2 samples=4 notices=1' browser.log
+grep 'notice Google voices are not listed: no Google credentials found' browser.log
+! stderr 'audio.provider is now'
 grep 'sample word 200 MP3\[Omar\]كِتَاب' browser.log
 grep 'sample sentence 200 MP3\[Omar\]قَرَأْتُ الْكِتَابَ' browser.log
 grep 'use 200' browser.log

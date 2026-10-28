@@ -14,33 +14,48 @@ type Sample struct {
 	Text  string `json:"text"`
 }
 
+type Choice struct {
+	Provider string `json:"provider"`
+	Voice    string `json:"voice"`
+}
+
 type Sampler interface {
-	Sample(ctx context.Context, voice, text string) (string, error)
+	Sample(ctx context.Context, c Choice, text string) (string, error)
+}
+
+type Candidates interface {
+	Current() Choice
+	List(ctx context.Context) ([]VoiceOption, []string, error)
+	Use(c Choice) error
 }
 
 type CompareDeps struct {
-	Voices  Voices
+	Choices Candidates
 	Sampler Sampler
 	Samples []Sample
 	Font    []byte
 }
 
 type comparison struct {
-	mu     sync.Mutex
-	deps   CompareDeps
-	voices []VoiceOption
-	used   string
+	mu      sync.Mutex
+	deps    CompareDeps
+	listed  bool
+	voices  []VoiceOption
+	notices []string
+	used    Choice
 }
 
 type compareView struct {
-	Voice   string        `json:"voice"`
-	Samples []Sample      `json:"samples"`
-	Voices  []VoiceOption `json:"voices"`
+	Provider string        `json:"provider"`
+	Voice    string        `json:"voice"`
+	Samples  []Sample      `json:"samples"`
+	Voices   []VoiceOption `json:"voices"`
+	Notices  []string      `json:"notices"`
 }
 
-func Compare(ctx context.Context, deps CompareDeps, started func(url string)) (string, error) {
-	if deps.Voices == nil || deps.Sampler == nil || len(deps.Samples) == 0 {
-		return "", errors.New("comparing voices needs voices, a way to speak and something to say")
+func Compare(ctx context.Context, deps CompareDeps, started func(url string)) (Choice, error) {
+	if deps.Choices == nil || deps.Sampler == nil || len(deps.Samples) == 0 {
+		return Choice{}, errors.New("comparing voices needs voices, a way to speak and something to say")
 	}
 	c := &comparison{deps: deps}
 	err := listen(ctx, c.handler, started)
@@ -49,18 +64,18 @@ func Compare(ctx context.Context, deps CompareDeps, started func(url string)) (s
 	return c.used, err
 }
 
-func (c *comparison) list(ctx context.Context) ([]VoiceOption, error) {
+func (c *comparison) list(ctx context.Context) ([]VoiceOption, []string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.voices != nil {
-		return c.voices, nil
+	if c.listed {
+		return c.voices, c.notices, nil
 	}
-	voices, err := c.deps.Voices.List(ctx)
+	voices, notices, err := c.deps.Choices.List(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	c.voices = voices
-	return voices, nil
+	c.listed, c.voices, c.notices = true, voices, notices
+	return voices, notices, nil
 }
 
 func (c *comparison) handler(token, host string, finish func()) http.Handler {
@@ -77,12 +92,13 @@ func (c *comparison) handler(token, host string, finish func()) http.Handler {
 		_, _ = w.Write(page)
 	})
 	mux.HandleFunc("GET "+base+"api/compare", func(w http.ResponseWriter, r *http.Request) {
-		voices, err := c.list(r.Context())
+		voices, notices, err := c.list(r.Context())
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, result{Message: "the voices could not be listed: " + err.Error(), Tone: "bad"})
 			return
 		}
-		writeJSON(w, http.StatusOK, compareView{Voice: c.deps.Voices.Current(), Samples: c.deps.Samples, Voices: voices})
+		current := c.deps.Choices.Current()
+		writeJSON(w, http.StatusOK, compareView{Provider: current.Provider, Voice: current.Voice, Samples: c.deps.Samples, Voices: voices, Notices: notices})
 	})
 	mux.HandleFunc("GET "+base+"sample", c.sample)
 	mux.HandleFunc("POST "+base+"api/use", c.use)
@@ -90,25 +106,28 @@ func (c *comparison) handler(token, host string, finish func()) http.Handler {
 		c.mu.Lock()
 		used := c.used
 		c.mu.Unlock()
-		writeJSON(w, http.StatusOK, map[string]string{"voice": used})
+		writeJSON(w, http.StatusOK, used)
 		finish()
 	})
 	return guard(host, mux)
 }
 
-func (c *comparison) known(ctx context.Context, name string) bool {
-	voices, err := c.list(ctx)
-	return err == nil && slices.ContainsFunc(voices, func(v VoiceOption) bool { return v.Name == name })
+func (c *comparison) known(ctx context.Context, choice Choice) bool {
+	voices, _, err := c.list(ctx)
+	return err == nil && slices.ContainsFunc(voices, func(v VoiceOption) bool {
+		return v.Provider == choice.Provider && v.Name == choice.Voice
+	})
 }
 
 func (c *comparison) sample(w http.ResponseWriter, r *http.Request) {
-	voice := r.URL.Query().Get("voice")
-	i := slices.IndexFunc(c.deps.Samples, func(s Sample) bool { return s.ID == r.URL.Query().Get("id") })
-	if i < 0 || !c.known(r.Context(), voice) {
+	query := r.URL.Query()
+	choice := Choice{Provider: query.Get("provider"), Voice: query.Get("voice")}
+	i := slices.IndexFunc(c.deps.Samples, func(s Sample) bool { return s.ID == query.Get("id") })
+	if i < 0 || !c.known(r.Context(), choice) {
 		http.NotFound(w, r)
 		return
 	}
-	path, err := c.deps.Sampler.Sample(r.Context(), voice, c.deps.Samples[i].Text)
+	path, err := c.deps.Sampler.Sample(r.Context(), choice, c.deps.Samples[i].Text)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, result{Message: err.Error(), Tone: "bad"})
 		return
@@ -123,16 +142,17 @@ func (c *comparison) use(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, result{Message: err.Error(), Tone: "bad"})
 		return
 	}
-	if !c.known(r.Context(), req.Voice) {
-		writeJSON(w, http.StatusBadRequest, result{Message: "the service has no Arabic voice named " + req.Voice, Tone: "bad"})
+	choice := Choice{Provider: req.Provider, Voice: req.Voice}
+	if !c.known(r.Context(), choice) {
+		writeJSON(w, http.StatusBadRequest, result{Message: "the service has no Arabic voice named " + req.Voice + " for " + req.Provider, Tone: "bad"})
 		return
 	}
-	if err := c.deps.Voices.Set(req.Voice); err != nil {
+	if err := c.deps.Choices.Use(choice); err != nil {
 		writeJSON(w, http.StatusInternalServerError, result{Message: err.Error(), Tone: "bad"})
 		return
 	}
 	c.mu.Lock()
-	c.used = req.Voice
+	c.used = choice
 	c.mu.Unlock()
-	writeJSON(w, http.StatusOK, result{Message: "♪ " + req.Voice + " speaks every clip made from now on; clips already made keep their voice until you remake them", Tone: "audio"})
+	writeJSON(w, http.StatusOK, result{Message: "♪ " + choice.Voice + " (" + choice.Provider + ") speaks every clip made from now on; clips already made keep their voice until you remake them", Tone: "audio"})
 }

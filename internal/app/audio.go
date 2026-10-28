@@ -62,9 +62,13 @@ func (a *App) Speaker(ctx context.Context) (clips.Speaker, error) {
 	if err != nil {
 		return nil, err
 	}
+	return a.speakerFor(ctx, cfg, cfg.Audio.Provider)
+}
+
+func (a *App) speakerFor(ctx context.Context, cfg config.Config, provider string) (clips.Speaker, error) {
 	perMinute := max(cfg.TTS.RequestsPerMinute, 1)
 	limiter := rate.NewLimiter(rate.Limit(float64(perMinute)/60), max(cfg.TTS.Concurrency, 1))
-	switch cfg.Audio.Provider {
+	switch provider {
 	case config.ProviderGoogle:
 		return a.googleSpeaker(ctx, cfg, limiter)
 	case config.ProviderMistral:
@@ -74,7 +78,7 @@ func (a *App) Speaker(ctx context.Context) (clips.Speaker, error) {
 		}
 		return mistralSpeaker{client: client}, nil
 	}
-	return nil, failure.Usage(fmt.Errorf("audio.provider %q is not supported", cfg.Audio.Provider))
+	return nil, failure.Usage(fmt.Errorf("audio.provider %q is not supported", provider))
 }
 
 func (a *App) googleSpeaker(ctx context.Context, cfg config.Config, limiter *rate.Limiter) (clips.Speaker, error) {

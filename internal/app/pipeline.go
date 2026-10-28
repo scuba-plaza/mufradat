@@ -43,13 +43,24 @@ func (a *App) Voice() (clips.Voice, error) {
 	if err != nil {
 		return clips.Voice{}, err
 	}
-	switch cfg.Audio.Provider {
-	case config.ProviderGoogle:
-		return clips.Voice{Provider: config.ProviderGoogle, Name: cfg.Google.Voice, Rate: cfg.Audio.Rate}, nil
-	case config.ProviderMistral:
-		return clips.Voice{Provider: config.ProviderMistral, Name: cfg.Mistral.Voice}, nil
+	return voiceFor(cfg, cfg.Audio.Provider, configuredVoice(cfg, cfg.Audio.Provider))
+}
+
+func configuredVoice(cfg config.Config, provider string) string {
+	if provider == config.ProviderGoogle {
+		return cfg.Google.Voice
 	}
-	return clips.Voice{}, fmt.Errorf("audio.provider %q is not supported", cfg.Audio.Provider)
+	return cfg.Mistral.Voice
+}
+
+func voiceFor(cfg config.Config, provider, name string) (clips.Voice, error) {
+	switch provider {
+	case config.ProviderGoogle:
+		return clips.Voice{Provider: config.ProviderGoogle, Name: name, Rate: cfg.Audio.Rate}, nil
+	case config.ProviderMistral:
+		return clips.Voice{Provider: config.ProviderMistral, Name: name}, nil
+	}
+	return clips.Voice{}, fmt.Errorf("audio.provider %q is not supported", provider)
 }
 
 func (a *App) VoiceSetting() (string, error) {

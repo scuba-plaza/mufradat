@@ -69,3 +69,38 @@ export function groupVoices(voices) {
   }
   return [...groups].map(([tier, members]) => ({ tier, voices: members }));
 }
+
+/** @type {Record<string, string>} */
+export const PROVIDER_LABEL = { mistral: 'Mistral', google: 'Google' };
+
+/**
+ * @param {string | undefined} provider
+ * @returns {string}
+ */
+export function providerLabel(provider) {
+  if (!provider) return '';
+  return PROVIDER_LABEL[provider] || provider;
+}
+
+/**
+ * @param {import('./types.js').Voice[]} voices
+ * @returns {{ provider: string, voices: import('./types.js').Voice[] }[]}
+ */
+export function groupProviders(voices) {
+  /** @type {Map<string, import('./types.js').Voice[]>} */
+  const groups = new Map();
+  for (const v of voices) {
+    const provider = v.provider || '';
+    groups.set(provider, [...(groups.get(provider) || []), v]);
+  }
+  return [...groups].map(([provider, members]) => ({ provider, voices: members }));
+}
+
+/**
+ * @param {import('./types.js').Voice} voice
+ * @param {{ provider: string, voice: string }} inUse
+ * @returns {boolean}
+ */
+export function isInUse(voice, inUse) {
+  return voice.provider === inUse.provider && voice.name === inUse.voice;
+}

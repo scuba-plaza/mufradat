@@ -81,10 +81,14 @@ func newVoicesCompare(a *app.App) *cobra.Command {
 		Use:   "compare",
 		Short: "Listen to the Arabic voices side by side and pick one",
 		Long: `Open a page in your browser, served only on this machine, where each Arabic voice
-of the audio provider can say a word and a sentence from your notes. Clips are
-made when you press play and kept in the workspace, so hearing a voice twice
-costs nothing. 'Use this voice' saves it as google.voice or mistral.voice, for
-the provider in use, in the workspace.
+of both providers, Mistral and Google, can say a word and a sentence from your
+notes. A provider that is not set up is left out, with a note on the page that
+says how to set it up. Clips are made when you press play and kept in the
+workspace, so hearing a voice twice costs nothing.
+
+'Use this voice' saves it as google.voice or mistral.voice in the workspace and,
+for a voice of the other provider, switches audio.provider to it. Clips the
+other provider already made are kept and found again if you switch back.
 
 Clips already made keep their voice until you remake them in 'review'.`,
 		Args: cobra.NoArgs,
@@ -95,6 +99,7 @@ Clips already made keep their voice until you remake them in 'review'.`,
 				return err
 			}
 			r := a.Reporter()
+			before := deps.Choices.Current()
 			used, err := review.Compare(ctx, deps, func(url string) {
 				fmt.Fprintf(a.Env.Stdout, "comparing voices at %s\n", url)
 				if !noOpen {
@@ -104,11 +109,13 @@ Clips already made keep their voice until you remake them in 'review'.`,
 				}
 				r.Event("press 'Done' on the page or Ctrl+C here when you have chosen")
 			})
-			if used != "" {
-				setting, _ := a.VoiceSetting()
-				r.Event("%s is now %s; `%s audio` makes the clips with it", setting, used, a.CommandPrefix())
-			} else {
+			switch {
+			case used.Voice == "":
 				r.Event("the voice was not changed")
+			case used.Provider == before.Provider:
+				r.Event("%s.voice is now %s; `%s audio` makes the clips with it", used.Provider, used.Voice, a.CommandPrefix())
+			default:
+				r.Event("audio.provider is now %s and %s.voice is %s; `%s audio` makes the clips with it, and the clips of the other provider are kept", used.Provider, used.Provider, used.Voice, a.CommandPrefix())
 			}
 			return err
 		},

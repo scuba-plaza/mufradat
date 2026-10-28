@@ -44,10 +44,11 @@ type Audio interface {
 }
 
 type VoiceOption struct {
-	Name   string `json:"name"`
-	Label  string `json:"label,omitempty"`
-	Tier   string `json:"tier,omitempty"`
-	Gender string `json:"gender,omitempty"`
+	Provider string `json:"provider,omitempty"`
+	Name     string `json:"name"`
+	Label    string `json:"label,omitempty"`
+	Tier     string `json:"tier,omitempty"`
+	Gender   string `json:"gender,omitempty"`
 }
 
 type Voices interface {

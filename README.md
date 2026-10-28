@@ -91,7 +91,7 @@ mean; elsewhere pass `--entry WORD#N`, `--pos`, `--pick N` or `--yes`.
 | `review [--all]` | Go through flagged notes (or every note) in your browser: accept, add a missing ending, edit, ask Mistral for a better version, hear the clips, remake or remove a clip, undo. |
 | `audio [--dry-run]` | Make the clips that are missing. `audio gc` lists clips no note needs with the current provider, voice and rate, `--delete` removes them. |
 | `build [-o PATH]` | Write the `.apkg`. The same inputs give identical bytes. |
-| `voices list`, `voices compare` | List the Arabic voices of the audio provider, or listen to them side by side and pick one. |
+| `voices list`, `voices compare` | List the Arabic voices of the audio provider, or listen to the voices of both providers side by side and pick one; picking a voice of the other provider switches `audio.provider` to it. |
 | `setup` | Install the vowel checkers (CAMeL Tools and CATT). |
 | `auth mistral --import FILE` | Keep the Mistral API key from a file in the user config directory. |
 | `auth google --import FILE` | Keep a Google service-account key in the user config directory, for `audio.provider = google`. |
