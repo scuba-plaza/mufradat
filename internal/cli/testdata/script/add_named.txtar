@@ -29,6 +29,7 @@ grep '"rank":333,' ws/notes.jsonl
 exec mufradat -C ws add كتاب --yes
 stderr 'كِتَاب is already in the deck'
 stderr 'nothing to add'
+! stderr 'tokens'
 
 ! exec mufradat -C ws add كلمةغيرموجودة
 stderr 'no Modern Standard Arabic entry matches: كلمةغيرموجودة'

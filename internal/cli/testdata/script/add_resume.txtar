@@ -37,6 +37,8 @@ mistral-mode unauthorized
 exits 3 mufradat -C ws add 1
 stderr 'the service rejected the credentials: Unauthorized'
 stderr 'hint: check the key with `mufradat -C .*ws doctor`'
+! stderr 'wrote 0'
+! stderr 'tokens'
 grep -count=3 '"lemma"' ws/notes.jsonl
 
 mistral-mode bad-first
