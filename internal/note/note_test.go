@@ -213,3 +213,70 @@ func TestRandomIDs(t *testing.T) {
 		t.Errorf("deterministic source gave %q", id)
 	}
 }
+
+func TestPlainExampleDropsTheMarksEvenWhenTheMarkupIsBroken(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"الْكِتَابُ [فِي] الْحَقِيبَةِ.", "الْكِتَابُ فِي الْحَقِيبَةِ."},
+		{"no marks", "no marks"},
+		{"[a] [b] c", "a b c"},
+		{"x[", "x"},
+		{"]x[", "x"},
+		{"[ ] x", "  x"},
+		{"", ""},
+	} {
+		if got := PlainExample(c.in); got != c.want {
+			t.Errorf("PlainExample(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestMarkExampleMarksTheFirstOccurrenceAnywhereInTheSentence(t *testing.T) {
+	for _, c := range []struct {
+		sentence, target, want string
+		ok                     bool
+	}{
+		{"مِنْ هُنَا", "مِنْ", "[مِنْ] هُنَا", true},
+		{"أَنَا مِنْ هُنَا مِنْ", "مِنْ", "أَنَا [مِنْ] هُنَا مِنْ", true},
+		{"هُنَا مِنْ", "مِنْ", "هُنَا [مِنْ]", true},
+		{"مِنْ", "مِنْ", "[مِنْ]", true},
+		{"abc", "x", "", false},
+		{"abc", "", "", false},
+		{"", "x", "", false},
+	} {
+		got, ok := MarkExample(c.sentence, c.target)
+		if got != c.want || ok != c.ok {
+			t.Errorf("MarkExample(%q, %q) = %q, %v; want %q, %v", c.sentence, c.target, got, ok, c.want, c.ok)
+		}
+	}
+}
+
+func TestSetLookupsFindTheRightNoteAndReportAMiss(t *testing.T) {
+	book := Note{ID: "n_aaaaaaaaaaaa", Seq: 1, Rank: 5, Lemma: "كِتَاب", POS: Noun}
+	pen := Note{ID: "n_bbbbbbbbbbbb", Seq: 2, Rank: 0, Lemma: "قَلَم", POS: Noun}
+	verb := Note{ID: "n_cccccccccccc", Seq: 3, Rank: 9, Lemma: "كَتَبَ", POS: Verb}
+	s := NewSet([]Note{book, pen, verb})
+
+	if got, ok := s.Get(pen.ID); !ok || got.ID != pen.ID {
+		t.Errorf("Get: %v, %v", got.ID, ok)
+	}
+	if got, ok := s.Get("n_zzzzzzzzzzzz"); ok || got.ID != "" {
+		t.Errorf("Get of a missing id: %+v, %v", got, ok)
+	}
+	if got, ok := s.ByRank(9); !ok || got.ID != verb.ID {
+		t.Errorf("ByRank(9): %v, %v", got.ID, ok)
+	}
+	for _, rank := range []int{0, -1, 6, 100} {
+		if got, ok := s.ByRank(rank); ok || got.ID != "" {
+			t.Errorf("ByRank(%d) found %+v: unranked notes have no rank to look up", rank, got)
+		}
+	}
+	if got, ok := s.ByLexeme(pen.LexemeKey()); !ok || got.ID != pen.ID {
+		t.Errorf("ByLexeme: %v, %v", got.ID, ok)
+	}
+	if got, ok := s.ByLexeme(Note{Lemma: "كِتَاب", POS: Verb}.LexemeKey()); ok || got.ID != "" {
+		t.Errorf("the same word as another part of speech is another lexeme: %+v, %v", got, ok)
+	}
+	if got, ok := s.ByLexeme(Note{Lemma: "كِتَابٌ", POS: Noun}.LexemeKey()); !ok || got.ID != book.ID {
+		t.Errorf("a lexeme is found whatever the vowels of its ending: %+v, %v", got, ok)
+	}
+}

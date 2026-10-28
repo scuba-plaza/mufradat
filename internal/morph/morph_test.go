@@ -93,3 +93,24 @@ func TestDecodeRejectsDataThatDoesNotFitTheLexicon(t *testing.T) {
 		t.Error("plain text accepted")
 	}
 }
+
+func TestFactsOfALemmaCoverTheMainEntryBeingAVerbAndAnyEntryBeingAPreposition(t *testing.T) {
+	entry := func(pos string) *lexicon.Entry { return &lexicon.Entry{Pos: pos, Canonical: "x"} }
+	for _, c := range []struct {
+		name    string
+		entries []*lexicon.Entry
+		want    Facts
+	}{
+		{"a noun", []*lexicon.Entry{entry("noun")}, Facts{}},
+		{"a verb", []*lexicon.Entry{entry("verb")}, Facts{Verb: true}},
+		{"a noun that is also a verb is judged by its main entry", []*lexicon.Entry{entry("noun"), entry("verb")}, Facts{}},
+		{"a verb that is also a noun", []*lexicon.Entry{entry("verb"), entry("noun")}, Facts{Verb: true}},
+		{"a preposition", []*lexicon.Entry{entry("prep")}, Facts{Prep: true}},
+		{"a noun with a preposition among its entries", []*lexicon.Entry{entry("noun"), entry("prep")}, Facts{Prep: true}},
+		{"a verb with a preposition among its entries", []*lexicon.Entry{entry("verb"), entry("prep")}, Facts{Verb: true, Prep: true}},
+	} {
+		if got := FactsOf(&lexicon.Lemma{ID: "x", Entries: c.entries}); got != c.want {
+			t.Errorf("%s: %+v, want %+v", c.name, got, c.want)
+		}
+	}
+}
