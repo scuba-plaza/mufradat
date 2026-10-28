@@ -54,10 +54,11 @@ func lemmaIssue() verify.Issue {
 }
 
 type fakeVerifier struct {
-	mu     sync.Mutex
-	issues map[string][]verify.Issue
-	err    error
-	seen   []string
+	mu         sync.Mutex
+	issues     map[string][]verify.Issue
+	err        error
+	unverified bool
+	seen       []string
 }
 
 func (f *fakeVerifier) Check(ctx context.Context, notes []note.Note) (verify.Report, error) {
@@ -65,7 +66,7 @@ func (f *fakeVerifier) Check(ctx context.Context, notes []note.Note) (verify.Rep
 	defer f.mu.Unlock()
 	report := verify.Report{Results: map[string]verify.NoteResult{}}
 	for _, n := range notes {
-		report.Results[n.ID] = verify.NoteResult{Verified: true, Issues: f.issues[n.ID]}
+		report.Results[n.ID] = verify.NoteResult{Verified: !f.unverified, Issues: f.issues[n.ID]}
 		f.seen = append(f.seen, n.Example)
 	}
 	return report, f.err

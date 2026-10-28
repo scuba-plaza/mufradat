@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -745,5 +746,102 @@ func TestNextStepsFollowsWhatTheSessionChanged(t *testing.T) {
 	}
 	if got := NextSteps(Summary{Edited: 1}, "mufradat -C ws"); !strings.Contains(got, "`mufradat -C ws audio`") || !strings.Contains(got, "`mufradat -C ws build`") {
 		t.Errorf("the command prefix is not used: %q", got)
+	}
+}
+
+func TestAKeptNoteShowsItsCardWithoutHighlightsAndItsFlagFaded(t *testing.T) {
+	h := newHarness(t, []note.Note{bookNote()}, map[string][]verify.Issue{idBook: {diacriticsIssue()}}, nil)
+	open := h.state(idBook).Entry
+	if open == nil || !slices.Contains(classes(open.Card.Example), classMajor) {
+		t.Fatalf("an open note must highlight the flagged word: %+v", open)
+	}
+	if len(open.Flags) != 1 || open.Flags[0].Faded {
+		t.Fatalf("an open flag is not faded: %+v", open.Flags)
+	}
+	h.mustOK("keep", idBook, map[string]any{"if_rev": h.rev(idBook)})
+	kept := h.state(idBook).Entry
+	if kept == nil || slices.Contains(classes(kept.Card.Example), classMajor) {
+		t.Errorf("a kept note still highlights the flagged word: %+v", kept)
+	}
+	if len(kept.Flags) != 1 || !kept.Flags[0].Faded {
+		t.Errorf("a kept note lists its flag faded: %+v", kept.Flags)
+	}
+}
+
+func TestEditingANoteWhileMistralIsBeingAskedCallsTheAskOff(t *testing.T) {
+	notes, issues := twoNotes()
+	started, release, cancelled := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	rewriter := fakeRewriter(func(ctx context.Context, n note.Note, fb string) (note.Note, error) {
+		close(started)
+		select {
+		case <-ctx.Done():
+			close(cancelled)
+		case <-release:
+		}
+		<-release
+		n.English = "the book"
+		return n, nil
+	})
+	h := newHarness(t, notes, issues, func(d *Deps) { d.Rewriter = rewriter })
+	t.Cleanup(func() { once.Do(func() { close(release) }) })
+
+	h.mustOK("ask", idBook, nil)
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Mistral was never asked")
+	}
+	ed := editOf(h.note(idBook))
+	ed.Hint = "edited by hand"
+	h.mustOK("save", idBook, map[string]any{"if_rev": h.rev(idBook), "note": ed})
+	select {
+	case <-cancelled:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the request to Mistral was not cancelled by the edit")
+	}
+	if e := h.state(idBook).Entry; e.Asking || e.Proposal != nil {
+		t.Errorf("the entry still waits for Mistral: asking=%v proposal=%+v", e.Asking, e.Proposal)
+	}
+	once.Do(func() { close(release) })
+	time.Sleep(50 * time.Millisecond)
+	if e := h.state(idBook).Entry; e.Asking || e.Proposal != nil {
+		t.Errorf("a late answer for the old note was kept: asking=%v proposal=%+v", e.Asking, e.Proposal)
+	}
+}
+
+func TestKeepingYourOwnVersionDropsTheSuggestionWithoutARevision(t *testing.T) {
+	notes, issues := twoNotes()
+	rewriter := fakeRewriter(func(ctx context.Context, n note.Note, fb string) (note.Note, error) {
+		n.English = "the book"
+		return n, nil
+	})
+	h := newHarness(t, notes, issues, func(d *Deps) { d.Rewriter = rewriter })
+	h.mustOK("ask", idBook, nil)
+	h.wait(idBook, func(e entryView) bool { return e.Proposal != nil })
+
+	res := h.mustOK("drop", idBook, nil)
+	if res.Message != "Kept your version of كِتَابٌ" || res.Show != idBook {
+		t.Errorf("result = %+v", res)
+	}
+	if e := h.state(idBook).Entry; e.Proposal != nil || e.State != "open" {
+		t.Errorf("entry = %+v", e)
+	}
+	if got := h.note(idBook).English; got != "book" {
+		t.Errorf("the note must stay as it was: %q", got)
+	}
+}
+
+func TestAChangeThatCannotBeCrossCheckedIsSaidToBeUnverified(t *testing.T) {
+	notes, issues := twoNotes()
+	ver := &fakeVerifier{unverified: true}
+	h := newHarness(t, notes, issues, func(d *Deps) { d.Verifier = ver })
+	if e := h.state(idTired).Entry; !e.Verified {
+		t.Fatalf("a note that was checked starts out verified: %+v", e)
+	}
+	h.mustOK("ending", idTired, map[string]any{"if_rev": h.rev(idTired), "source": "catt"})
+	e := h.wait(idTired, func(e entryView) bool { return !e.Checking })
+	if e.Verified || e.NoticeTone != "warn" || e.Notice != "The change could not be cross-checked; run 'check' before building" {
+		t.Errorf("entry = %+v", e)
 	}
 }
