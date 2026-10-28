@@ -19,9 +19,6 @@ import (
 func Load(files ...string) (Config, error) {
 	cfg := Default()
 	for _, path := range files {
-		if path == "" {
-			continue
-		}
 		raw, err := os.ReadFile(path)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
@@ -166,12 +163,6 @@ func parseLike(sample any, value string) (any, error) {
 			return nil, fmt.Errorf("%q is not a number", value)
 		}
 		return f, nil
-	case bool:
-		b, err := strconv.ParseBool(value)
-		if err != nil {
-			return nil, fmt.Errorf("%q is not true or false", value)
-		}
-		return b, nil
 	}
 	return value, nil
 }

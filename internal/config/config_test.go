@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -17,25 +18,32 @@ func write(t *testing.T, dir, name, content string) string {
 	return path
 }
 
-func TestDefaultsChooseMistralForNotesAndSpeech(t *testing.T) {
-	cfg := Default()
-	if cfg.Audio.Provider != "mistral" {
-		t.Errorf("audio.provider = %q, want mistral", cfg.Audio.Provider)
+func TestDefaultSettingsAreExactlyTheDocumentedOnes(t *testing.T) {
+	flat, err := Flatten(Default())
+	if err != nil {
+		t.Fatal(err)
 	}
-	if cfg.Author.Model != "mistral-medium-latest" {
-		t.Errorf("author.model = %q", cfg.Author.Model)
+	want := map[string]any{
+		"schema": int64(1), "workspace": "", "deck_name": "Arabic MSA Core",
+		"anki.deck_id": int64(0), "anki.model_id": int64(0), "anki.production_top": int64(1000),
+		"audio.provider": "mistral", "audio.rate": 0.9,
+		"tts.requests_per_minute": int64(300), "tts.concurrency": int64(4),
+		"google.credentials_file": "", "google.quota_project": "", "google.endpoint": "", "google.voice": "ar-XA-Chirp3-HD-Achernar",
+		"mistral.api_key": "", "mistral.endpoint": "", "mistral.voice": "voice_479",
+		"author.model": "mistral-medium-latest", "author.batch_size": int64(10), "author.concurrency": int64(2), "author.allow_rank": int64(1500),
+		"verify.enabled": "auto", "verify.python": "",
 	}
-	if cfg.Mistral.Voice != "voice_479" {
-		t.Errorf("mistral.voice = %q", cfg.Mistral.Voice)
-	}
-	if cfg.Google.Voice != "ar-XA-Chirp3-HD-Achernar" {
-		t.Errorf("google.voice = %q", cfg.Google.Voice)
-	}
-	if cfg.TTS.RequestsPerMinute != 300 || cfg.TTS.Concurrency != 4 {
-		t.Errorf("tts = %+v", cfg.TTS)
-	}
-	if cfg.Audio.Rate != 0.9 {
-		t.Errorf("audio.rate = %v", cfg.Audio.Rate)
+	if !reflect.DeepEqual(flat, want) {
+		for k, v := range want {
+			if flat[k] != v {
+				t.Errorf("%s = %#v, want %#v", k, flat[k], v)
+			}
+		}
+		for k := range flat {
+			if _, ok := want[k]; !ok {
+				t.Errorf("unexpected setting %s", k)
+			}
+		}
 	}
 }
 
@@ -119,7 +127,16 @@ func TestValidateNamesTheOffendingSetting(t *testing.T) {
 		{"google voice", func(c *Config) { c.Google.Voice = "" }, "google.voice must not be empty"},
 		{"mistral voice", func(c *Config) { c.Mistral.Voice = "" }, "mistral.voice must not be empty"},
 		{"google endpoint", func(c *Config) { c.Google.Endpoint = "not-a-url" }, `google.endpoint "not-a-url"`},
-		{"mistral endpoint", func(c *Config) { c.Mistral.Endpoint = "ftp://x" }, `mistral.endpoint "ftp://x"`},
+		{"mistral endpoint", func(c *Config) { c.Mistral.Endpoint = "ftp://x" }, `mistral.endpoint "ftp://x" must be an http(s) URL such as https://api.mistral.ai`},
+		{"google endpoint example", func(c *Config) { c.Google.Endpoint = "not-a-url" }, "such as https://eu-texttospeech.googleapis.com"},
+		{"endpoint without a host", func(c *Config) { c.Google.Endpoint = "https://" }, `google.endpoint "https://"`},
+		{"endpoint that does not parse", func(c *Config) { c.Mistral.Endpoint = "http://[bad" }, `mistral.endpoint "http://[bad"`},
+		{"deck name", func(c *Config) { c.DeckName = "" }, "deck_name must not be empty"},
+		{"production top", func(c *Config) { c.Anki.ProductionTop = -1 }, "anki.production_top must not be negative"},
+		{"author concurrency", func(c *Config) { c.Author.Concurrency = 0 }, "author.concurrency must be at least 1"},
+		{"allow rank", func(c *Config) { c.Author.AllowRank = -1 }, "author.allow_rank must not be negative"},
+		{"rate just below", func(c *Config) { c.Audio.Rate = 0.24 }, "audio.rate 0.24 is outside"},
+		{"rate just above", func(c *Config) { c.Audio.Rate = 2.01 }, "audio.rate 2.01 is outside"},
 	}
 	for _, tc := range cases {
 		cfg := Default()
@@ -138,6 +155,55 @@ func TestValidateNamesTheOffendingSetting(t *testing.T) {
 	cfg.Google.Endpoint = "https://eu-texttospeech.googleapis.com"
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("google provider with endpoints must validate: %v", err)
+	}
+}
+
+func TestValidateAcceptsTheEdgesOfEverySetting(t *testing.T) {
+	cases := map[string]func(*Config){
+		"production top 0":      func(c *Config) { c.Anki.ProductionTop = 0 },
+		"rate 0.25":             func(c *Config) { c.Audio.Rate = 0.25 },
+		"rate 2":                func(c *Config) { c.Audio.Rate = 2 },
+		"requests per minute 1": func(c *Config) { c.TTS.RequestsPerMinute = 1 },
+		"tts concurrency 1":     func(c *Config) { c.TTS.Concurrency = 1 },
+		"batch size 1":          func(c *Config) { c.Author.BatchSize = 1 },
+		"author concurrency 1":  func(c *Config) { c.Author.Concurrency = 1 },
+		"allow rank 0":          func(c *Config) { c.Author.AllowRank = 0 },
+		"verify on":             func(c *Config) { c.Verify.Enabled = "on" },
+		"verify off":            func(c *Config) { c.Verify.Enabled = "off" },
+		"google provider":       func(c *Config) { c.Audio.Provider = "google" },
+		"plain http endpoint":   func(c *Config) { c.Mistral.Endpoint = "http://127.0.0.1:8080" },
+	}
+	for name, mutate := range cases {
+		cfg := Default()
+		mutate(&cfg)
+		if err := cfg.Validate(); err != nil {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+func TestLoadReportsTheFileThatCannotBeUsed(t *testing.T) {
+	dir := t.TempDir()
+	bad := write(t, dir, "bad.toml", "[mistral]\nvoise = \"x\"\n")
+	if _, err := Load(bad); err == nil || !strings.Contains(err.Error(), bad) {
+		t.Errorf("an unknown key should name the file, got %v", err)
+	}
+	invalid := write(t, dir, "invalid.toml", "[audio]\nrate = 9\n")
+	if _, err := Load(invalid); err == nil || !strings.HasPrefix(err.Error(), "invalid configuration: audio.rate 9") {
+		t.Errorf("an invalid value should be reported as an invalid configuration, got %v", err)
+	}
+	if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), dir) {
+		t.Errorf("a directory where a file should be is an error that names it, got %v", err)
+	}
+}
+
+func TestGetNamesTheKnownKeysWhenAskedForAnUnknownOne(t *testing.T) {
+	v, err := Get(Default(), "audio.provider")
+	if err != nil || v != "mistral" {
+		t.Fatalf("audio.provider = %v, %v", v, err)
+	}
+	if _, err := Get(Default(), "audio.voice"); err == nil || !strings.Contains(err.Error(), `unknown key "audio.voice"`) || !strings.Contains(err.Error(), "audio.provider, audio.rate") {
+		t.Errorf("got %v", err)
 	}
 }
 
@@ -166,16 +232,19 @@ func TestSetFileWritesTypedValuesAndKeepsOthers(t *testing.T) {
 
 func TestSetFileRejectsBadInput(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ws.toml")
-	for key, value := range map[string]string{
-		"author.batch_size": "many",
-		"audio.rate":        "99",
-		"audio.provider":    "azure",
-		"no.such.key":       "1",
-		"audio.voice":       "x",
-		"author.effort":     "high",
-	} {
-		if err := SetFile(path, key, value); err == nil {
-			t.Errorf("%s=%s should fail", key, value)
+	cases := []struct{ key, value, want string }{
+		{"author.batch_size", "many", `author.batch_size: "many" is not an integer`},
+		{"audio.rate", "fast", `audio.rate: "fast" is not a number`},
+		{"audio.rate", "99", "audio.rate: audio.rate 99 is outside 0.25 to 2"},
+		{"audio.provider", "azure", `audio.provider: audio.provider "azure" must be mistral or google`},
+		{"no.such.key", "1", `unknown key "no.such.key"`},
+		{"audio.voice", "x", `unknown key "audio.voice"`},
+		{"author.effort", "high", `unknown key "author.effort"`},
+	}
+	for _, tc := range cases {
+		err := SetFile(path, tc.key, tc.value)
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s=%s: got %v, want an error containing %q", tc.key, tc.value, err, tc.want)
 		}
 	}
 	if _, err := os.Stat(path); err == nil {
@@ -183,22 +252,8 @@ func TestSetFileRejectsBadInput(t *testing.T) {
 	}
 }
 
-func TestKeysCoverEveryField(t *testing.T) {
+func TestRetiredKeysAreNotSettings(t *testing.T) {
 	keys := Keys()
-	want := []string{
-		"deck_name", "anki.deck_id", "workspace",
-		"audio.provider", "audio.rate",
-		"tts.requests_per_minute", "tts.concurrency",
-		"google.credentials_file", "google.quota_project", "google.endpoint", "google.voice",
-		"mistral.api_key", "mistral.endpoint", "mistral.voice",
-		"author.model", "author.batch_size", "author.concurrency", "author.allow_rank",
-		"verify.enabled",
-	}
-	for _, k := range want {
-		if !slices.Contains(keys, k) {
-			t.Errorf("missing key %s in %v", k, keys)
-		}
-	}
 	for _, gone := range []string{"audio.voice", "tts.endpoint", "tts.quota_project", "author.backend", "author.effort"} {
 		if slices.Contains(keys, gone) {
 			t.Errorf("key %s should not exist any more", gone)
