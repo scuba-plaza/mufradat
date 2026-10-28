@@ -6,6 +6,7 @@ exec mufradat -C ws config set audio.provider google
 env FAKE_BROWSER=compare
 exec mufradat -C ws voices compare
 stdout 'comparing voices at http://127.0.0.1:[0-9]+/[A-Z2-7]+/'
+! stderr 'could not open a browser'
 stderr 'google.voice is now ar-XA-Wavenet-A'
 grep 'compare current=ar-XA-Chirp3-HD-Achernar voices=2 samples=4' browser.log
 grep 'sample word 200 MP3\[ar-XA-Wavenet-A\]كِتَاب' browser.log

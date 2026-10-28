@@ -10,11 +10,14 @@ stderr 'nothing to review'
 env FAKE_BROWSER=finish
 exec mufradat -C ws review --all
 stdout 'reviewing 2 notes at http://127.0.0.1:[0-9]+/[A-Z2-7]+/'
+! stderr 'could not open a browser'
 stderr '2 notes: 0 marked right, 0 edited, 0 rewritten by Mistral, 2 still open'
 grep 'finish 200' browser.log
 exec mufradat -C ws config set verify.enabled auto
 
 env FAKE_BROWSER=finish
+exec mufradat review --help
+stdout '--minor +include notes whose only flags are minor disagreements \(default true\)'
 exec mufradat -C ws review --no-check
 stderr 'nothing to review'
 exec mufradat -C ws check
@@ -22,6 +25,9 @@ exec mufradat -C ws check
 env FAKE_BROWSER=keep
 exec mufradat -C ws review
 stdout 'reviewing 1 flagged note at http://127.0.0.1:[0-9]+/[A-Z2-7]+/'
+! stderr 'not checked yet'
+! stderr 'checking .* items'
+! stderr 'could not open a browser'
 stderr '1 marked right'
 stderr 'Next: `mufradat -C .*ws build`'
 grep -count=1 'keep 200' browser.log
@@ -54,6 +60,7 @@ env FAKE_BROWSER=finish
 exec mufradat -C ws review --no-check
 stderr '1 note is not checked yet, so they are not listed'
 exec mufradat -C ws review
+stderr 'checking [0-9]+ items that have not been checked yet'
 grep -count=2 '^serve$' sidecar.log
 
 -- notes.jsonl --

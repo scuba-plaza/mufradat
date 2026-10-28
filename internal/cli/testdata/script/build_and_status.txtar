@@ -34,6 +34,8 @@ exec mufradat -C ws status --json
 stdout '"name": "audio"'
 stdout '"done": false'
 
+exec mufradat build --help
+stdout 'The package is written to <workspace>/out/ unless -o is given'
 exec mufradat -C ws build
 stdout 'out/arabic-msa-core\.apkg$'
 stderr '2 notes, 4 cards \(2 production\), 0 audio clips'

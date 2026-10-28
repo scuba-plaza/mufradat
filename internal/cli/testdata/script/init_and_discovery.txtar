@@ -15,6 +15,10 @@ exists home/.local/share/mufradat/default/state
 ! exec mufradat init
 stderr 'already a workspace'
 
+exits 2 mufradat init one two
+stderr 'accepts at most 1 arg'
+! exists one
+! exists two
 exec mufradat init --git proj/deck
 exists proj/deck/mufradat.toml
 grep 'state/' proj/deck/.gitignore
