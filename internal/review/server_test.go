@@ -6,7 +6,10 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/scuba-plaza/mufradat/internal/note"
 	"github.com/scuba-plaza/mufradat/internal/store"
@@ -627,5 +630,96 @@ func TestPageAndModulesAreServed(t *testing.T) {
 	}
 	if code, kind, body := fetch("font.ttf"); code != http.StatusOK || kind != "font/ttf" || body != "font-bytes" {
 		t.Errorf("font = %d %s %q", code, kind, body)
+	}
+}
+
+type gatedAudio struct {
+	*fakeAudio
+	started chan struct{}
+	release chan struct{}
+	fail    error
+	calls   atomic.Int32
+	opened  sync.Once
+}
+
+func newGatedAudio(t *testing.T) *gatedAudio {
+	g := &gatedAudio{fakeAudio: &fakeAudio{dir: t.TempDir()}, started: make(chan struct{}, 8), release: make(chan struct{})}
+	t.Cleanup(g.open)
+	return g
+}
+
+func (g *gatedAudio) open() { g.opened.Do(func() { close(g.release) }) }
+
+func (g *gatedAudio) Remake(ctx context.Context, n note.Note, kind string) error {
+	g.calls.Add(1)
+	g.started <- struct{}{}
+	<-g.release
+	if g.fail != nil {
+		return g.fail
+	}
+	return g.fakeAudio.Remake(ctx, n, kind)
+}
+
+func TestARemakeThatIsStillRunningIsNotStartedAgainAndFinishedOnesCanBeRepeated(t *testing.T) {
+	notes, issues := twoNotes()
+	audio := newGatedAudio(t)
+	h := newHarness(t, notes, issues, func(d *Deps) { d.Audio = audio })
+
+	first := make(chan result, 1)
+	go func() {
+		_, res := h.post("remake", idBook, map[string]any{"clip": "word"})
+		first <- res
+	}()
+	select {
+	case <-audio.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the first remake never started")
+	}
+	second := make(chan result, 1)
+	go func() {
+		_, res := h.post("remake", idBook, map[string]any{"clip": "word"})
+		second <- res
+	}()
+	select {
+	case res := <-second:
+		if res.Message != "" || res.Show != idBook || audio.calls.Load() != 1 {
+			t.Errorf("a second remake while one runs: %+v after %d calls", res, audio.calls.Load())
+		}
+	case <-time.After(3 * time.Second):
+		t.Error("a second remake waited for the first instead of returning at once")
+	}
+	audio.open()
+	select {
+	case res := <-first:
+		if !strings.Contains(res.Message, "Made the word audio of كِتَابٌ") || res.Tone != "audio" {
+			t.Errorf("the finished remake says %+v", res)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the first remake never finished")
+	}
+	h.mustOK("remake", idBook, map[string]any{"clip": "word"})
+	if audio.calls.Load() != 2 {
+		t.Errorf("a remake after the first finished made %d calls in all, want 2", audio.calls.Load())
+	}
+}
+
+func TestARemakeThatFailsShowsTheReasonAndCanBeTriedAgain(t *testing.T) {
+	notes, issues := twoNotes()
+	audio := newGatedAudio(t)
+	audio.fail = errors.New("mistral: Unauthorized (HTTP 401)")
+	audio.open()
+	h := newHarness(t, notes, issues, func(d *Deps) { d.Audio = audio })
+
+	for attempt := 1; attempt <= 2; attempt++ {
+		code, res := h.post("remake", idBook, map[string]any{"clip": "word"})
+		if code != http.StatusInternalServerError || res.Message != "mistral: Unauthorized (HTTP 401)" || res.Tone != "bad" || res.Show != idBook {
+			t.Errorf("attempt %d: %d %+v", attempt, code, res)
+		}
+		if int(audio.calls.Load()) != attempt {
+			t.Errorf("attempt %d reached the audio backend %d times: a failed remake must not block the next", attempt, audio.calls.Load())
+		}
+	}
+	if h.state(idBook).Entry.Clips[0].Ready {
+		t.Error("a failed remake must not leave a clip behind")
 	}
 }
