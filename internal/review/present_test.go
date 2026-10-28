@@ -112,3 +112,28 @@ func TestSentenceDiffKeepsTheTargetHighlight(t *testing.T) {
 		t.Errorf("old %+v new %+v", cs[0].Old, cs[0].New)
 	}
 }
+
+func TestEveryKindOfChangeIsLabelledAndKnowsWhichWayItReads(t *testing.T) {
+	cur := note.Note{Lemma: "كِتَاب", POS: note.Noun, English: "book", Hint: "read", Forms: []note.Form{{Label: "pl.", Arabic: "كُتُب"}}, Example: "[كِتَابٌ] جَدِيدٌ.", ExampleEN: "A new book.", Comment: "common"}
+	fresh := note.Note{Lemma: "قَلَم", POS: note.Verb, English: "pen", Hint: "write", Forms: []note.Form{{Label: "pl.", Arabic: "أَقْلَام"}}, Example: "[قَلَمٌ] جَدِيدٌ.", ExampleEN: "A new pen.", Comment: "rare"}
+	want := []struct {
+		label string
+		rtl   bool
+	}{{"word", true}, {"type", false}, {"meaning", false}, {"hint", false}, {"forms", false}, {"sentence", true}, {"translation", false}, {"comment", false}}
+	got := changes(cur, fresh)
+	if len(got) != len(want) {
+		t.Fatalf("changes = %+v", got)
+	}
+	for i, w := range want {
+		if got[i].Label != w.label || got[i].RTL != w.rtl {
+			t.Errorf("change %d is %q rtl=%v, want %q rtl=%v", i, got[i].Label, got[i].RTL, w.label, w.rtl)
+		}
+	}
+}
+
+func TestMissingLettersOutsideTheWordAreIgnored(t *testing.T) {
+	is := verify.Issue{Word: "تَعِب", Missing: []int{-1, 2, 3, 99}}
+	if got := bareLetters(is); !slices.Equal(got, []bool{false, false, true}) {
+		t.Errorf("bareLetters = %v", got)
+	}
+}

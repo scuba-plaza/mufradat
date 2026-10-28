@@ -163,3 +163,28 @@ func TestCompareRunsUntilDone(t *testing.T) {
 		t.Error("Compare needs voices, a sampler and samples")
 	}
 }
+
+func TestCompareRefusesToStartWithoutAnythingItNeeds(t *testing.T) {
+	full := func() CompareDeps {
+		return CompareDeps{Voices: &fakeVoices{current: "v"}, Sampler: &fakeSampler{dir: t.TempDir()}, Samples: []Sample{{ID: "s1", Text: "x"}}}
+	}
+	without := map[string]func(*CompareDeps){
+		"voices":  func(d *CompareDeps) { d.Voices = nil },
+		"sampler": func(d *CompareDeps) { d.Sampler = nil },
+		"samples": func(d *CompareDeps) { d.Samples = nil },
+	}
+	for name, drop := range without {
+		deps := full()
+		drop(&deps)
+		ctx, cancel := context.WithCancel(context.Background())
+		started := false
+		_, err := Compare(ctx, deps, func(string) { started = true; cancel() })
+		cancel()
+		if err == nil || err.Error() != "comparing voices needs voices, a way to speak and something to say" {
+			t.Errorf("without %s: error %v", name, err)
+		}
+		if started {
+			t.Errorf("without %s: the page was served anyway", name)
+		}
+	}
+}
