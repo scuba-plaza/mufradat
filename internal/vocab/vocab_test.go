@@ -132,3 +132,11 @@ func TestEmbeddedDataAgrees(t *testing.T) {
 		t.Errorf("طَاوِلَة ranks beyond 1500: %+v", off)
 	}
 }
+
+func TestBeyondReportsARepeatedWordOnce(t *testing.T) {
+	c := fixture(t)
+	off := c.Beyond("[الْكِتَابُ] الطَّاوِلَةِ ثُمَّ الطَّاوِلَةِ", 3)
+	if len(off) != 1 || off[0].Word != "الطَّاوِلَةِ" {
+		t.Errorf("offenders = %v", words(off))
+	}
+}

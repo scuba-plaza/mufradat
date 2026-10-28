@@ -304,3 +304,19 @@ func TestFoldMergesHamzatedAlefs(t *testing.T) {
 		}
 	}
 }
+
+func TestTheArticleAssimilatesToEverySunLetterAndNoMoonLetter(t *testing.T) {
+	const shadda, fatha = "ّ", "َ"
+	for _, l := range "تثدذرزسشصضطظلن" {
+		plain, doubled := "ال"+string(l)+fatha+"ب", "ال"+string(l)+shadda+fatha+"ب"
+		if DiacKey(plain) != DiacKey(doubled) {
+			t.Errorf("sun letter %c: the doubling is only a spelling of the assimilation: %q vs %q", l, DiacKey(plain), DiacKey(doubled))
+		}
+	}
+	for _, l := range "بجحخعغفقكمهوي" {
+		plain, doubled := "ال"+string(l)+fatha+"ب", "ال"+string(l)+shadda+fatha+"ب"
+		if DiacKey(plain) == DiacKey(doubled) {
+			t.Errorf("moon letter %c: a doubled letter is a real difference: both gave %q", l, DiacKey(plain))
+		}
+	}
+}
