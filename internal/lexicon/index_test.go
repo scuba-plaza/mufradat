@@ -129,3 +129,20 @@ func TestEmbeddedIndexLoads(t *testing.T) {
 		t.Errorf("عين should be found, got %v", names(got))
 	}
 }
+
+func TestWithoutArticleDropsOnlyALeadingAlLeavingAtLeastTwoLetters(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"الْكِتَابُ", "كِتَابُ"},
+		{"الكتاب", "كتاب"},
+		{"كِتَاب", "كِتَاب"},
+		{"بَيْت", "بَيْت"},
+		{"اَلْمَ", "اَلْمَ"},
+		{"الْمَكْتَب", "مَكْتَب"},
+		{"الم", "الم"},
+		{"", ""},
+	} {
+		if got := withoutArticle(c.in); got != c.want {
+			t.Errorf("withoutArticle(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
