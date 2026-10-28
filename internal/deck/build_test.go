@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -247,7 +248,7 @@ func TestCardsAndDueOrder(t *testing.T) {
 	notes, opts := fixture(t)
 	data, _ := buildBytes(t, notes, opts)
 	col := readPackage(t, data)
-	if got := col.cards["n_bbbbbbbbbbbb"]; len(got) != 2 || got[0] != (cardRow{0, 1}) || got[1] != (cardRow{1, 1 + ProductionDelay}) {
+	if got := col.cards["n_bbbbbbbbbbbb"]; len(got) != 2 || got[0] != (cardRow{0, 1}) || got[1] != (cardRow{1, 21}) {
 		t.Errorf("rank 1 cards = %+v", got)
 	}
 	if got := col.cards["n_aaaaaaaaaaaa"]; len(got) != 1 || got[0].due != 3 {
@@ -384,5 +385,51 @@ func TestPackageModelIsNeverOlderThanTheTemplates(t *testing.T) {
 	mod, _ := readPackage(t, data).model["mod"].(float64)
 	if int64(mod) < TemplatesRevised().Unix() {
 		t.Fatalf("the model is dated %d, before the templates were revised at %d", int64(mod), TemplatesRevised().Unix())
+	}
+}
+
+func TestCheckTagsFollowTheWorstFlagAndAreCounted(t *testing.T) {
+	notes, opts := fixture(t)
+	minor := Flag{Severity: Minor, Word: "فِي", Detail: "CATT reads فِى; CAMeL agrees with the card"}
+	major := Flag{Severity: Major, Detail: "the ending has no vowel mark"}
+	opts.Check = func(n note.Note) Check {
+		switch n.ID {
+		case "n_aaaaaaaaaaaa":
+			return Check{Verified: true, Flags: []Flag{minor}}
+		case "n_bbbbbbbbbbbb":
+			return Check{Verified: true, Flags: []Flag{minor, major, minor}}
+		}
+		return Check{Verified: true}
+	}
+	data, sum := buildBytes(t, notes, opts)
+	col := readPackage(t, data)
+	tags := func(id string) string { return col.notes[id].tags }
+	if !strings.Contains(tags("n_aaaaaaaaaaaa"), " check::diacritics-minor ") || strings.Contains(tags("n_aaaaaaaaaaaa"), " check::diacritics ") {
+		t.Errorf("only minor flags: %q", tags("n_aaaaaaaaaaaa"))
+	}
+	if !strings.Contains(tags("n_bbbbbbbbbbbb"), " check::diacritics ") || strings.Contains(tags("n_bbbbbbbbbbbb"), "diacritics-minor") {
+		t.Errorf("a major flag outranks minor ones: %q", tags("n_bbbbbbbbbbbb"))
+	}
+	if strings.Contains(tags("n_cccccccccccc"), "check::") {
+		t.Errorf("a checked note with no flags carries no check tag: %q", tags("n_cccccccccccc"))
+	}
+	if want := map[string]int{"check::diacritics-minor": 1, "check::diacritics": 1}; !reflect.DeepEqual(sum.Tagged, want) {
+		t.Errorf("tag counts %v, want %v", sum.Tagged, want)
+	}
+	check := col.notes["n_bbbbbbbbbbbb"].fields[fieldIndex("Check")]
+	if strings.Count(check, "<br>") != 3 || !strings.HasPrefix(check, "<b>Check:</b><br>") || !strings.Contains(check, "the ending has no vowel mark") {
+		t.Errorf("the check field lists every flag: %q", check)
+	}
+}
+
+func TestTheStableIdentitiesAndDatesAreTheRecordedOnes(t *testing.T) {
+	if got := ModelID(100); got != 1767785938850 {
+		t.Errorf("ModelID(100) = %d: changing it makes Anki see a different note type (SchemaVersion %d)", got, SchemaVersion)
+	}
+	if got := TemplatesRevised(); !got.Equal(time.Date(2026, time.October, 9, 12, 0, 0, 0, time.UTC)) {
+		t.Errorf("TemplatesRevised = %v: it moves only together with the recorded template digest", got)
+	}
+	if ProductionDelay != 20 {
+		t.Errorf("ProductionDelay = %d", ProductionDelay)
 	}
 }
