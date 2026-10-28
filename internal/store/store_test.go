@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -253,5 +254,82 @@ func TestRevertRestoresWhatValidationWouldRefuse(t *testing.T) {
 	})
 	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected not found, got %v", err)
+	}
+}
+
+type scriptedIDs struct {
+	ids   []string
+	calls int
+}
+
+func (s *scriptedIDs) NewID() (string, error) {
+	id := s.ids[s.calls%len(s.ids)]
+	s.calls++
+	return id, nil
+}
+
+func TestAddMintsIdsUntilOneIsFreeAndGivesUpAfterEightCollisions(t *testing.T) {
+	_, ws := newStore(t)
+	clock := func() time.Time { return time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC) }
+	add := func(ids *scriptedIDs) (note.Note, error) {
+		var added note.Note
+		err := New(ws, clock, ids).Update(context.Background(), func(tx *Tx) error {
+			var err error
+			added, err = tx.Add(draft("كِتَاب"))
+			return err
+		})
+		return added, err
+	}
+
+	first := &scriptedIDs{ids: []string{"n_aaaaaaaaaaaa"}}
+	if added, err := add(first); err != nil || added.ID != "n_aaaaaaaaaaaa" || first.calls != 1 {
+		t.Fatalf("a free id is taken at once: %+v, %v after %d draws", added, err, first.calls)
+	}
+
+	second := &scriptedIDs{ids: []string{"n_aaaaaaaaaaaa", "n_aaaaaaaaaaaa", "n_bbbbbbbbbbbb", "n_cccccccccccc"}}
+	if added, err := add(second); err != nil || added.ID != "n_bbbbbbbbbbbb" || second.calls != 3 {
+		t.Fatalf("a taken id is skipped and drawing stops at the first free one: %+v, %v after %d draws", added, err, second.calls)
+	}
+
+	stuck := &scriptedIDs{ids: []string{"n_aaaaaaaaaaaa"}}
+	if _, err := add(stuck); err == nil || err.Error() != "could not mint an unused note id" || stuck.calls != 8 {
+		t.Fatalf("eight collisions in a row are an error, got %v after %d draws", err, stuck.calls)
+	}
+
+	last := &scriptedIDs{ids: append(slices.Repeat([]string{"n_aaaaaaaaaaaa"}, 7), "n_dddddddddddd")}
+	if added, err := add(last); err != nil || added.ID != "n_dddddddddddd" {
+		t.Fatalf("the eighth draw still counts: %+v, %v", added, err)
+	}
+}
+
+func TestDeleteRemovesTheNoteForGoodAndReportsAMissingOne(t *testing.T) {
+	s, _ := newStore(t)
+	var keep, drop note.Note
+	if err := s.Update(context.Background(), func(tx *Tx) error {
+		var err error
+		if keep, err = tx.Add(draft("كِتَاب")); err != nil {
+			return err
+		}
+		drop, err = tx.Add(draft("قَلَم"))
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Update(context.Background(), func(tx *Tx) error { return tx.Delete(drop.ID) }); err != nil {
+		t.Fatal(err)
+	}
+	set, err := s.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := set.Get(drop.ID); ok {
+		t.Error("the deleted note is still on disk")
+	}
+	if _, ok := set.Get(keep.ID); !ok || set.Len() != 1 {
+		t.Errorf("deleting one note must leave the other: %d notes", set.Len())
+	}
+	err = s.Update(context.Background(), func(tx *Tx) error { return tx.Delete(drop.ID) })
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("deleting a note twice: %v, want ErrNotFound", err)
 	}
 }
