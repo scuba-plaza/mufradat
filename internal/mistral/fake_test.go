@@ -12,7 +12,11 @@ import (
 	"testing"
 )
 
-const testKey = "test-key"
+const (
+	testKey    = "test-key"
+	speechPath = "/v1/audio/speech"
+	modelsPath = "/v1/models"
+)
 
 type reply struct {
 	Status int
@@ -76,6 +80,9 @@ func (f *fake) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if got := r.Header.Get("Authorization"); got != "Bearer "+testKey {
 		f.t.Errorf("%s: Authorization = %q", key, got)
+	}
+	if got := r.Header.Get("Accept"); got != "application/json" {
+		f.t.Errorf("%s: Accept = %q", key, got)
 	}
 	if rt.Method == http.MethodPost {
 		if got := r.Header.Get("Content-Type"); got != "application/json" {

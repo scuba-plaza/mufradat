@@ -98,7 +98,7 @@ func newAPIError(status int, body []byte, wait time.Duration) *APIError {
 
 func scalar(raw json.RawMessage) string {
 	raw = bytes.TrimSpace(raw)
-	if len(raw) == 0 || string(raw) == "null" {
+	if len(raw) == 0 {
 		return ""
 	}
 	var s string

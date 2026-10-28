@@ -17,7 +17,8 @@ import (
 const voicesPage1 = `{"data":[
  {"id":"11111111-1111-4111-8111-111111111111","name":"Maryam","slug":"voice_479","languages":["ar"],"gender":"female","kind":"preset","type":"tts"},
  {"id":"22222222-2222-4222-8222-222222222222","name":"Oliver","slug":"voice_001","languages":["en_GB","en_us"],"gender":"male","kind":"preset","type":"tts"},
- {"id":"33333333-3333-4333-8333-333333333333","name":"Layla","slug":"voice_480","languages":["AR_SA","en"],"gender":"female","kind":"preset","type":"tts"}
+ {"id":"33333333-3333-4333-8333-333333333333","name":"Layla","slug":"voice_480","languages":["AR_SA","en"],"gender":"Female","kind":"preset","type":"tts"},
+ {"id":"55555555-5555-4555-8555-555555555555","name":"Mapu","slug":"voice_777","languages":["arn"],"gender":"male","kind":"preset","type":"tts"}
 ],"next_page_token":"tok2"}`
 
 const voicesPage2 = `{"data":[
@@ -49,7 +50,7 @@ func clientFor(f *fake) *Client {
 }
 
 func TestVoicesFollowsPagesAndKeepsOnlyArabic(t *testing.T) {
-	f := speechFake(t, route{Method: http.MethodPost, Path: PathSpeech, Body: "{}", Reply: ok("{}")})
+	f := speechFake(t, route{Method: http.MethodPost, Path: speechPath, Body: "{}", Reply: ok("{}")})
 	voices, err := clientFor(f).Voices(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -59,10 +60,13 @@ func TestVoicesFollowsPagesAndKeepsOnlyArabic(t *testing.T) {
 		names = append(names, v.Name)
 	}
 	if !slices.Equal(names, []string{"Maryam", "Layla", "Omar"}) {
-		t.Fatalf("voices %v: Oliver (English) must be filtered out, the second page must be read", names)
+		t.Fatalf("voices %v: Oliver (English) and Mapu (arn, not ar) must be filtered out, the second page must be read", names)
 	}
 	if voices[0].ID != "11111111-1111-4111-8111-111111111111" || voices[0].Slug != "voice_479" || voices[0].Gender != "female" {
 		t.Errorf("first voice %+v", voices[0])
+	}
+	if voices[1].Gender != "female" {
+		t.Errorf("genders are lower-cased, got %q", voices[1].Gender)
 	}
 	if voices[2].Slug != "" {
 		t.Errorf("a null slug should be empty, got %q", voices[2].Slug)
@@ -73,7 +77,7 @@ func TestVoicesFollowsPagesAndKeepsOnlyArabic(t *testing.T) {
 }
 
 func TestVoicesAreListedOncePerClient(t *testing.T) {
-	f := speechFake(t, route{Method: http.MethodPost, Path: PathSpeech, Body: "{}", Reply: ok("{}")})
+	f := speechFake(t, route{Method: http.MethodPost, Path: speechPath, Body: "{}", Reply: ok("{}")})
 	c := clientFor(f)
 	for range 3 {
 		if _, err := c.Voices(context.Background()); err != nil {
@@ -109,9 +113,9 @@ func TestVoicesFailureIsNotCachedAndInventsNothing(t *testing.T) {
 }
 
 func TestSynthesizeSendsTheDocumentedRequest(t *testing.T) {
-	audio := []byte("ID3\x04fake-mp3")
+	audio := []byte("ID3\x04\xfb\xff\xfe-mp3")
 	f := speechFake(t, route{
-		Method: http.MethodPost, Path: PathSpeech,
+		Method: http.MethodPost, Path: speechPath,
 		Body:  speechBody("قَلَم", "11111111-1111-4111-8111-111111111111"),
 		Reply: ok(`{"audio_data":"` + base64.StdEncoding.EncodeToString(audio) + `"}`),
 	})
@@ -127,19 +131,19 @@ func TestSynthesizeSendsTheDocumentedRequest(t *testing.T) {
 func TestSynthesizeResolvesTheVoiceByIDSlugOrName(t *testing.T) {
 	for _, ref := range []string{"11111111-1111-4111-8111-111111111111", "voice_479", "Maryam", "maryam"} {
 		f := speechFake(t, route{
-			Method: http.MethodPost, Path: PathSpeech,
+			Method: http.MethodPost, Path: speechPath,
 			Body:  speechBody("كِتَاب", "11111111-1111-4111-8111-111111111111"),
 			Reply: ok(`{"audio_data":"` + base64.StdEncoding.EncodeToString([]byte("a")) + `"}`),
 		})
 		if _, err := clientFor(f).Synthesize(context.Background(), SpeechRequest{Text: "كِتَاب", Voice: ref}); err != nil {
 			t.Errorf("%q: %v", ref, err)
 		}
-		if f.count(http.MethodPost, PathSpeech) != 1 {
-			t.Errorf("%q: %d speech requests", ref, f.count(http.MethodPost, PathSpeech))
+		if f.count(http.MethodPost, speechPath) != 1 {
+			t.Errorf("%q: %d speech requests", ref, f.count(http.MethodPost, speechPath))
 		}
 	}
 	f := speechFake(t, route{
-		Method: http.MethodPost, Path: PathSpeech,
+		Method: http.MethodPost, Path: speechPath,
 		Body:  speechBody("x", "44444444-4444-4444-8444-444444444444"),
 		Reply: ok(`{"audio_data":"YQ=="}`),
 	})
@@ -149,7 +153,7 @@ func TestSynthesizeResolvesTheVoiceByIDSlugOrName(t *testing.T) {
 }
 
 func TestSynthesizeWithAnUnknownVoiceMakesNoSpeechRequest(t *testing.T) {
-	f := speechFake(t, route{Method: http.MethodPost, Path: PathSpeech, Body: "{}", Reply: ok("{}")})
+	f := speechFake(t, route{Method: http.MethodPost, Path: speechPath, Body: "{}", Reply: ok("{}")})
 	_, err := clientFor(f).Synthesize(context.Background(), SpeechRequest{Text: "x", Voice: "voice_999"})
 	var unknown *VoiceError
 	if !errors.As(err, &unknown) {
@@ -161,8 +165,20 @@ func TestSynthesizeWithAnUnknownVoiceMakesNoSpeechRequest(t *testing.T) {
 	if !strings.Contains(err.Error(), `"voice_999"`) {
 		t.Errorf("message %q should name the voice", err)
 	}
-	if f.count(http.MethodPost, PathSpeech) != 0 {
-		t.Fatalf("the speech endpoint was called %d times", f.count(http.MethodPost, PathSpeech))
+	if f.count(http.MethodPost, speechPath) != 0 {
+		t.Fatalf("the speech endpoint was called %d times", f.count(http.MethodPost, speechPath))
+	}
+}
+
+func TestSynthesizeWithoutAVoiceNeverPicksOne(t *testing.T) {
+	f := speechFake(t, route{Method: http.MethodPost, Path: speechPath, Body: "{}", Reply: ok("{}")})
+	_, err := clientFor(f).Synthesize(context.Background(), SpeechRequest{Text: "x"})
+	var unknown *VoiceError
+	if !errors.As(err, &unknown) || unknown.Voice != "" {
+		t.Fatalf("got %T %v", err, err)
+	}
+	if f.count(http.MethodPost, speechPath) != 0 {
+		t.Fatalf("the speech endpoint was called %d times", f.count(http.MethodPost, speechPath))
 	}
 }
 
@@ -172,21 +188,22 @@ func TestSynthesizeRefusesAnAmbiguousVoiceName(t *testing.T) {
 	 {"id":"b","name":"Sara","slug":"s2","languages":["ar"],"gender":"female"}],"next_page_token":null}`
 	f := newFake(t,
 		route{Method: http.MethodGet, Path: "/v2/audio/voices", Query: url.Values{"page_size": {"100"}, "language": {"ar"}}, Reply: ok(page)},
-		route{Method: http.MethodPost, Path: PathSpeech, Body: "{}", Reply: ok("{}")})
+		route{Method: http.MethodPost, Path: speechPath, Body: "{}", Reply: ok("{}")})
 	_, err := clientFor(f).Synthesize(context.Background(), SpeechRequest{Text: "x", Voice: "sara"})
 	var ve *VoiceError
 	if !errors.As(err, &ve) || !strings.Contains(err.Error(), "2 voices") {
 		t.Fatalf("got %T %v", err, err)
 	}
-	if f.count(http.MethodPost, PathSpeech) != 0 {
+	if f.count(http.MethodPost, speechPath) != 0 {
 		t.Error("no speech request expected")
 	}
 }
 
 func TestSynthesizeRejectsEmptyTextWithoutCallingTheService(t *testing.T) {
 	f := newFake(t)
-	if _, err := clientFor(f).Synthesize(context.Background(), SpeechRequest{Text: "  ", Voice: "voice_479"}); err == nil {
-		t.Fatal("empty text accepted")
+	_, err := clientFor(f).Synthesize(context.Background(), SpeechRequest{Text: "  ", Voice: "voice_479"})
+	if err == nil || !strings.Contains(err.Error(), "empty text") {
+		t.Fatalf("got %v, want an error about empty text", err)
 	}
 	if len(f.requests()) != 0 {
 		t.Errorf("requests %v", f.requests())
@@ -194,19 +211,20 @@ func TestSynthesizeRejectsEmptyTextWithoutCallingTheService(t *testing.T) {
 }
 
 func TestSynthesizeRejectsRepliesWithoutAudio(t *testing.T) {
-	for name, body := range map[string]string{
-		"missing":       `{}`,
-		"empty":         `{"audio_data":""}`,
-		"not base64":    `{"audio_data":"***"}`,
-		"not an object": `[]`,
+	for name, tc := range map[string]struct{ body, want string }{
+		"missing":       {`{}`, "no audio"},
+		"empty":         {`{"audio_data":""}`, "no audio"},
+		"not base64":    {`{"audio_data":"***"}`, "invalid audio"},
+		"not an object": {`[]`, "unreadable reply from /v1/audio/speech"},
 	} {
 		f := speechFake(t, route{
-			Method: http.MethodPost, Path: PathSpeech,
+			Method: http.MethodPost, Path: speechPath,
 			Body:  speechBody("x", "11111111-1111-4111-8111-111111111111"),
-			Reply: ok(body),
+			Reply: ok(tc.body),
 		})
-		if _, err := clientFor(f).Synthesize(context.Background(), SpeechRequest{Text: "x", Voice: "voice_479"}); err == nil {
-			t.Errorf("%s: expected an error", name)
+		_, err := clientFor(f).Synthesize(context.Background(), SpeechRequest{Text: "x", Voice: "voice_479"})
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: got %v, want an error containing %q", name, err, tc.want)
 		}
 	}
 }
@@ -228,12 +246,13 @@ func TestSynthesizeErrorKinds(t *testing.T) {
 		{"forbidden", 403, flat("Forbidden"), KindAuth, true, false, false},
 		{"rate limited", 429, flat("Rate limit exceeded"), KindRateLimited, false, true, false},
 		{"server error", 500, flat("oops"), KindTransient, false, true, false},
+		{"bad request", 400, flat("Bad request"), KindBadRequest, false, false, false},
 		{"validation", 422, `{"object":"error","message":{"detail":[{"type":"extra_forbidden","loc":["body","rate"],"msg":"Extra inputs are not permitted"}]},"type":"invalid_request_error","param":null,"code":null}`, KindBadRequest, false, false, false},
 		{"moderation", 403, `{"object":"error","message":"Content flagged by guardrails","type":"guardrail_violation","param":null,"code":"1920"}`, KindBlocked, false, false, true},
 	}
 	for _, tc := range cases {
 		f := speechFake(t, route{
-			Method: http.MethodPost, Path: PathSpeech,
+			Method: http.MethodPost, Path: speechPath,
 			Body:  speechBody("x", "11111111-1111-4111-8111-111111111111"),
 			Reply: failing(tc.status, tc.body, nil),
 		})
@@ -269,11 +288,32 @@ func TestErrorMessagesCarryTheServiceText(t *testing.T) {
 	if got := empty.Error(); got != "mistral: Service Unavailable (HTTP 503)" {
 		t.Errorf("Error() = %q", got)
 	}
+	const nullBody = `{"object":"error","message":null,"type":"invalid_request_error"}`
+	if got := newAPIError(400, []byte(nullBody), 0).Message; got != nullBody {
+		t.Errorf("a null message should fall back to the body, got %q", got)
+	}
+	if got := len(newAPIError(502, []byte(strings.Repeat("x", 1000)), 0).Message); got != 300 {
+		t.Errorf("a long body is cut to 300 bytes, got %d", got)
+	}
+}
+
+func TestAnUnreachableServerIsTemporaryAndNamesMistral(t *testing.T) {
+	f := newFake(t)
+	c := clientFor(f)
+	f.Close()
+	_, err := c.Voices(context.Background())
+	var api *APIError
+	if !errors.As(err, &api) || api.Kind() != KindTransient || !api.Retryable() || api.Status != 0 {
+		t.Fatalf("got %T %v", err, err)
+	}
+	if !strings.HasPrefix(err.Error(), "mistral: could not reach the service") {
+		t.Errorf("message %q", err)
+	}
 }
 
 func TestAModerationBlockIsNeverRetried(t *testing.T) {
 	f := speechFake(t, route{
-		Method: http.MethodPost, Path: PathSpeech,
+		Method: http.MethodPost, Path: speechPath,
 		Body:  speechBody("x", "11111111-1111-4111-8111-111111111111"),
 		Reply: failing(403, `{"object":"error","message":"blocked","type":"guardrail_violation","code":"1920"}`, nil),
 	})
@@ -285,14 +325,14 @@ func TestAModerationBlockIsNeverRetried(t *testing.T) {
 	if !errors.As(err, &api) || !api.Blocked() {
 		t.Fatalf("got %v", err)
 	}
-	if got := f.count(http.MethodPost, PathSpeech); got != 1 {
+	if got := f.count(http.MethodPost, speechPath); got != 1 {
 		t.Fatalf("speech endpoint called %d times", got)
 	}
 }
 
 func TestTemporaryFailuresAreRetriedUntilTheyClear(t *testing.T) {
 	f := speechFake(t, route{
-		Method: http.MethodPost, Path: PathSpeech,
+		Method: http.MethodPost, Path: speechPath,
 		Body: speechBody("x", "11111111-1111-4111-8111-111111111111"),
 		Reply: func(call int, _ url.Values) reply {
 			if call < 3 {
@@ -319,7 +359,7 @@ func (c *countingWaiter) Wait(context.Context) error { c.n++; return nil }
 
 func TestEveryRequestPassesTheSharedLimiter(t *testing.T) {
 	f := speechFake(t, route{
-		Method: http.MethodPost, Path: PathSpeech,
+		Method: http.MethodPost, Path: speechPath,
 		Body:  speechBody("x", "11111111-1111-4111-8111-111111111111"),
 		Reply: ok(`{"audio_data":"YQ=="}`),
 	})
@@ -337,14 +377,22 @@ func TestEveryRequestPassesTheSharedLimiter(t *testing.T) {
 }
 
 func TestCheckKeyUsesTheFreeModelsEndpoint(t *testing.T) {
-	f := newFake(t, route{Method: http.MethodGet, Path: PathModels, Reply: ok(`{"object":"list","data":[]}`)})
+	f := newFake(t, route{Method: http.MethodGet, Path: modelsPath, Reply: ok(`{"object":"list","data":[]}`)})
 	if err := clientFor(f).CheckKey(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	bad := newFake(t, route{Method: http.MethodGet, Path: PathModels, Reply: failing(401, `{"object":"error","message":"Unauthorized"}`, nil)})
+	bad := newFake(t, route{Method: http.MethodGet, Path: modelsPath, Reply: failing(401, `{"object":"error","message":"Unauthorized"}`, nil)})
 	err := clientFor(bad).CheckKey(context.Background())
 	var api *APIError
 	if !errors.As(err, &api) || api.Kind() != KindAuth {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestABaseURLEndingInSlashesStillReachesTheDocumentedPath(t *testing.T) {
+	f := newFake(t, route{Method: http.MethodGet, Path: modelsPath, Reply: ok(`{"object":"list","data":[]}`)})
+	c := &Client{BaseURL: f.URL + "//", Key: testKey, HTTP: f.Client()}
+	if err := c.CheckKey(context.Background()); err != nil {
+		t.Fatal(err)
 	}
 }

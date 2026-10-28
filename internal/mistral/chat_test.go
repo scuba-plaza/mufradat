@@ -108,6 +108,7 @@ func TestCompleteRejectsAnswersThatCannotBeUsed(t *testing.T) {
 		{"no choices", `{"id":"x","object":"chat.completion","model":"m","choices":[],"usage":{"prompt_tokens":1,"completion_tokens":0}}`, "no choices"},
 		{"plain text", chatReply(quote("Sure, here you go!"), "stop"), "not JSON"},
 		{"chunks without text", chatReply(`[{"type":"image_url","image_url":"x"}]`, "stop"), "empty"},
+		{"only whitespace", chatReply(quote("  \n "), "stop"), "empty"},
 	}
 	for _, tc := range cases {
 		f := newFake(t, route{
@@ -202,7 +203,7 @@ func TestCompleteReportsAnUnreachableServerAsTemporary(t *testing.T) {
 	f.Close()
 	_, err := ask(b)
 	var transient *llm.TransientError
-	if !errors.As(err, &transient) {
+	if !errors.As(err, &transient) || !strings.Contains(transient.Message, "could not reach the service") {
 		t.Fatalf("got %T %v", err, err)
 	}
 }
@@ -230,5 +231,54 @@ func TestCompleteRejectsASchemaThatIsNotJSON(t *testing.T) {
 	}
 	if len(f.requests()) != 0 {
 		t.Errorf("no request should be sent: %v", f.requests())
+	}
+}
+
+func TestCompleteReportsTheModelThatAnswered(t *testing.T) {
+	cases := []struct{ name, reply, want string }{
+		{"the model named in the reply", strings.Replace(chatReply(quote(`{"a":1}`), "stop"), `"model":"mistral-small-latest"`, `"model":"mistral-small-2506"`, 1), "mistral-small-2506"},
+		{"the requested model when the reply names none", strings.Replace(chatReply(quote(`{"a":1}`), "stop"), `"model":"mistral-small-latest",`, ``, 1), "mistral-small-latest"},
+	}
+	for _, tc := range cases {
+		f := newFake(t, route{
+			Method: http.MethodPost, Path: chatPath,
+			Body:  chatBody(t, "mistral-small-latest", "Answer in JSON.", "Say ok.", tinySchema),
+			Reply: ok(tc.reply),
+		})
+		resp, err := ask(backendFor(f))
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if !slices.Equal(resp.Usage.Models, []string{tc.want}) {
+			t.Errorf("%s: models %v, want [%s]", tc.name, resp.Usage.Models, tc.want)
+		}
+	}
+}
+
+func TestCompleteReadsOnlyTextChunksAndTrimsTheAnswer(t *testing.T) {
+	chunks := `[{"type":"reference","text":"ignored"},{"type":"text","text":"\n{\"answer\":"},{"type":"text","text":"\"ok\"}\n "}]`
+	f := newFake(t, route{
+		Method: http.MethodPost, Path: chatPath,
+		Body:  chatBody(t, "mistral-small-latest", "Answer in JSON.", "Say ok.", tinySchema),
+		Reply: ok(chatReply(chunks, "stop")),
+	})
+	resp, err := ask(backendFor(f))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(resp.Output) != `{"answer":"ok"}` {
+		t.Errorf("output %q", resp.Output)
+	}
+}
+
+func TestCompleteReportsAReplyThatIsNotJSON(t *testing.T) {
+	f := newFake(t, route{
+		Method: http.MethodPost, Path: chatPath,
+		Body:  chatBody(t, "mistral-small-latest", "Answer in JSON.", "Say ok.", tinySchema),
+		Reply: ok("<html>sign in to the network</html>"),
+	})
+	_, err := ask(backendFor(f))
+	if err == nil || !strings.Contains(err.Error(), "unreadable reply from /v1/chat/completions") {
+		t.Fatalf("got %v", err)
 	}
 }

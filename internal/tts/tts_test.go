@@ -108,13 +108,13 @@ func audioReply(data string) string {
 }
 
 func TestSynthesizeSendsTheDocumentedRequestAndDecodesTheAudio(t *testing.T) {
-	f := newFake(t, route{Method: "POST", Path: "/v1/text:synthesize", Body: synthBody("كِتَاب", "ar-XA-Test", 0.9), Reply: audioReply("MP3DATA")})
+	f := newFake(t, route{Method: "POST", Path: "/v1/text:synthesize", Body: synthBody("كِتَاب", "ar-XA-Test", 0.9), Reply: audioReply("\xfb\xff\xfeMP3DATA")})
 	c := &Client{BaseURL: f.URL, HTTP: f.Client()}
 	audio, err := c.Synthesize(context.Background(), Request{Text: "كِتَاب", Voice: "ar-XA-Test", Rate: 0.9})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(audio) != "MP3DATA" {
+	if string(audio) != "\xfb\xff\xfeMP3DATA" {
 		t.Fatalf("audio %q", audio)
 	}
 }
@@ -142,16 +142,17 @@ func TestSynthesizeRejectsBadInputWithoutCallingTheService(t *testing.T) {
 }
 
 func TestSynthesizeRejectsRepliesWithoutUsableAudio(t *testing.T) {
-	for name, reply := range map[string]string{
-		"empty":      `{"audioContent":""}`,
-		"missing":    `{}`,
-		"not base64": `{"audioContent":"%%%"}`,
-		"not json":   `<html>`,
+	for name, tc := range map[string]struct{ reply, want string }{
+		"empty":      {`{"audioContent":""}`, "no audio"},
+		"missing":    {`{}`, "no audio"},
+		"not base64": {`{"audioContent":"%%%"}`, "invalid audio"},
+		"not json":   {`<html>`, "unreadable synthesize response"},
 	} {
-		f := newFake(t, route{Method: "POST", Path: "/v1/text:synthesize", Body: synthBody("x", "v", 1), Reply: reply})
+		f := newFake(t, route{Method: "POST", Path: "/v1/text:synthesize", Body: synthBody("x", "v", 1), Reply: tc.reply})
 		c := &Client{BaseURL: f.URL, HTTP: f.Client()}
-		if _, err := c.Synthesize(context.Background(), Request{Text: "x", Voice: "v", Rate: 1}); err == nil {
-			t.Errorf("%s: expected an error", name)
+		_, err := c.Synthesize(context.Background(), Request{Text: "x", Voice: "v", Rate: 1})
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: got %v, want an error containing %q", name, err, tc.want)
 		}
 	}
 }
@@ -170,6 +171,7 @@ func TestErrorsAreClassifiedFromTheServiceReply(t *testing.T) {
 		{"permission denied", 403, `{"error":{"message":"denied","status":"PERMISSION_DENIED"}}`, KindAuth, true, false, "denied"},
 		{"api disabled", 403, `{"error":{"message":"api off","status":"PERMISSION_DENIED","details":[{"reason":"SERVICE_DISABLED"}]}}`, KindQuota, true, false, "api off"},
 		{"billing", 403, `{"error":{"message":"no billing","status":"PERMISSION_DENIED","details":[{"reason":"BILLING_DISABLED"}]}}`, KindQuota, true, false, "no billing"},
+		{"quota named in lower case", 429, `{"error":{"message":"daily limit","status":"RESOURCE_EXHAUSTED","details":[{"reason":"quota_exceeded"}]}}`, KindQuota, true, false, "daily limit"},
 		{"rate limited", 429, `{"error":{"message":"quota","status":"RESOURCE_EXHAUSTED"}}`, KindRateLimited, false, true, "quota"},
 		{"bad voice", 400, `{"error":{"message":"bad voice","status":"INVALID_ARGUMENT"}}`, KindBadRequest, false, false, "bad voice"},
 		{"server error", 500, `oops`, KindTransient, false, true, "oops"},
@@ -264,5 +266,44 @@ func TestEveryRequestPassesTheLimiter(t *testing.T) {
 	}
 	if w.n != 4 {
 		t.Fatalf("limiter waited %d times, want 4", w.n)
+	}
+}
+
+func TestSynthesizeAcceptsTextAtTheLimitAndRejectsOneByteMore(t *testing.T) {
+	atLimit := strings.Repeat("x", 4500)
+	f := newFake(t, route{Method: "POST", Path: "/v1/text:synthesize", Body: synthBody(atLimit, "v", 1), Reply: audioReply("a")})
+	c := &Client{BaseURL: f.URL, HTTP: f.Client()}
+	if _, err := c.Synthesize(context.Background(), Request{Text: atLimit, Voice: "v", Rate: 1}); err != nil {
+		t.Fatalf("4500 bytes should be accepted: %v", err)
+	}
+	_, err := c.Synthesize(context.Background(), Request{Text: atLimit + "x", Voice: "v", Rate: 1})
+	if err == nil || !strings.Contains(err.Error(), "4501 bytes") || !strings.Contains(err.Error(), "at most 4500") {
+		t.Fatalf("4501 bytes: %v", err)
+	}
+	if n := f.count("POST", "/v1/text:synthesize"); n != 1 {
+		t.Fatalf("service called %d times, want 1", n)
+	}
+}
+
+func TestVoicesRejectAReplyThatIsNotJSON(t *testing.T) {
+	f := newFake(t, route{Method: "GET", Path: "/v1/voices", Query: url.Values{"languageCode": {"ar-XA"}}, Reply: `<html>`})
+	c := &Client{BaseURL: f.URL, HTTP: f.Client()}
+	voices, err := c.Voices(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "unreadable voices response") || voices != nil {
+		t.Fatalf("got %v, %v", voices, err)
+	}
+}
+
+func TestAnErrorKeepsTheStatusAndEveryDetailReason(t *testing.T) {
+	body := `{"error":{"code":403,"message":"Cloud Text-to-Speech API has not been used in project 1 before or it is disabled.","status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SERVICE_DISABLED","domain":"googleapis.com"},{"@type":"type.googleapis.com/google.rpc.Help"}]}}`
+	e := newAPIError(403, []byte(body), 0)
+	if e.Reason != "PERMISSION_DENIED SERVICE_DISABLED" {
+		t.Errorf("Reason = %q", e.Reason)
+	}
+	if e.Message != "Cloud Text-to-Speech API has not been used in project 1 before or it is disabled." {
+		t.Errorf("Message = %q", e.Message)
+	}
+	if got := len(newAPIError(500, []byte(strings.Repeat("y", 500)), 0).Message); got != 200 {
+		t.Errorf("a long body is cut to 200 bytes, got %d", got)
 	}
 }

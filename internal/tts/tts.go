@@ -6,12 +6,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/scuba-plaza/mufradat/internal/httpretry"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/scuba-plaza/mufradat/internal/httpretry"
 )
 
 const (
