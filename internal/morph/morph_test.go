@@ -78,12 +78,14 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 func TestDecodeRejectsDataThatDoesNotFitTheLexicon(t *testing.T) {
 	facts := []Facts{{}, {}}
 	for name, text := range map[string]string{
-		"no tab":         "كتاب\n",
-		"no class":       "كتاب\t0\n",
-		"lemma too big":  "كتاب\t2:0\n",
-		"negative lemma": "كتاب\t-1:0\n",
-		"bad class":      "كتاب\t0:9\n",
-		"not numbers":    "كتاب\ta:b\n",
+		"no tab":                      "كتاب\n",
+		"no class":                    "كتاب\t0\n",
+		"lemma too big":               "كتاب\t2:0\n",
+		"negative lemma":              "كتاب\t-1:0\n",
+		"bad class":                   "كتاب\t0:9\n",
+		"not numbers":                 "كتاب\ta:b\n",
+		"lemma alone is not a number": "كتاب\tx:0\n",
+		"class alone is not a number": "كتاب\t0:y\n",
 	} {
 		if _, err := Decode(gz(t, text), facts); err == nil {
 			t.Errorf("%s: expected an error", name)
@@ -112,5 +114,30 @@ func TestFactsOfALemmaCoverTheMainEntryBeingAVerbAndAnyEntryBeingAPreposition(t 
 		if got := FactsOf(&lexicon.Lemma{ID: "x", Entries: c.entries}); got != c.want {
 			t.Errorf("%s: %+v, want %+v", c.name, got, c.want)
 		}
+	}
+}
+
+func TestEncodeWritesEachWordsLemmasInLemmaOrderThenClass(t *testing.T) {
+	table := NewTable([]Facts{{}, {}, {}})
+	for _, f := range []struct {
+		lemma int
+		class lexicon.Class
+	}{{2, 1}, {0, 2}, {2, 0}, {1, 0}} {
+		table.Add(f.lemma, lexicon.Form{Skeleton: "كتب", Class: f.class})
+	}
+	var b bytes.Buffer
+	if err := table.Encode(&b); err != nil {
+		t.Fatal(err)
+	}
+	zr, err := gzip.NewReader(&b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(raw), "كتب\t0:2,1:0,2:0,2:1\n"; got != want {
+		t.Errorf("encoded %q, want %q", got, want)
 	}
 }
