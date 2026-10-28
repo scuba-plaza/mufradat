@@ -112,11 +112,42 @@ func TestStudyOrder(t *testing.T) {
 	}
 }
 
+func TestStudyOrderRanksFirstThenTheOrderTheyWereAdded(t *testing.T) {
+	mk := func(id string, seq, rank int) Note { return Note{ID: id, Seq: seq, Rank: rank} }
+	for _, c := range []struct {
+		name string
+		a, b Note
+		want int
+	}{
+		{"lower rank first", mk("a", 9, 2), mk("b", 1, 7), -1},
+		{"higher rank later", mk("a", 1, 7), mk("b", 9, 2), 1},
+		{"same rank falls back to the order added", mk("a", 1, 4), mk("b", 2, 4), -1},
+		{"same rank falls back to the order added, reversed", mk("a", 2, 4), mk("b", 1, 4), 1},
+		{"ranked before unranked however late it was added", mk("a", 9, 50), mk("b", 1, 0), -1},
+		{"unranked after ranked however early it was added", mk("a", 1, 0), mk("b", 9, 50), 1},
+		{"unranked keep the order added", mk("a", 1, 0), mk("b", 2, 0), -1},
+		{"unranked keep the order added, reversed", mk("a", 2, 0), mk("b", 1, 0), 1},
+		{"identical order falls back to the id", mk("a", 3, 0), mk("b", 3, 0), -1},
+		{"identical order falls back to the id, reversed", mk("b", 3, 0), mk("a", 3, 0), 1},
+		{"the same note", mk("a", 3, 5), mk("a", 3, 5), 0},
+	} {
+		if got := CompareStudy(c.a, c.b); got != c.want {
+			t.Errorf("%s: CompareStudy = %d, want %d", c.name, got, c.want)
+		}
+		if StudyBefore(c.a, c.b) && StudyBefore(c.b, c.a) {
+			t.Errorf("%s: each note claims to come before the other", c.name)
+		}
+	}
+}
+
 func TestWantsProduction(t *testing.T) {
 	yes, no := true, false
 	n := Note{Rank: 10}
 	if !n.WantsProduction(1000) || n.WantsProduction(5) {
 		t.Error("rank cut-off wrong")
+	}
+	if !n.WantsProduction(10) || n.WantsProduction(9) {
+		t.Error("the cut-off rank itself is included, the one after is not")
 	}
 	if (Note{}).WantsProduction(1000) {
 		t.Error("unranked notes get no production card by default")
