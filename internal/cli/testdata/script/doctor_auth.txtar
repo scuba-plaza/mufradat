@@ -12,11 +12,11 @@ stdout 'hint: set MISTRAL_API_KEY, or run `mufradat -C .*ws auth mistral --impor
 exits 3 mufradat -C ws auth mistral
 stderr 'no Mistral API key found'
 
-! exec mufradat auth mistral --import missing.txt
+exits 1 mufradat auth mistral --import missing.txt
 stderr 'missing.txt does not exist'
-! exec mufradat auth mistral --import empty.txt
+exits 1 mufradat auth mistral --import empty.txt
 stderr 'empty.txt is empty'
-! exec mufradat auth mistral --import spaced.txt
+exits 1 mufradat auth mistral --import spaced.txt
 stderr 'spaced.txt contains whitespace or control characters'
 ! exists home/.config/mufradat/mistral-api-key
 

@@ -16,7 +16,7 @@ var testName = regexp.MustCompile(`\bTest\w+`)
 
 func EndpointsAreTested(t *testing.T, pkg, doc string) {
 	t.Helper()
-	endpoints, unnamed := endpointsOf(t)
+	endpoints, methods, unnamed := endpointsOf(t)
 	for _, pos := range unnamed {
 		t.Errorf("%s: a request is made without a Path constant, so this guard cannot see which endpoint it is", pos)
 	}
@@ -43,6 +43,9 @@ func EndpointsAreTested(t *testing.T, pkg, doc string) {
 				continue
 			}
 			found = true
+			if method := methods[name]; method != "" && !strings.Contains(cells[1], method+" `"+value+"`") {
+				t.Errorf("%s (%s) is called with %s, but its row in %s says %q", name, value, method, doc, cells[1])
+			}
 			names := testName.FindAllString(cells[2], -1)
 			if len(names) == 0 {
 				t.Errorf("%s (%s) is listed in %s without a test", name, value, doc)
@@ -84,7 +87,7 @@ func tableRows(doc string) [][]string {
 	return rows
 }
 
-func endpointsOf(t *testing.T) (map[string]string, []string) {
+func endpointsOf(t *testing.T) (map[string]string, map[string]string, []string) {
 	t.Helper()
 	fset := token.NewFileSet()
 	pkgs, err := parser.ParseDir(fset, ".", func(fi fs.FileInfo) bool { return !strings.HasSuffix(fi.Name(), "_test.go") }, 0)
@@ -92,6 +95,7 @@ func endpointsOf(t *testing.T) (map[string]string, []string) {
 		t.Fatal(err)
 	}
 	endpoints := map[string]string{}
+	methods := map[string]string{}
 	var unnamed []string
 	for _, p := range pkgs {
 		for _, file := range p.Files {
@@ -110,24 +114,32 @@ func endpointsOf(t *testing.T) (map[string]string, []string) {
 					}
 				case *ast.CallExpr:
 					sel, ok := n.Fun.(*ast.SelectorExpr)
-					if ok && sel.Sel.Name == "do" && len(n.Args) >= 3 && !mentionsPath(n.Args[2]) {
+					if !ok || sel.Sel.Name != "do" || len(n.Args) < 3 {
+						return true
+					}
+					path := pathName(n.Args[2])
+					if path == "" {
 						unnamed = append(unnamed, fset.Position(n.Pos()).String())
+						return true
+					}
+					if m, ok := n.Args[1].(*ast.SelectorExpr); ok && strings.HasPrefix(m.Sel.Name, "Method") {
+						methods[path] = strings.ToUpper(strings.TrimPrefix(m.Sel.Name, "Method"))
 					}
 				}
 				return true
 			})
 		}
 	}
-	return endpoints, unnamed
+	return endpoints, methods, unnamed
 }
 
-func mentionsPath(e ast.Expr) bool {
-	found := false
+func pathName(e ast.Expr) string {
+	name := ""
 	ast.Inspect(e, func(n ast.Node) bool {
 		if id, ok := n.(*ast.Ident); ok && strings.HasPrefix(id.Name, "Path") {
-			found = true
+			name = id.Name
 		}
-		return !found
+		return name == ""
 	})
-	return found
+	return name
 }

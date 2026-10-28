@@ -12,7 +12,13 @@ env MISTRAL_API_KEY=
 exits 3 mufradat -C ws audio
 stderr 'no Mistral API key found'
 stderr 'hint: set MISTRAL_API_KEY, or save the key in a file and run `mufradat -C .*ws auth mistral --import FILE`'
+env MISTRAL_API_KEY=wrong-key
+exits 3 mufradat -C ws audio --limit 1
+stderr 'hint: check the key with `mufradat -C .*ws doctor`'
 env MISTRAL_API_KEY=fake-mistral-key
+
+exits 2 mufradat -C ws audio --limit -1
+stderr '--limit cannot be negative'
 
 exec mufradat -C ws audio --limit 2
 stderr 'limited to the first 2'

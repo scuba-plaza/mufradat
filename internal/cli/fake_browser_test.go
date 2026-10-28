@@ -60,8 +60,8 @@ func fakeBrowser() int {
 	base := os.Args[1]
 	mode := os.Getenv("FAKE_BROWSER")
 	logLine(log, "opened "+mode)
-	if mode == "compare" {
-		return fakeComparer(base, log)
+	if mode == "compare" || mode == "compare-keep" {
+		return fakeComparer(base, log, mode == "compare")
 	}
 
 	list, err := browserState(base, "")
@@ -115,7 +115,7 @@ func fakeBrowser() int {
 	return 0
 }
 
-func fakeComparer(base, log string) int {
+func fakeComparer(base, log string, use bool) int {
 	resp, err := http.Get(base + "api/compare")
 	if err != nil {
 		logLine(log, "error: "+err.Error())
@@ -155,9 +155,11 @@ func fakeComparer(base, log string) int {
 		resp.Body.Close()
 		logLine(log, fmt.Sprintf("sample %s %d %s", s.Label, resp.StatusCode, body))
 	}
-	code, body, err := browserPost(base, "use", "", map[string]any{"voice": target})
-	logLine(log, fmt.Sprintf("use %d %v %s", code, err, body))
-	code, body, err = browserPost(base, "finish", "", nil)
+	if use {
+		code, body, err := browserPost(base, "use", "", map[string]any{"voice": target})
+		logLine(log, fmt.Sprintf("use %d %v %s", code, err, body))
+	}
+	code, body, err := browserPost(base, "finish", "", nil)
 	logLine(log, fmt.Sprintf("finish %d %v %s", code, err, body))
 	return 0
 }

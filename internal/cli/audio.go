@@ -119,13 +119,20 @@ func reportClipFailures(a *app.App, res clips.Result) error {
 	failed, blocked := len(res.Failed), len(res.Blocked)
 	switch {
 	case failed > 0 && blocked > 0:
-		return failure.Newf(failure.ExitFailure, blockedHint(a)+"; run the command again to retry the others", "%d clips failed; %s", failed, blockedClips(blocked))
+		return failure.Newf(failure.ExitFailure, blockedHint(a)+"; run the command again to retry the others", "%s; %s", failedClips(failed), blockedClips(blocked))
 	case blocked > 0:
 		return failure.Newf(failure.ExitFailure, blockedHint(a), "%s", blockedClips(blocked))
 	case failed > 0:
-		return failure.Newf(failure.ExitFailure, "run the command again to retry the failed clips", "%d clips failed", failed)
+		return failure.Newf(failure.ExitFailure, "run the command again to retry the failed clips", "%s", failedClips(failed))
 	}
 	return nil
+}
+
+func failedClips(n int) string {
+	if n == 1 {
+		return "1 clip failed"
+	}
+	return fmt.Sprintf("%d clips failed", n)
 }
 
 func blockedClips(n int) string {

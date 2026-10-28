@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/rogpeppe/go-internal/testscript"
 )
@@ -67,6 +68,8 @@ type fakeMistral struct {
 	mode     string
 	calls    int
 	problems []string
+	inflight int
+	peak     int
 }
 
 func newFakeMistral(t *testing.T, requests, synth string) *fakeMistral {
@@ -95,6 +98,26 @@ func (f *fakeMistral) reset() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = 0
+	f.peak = 0
+}
+
+func (f *fakeMistral) enter() func() {
+	f.mu.Lock()
+	f.inflight++
+	f.peak = max(f.peak, f.inflight)
+	f.mu.Unlock()
+	time.Sleep(40 * time.Millisecond)
+	return func() {
+		f.mu.Lock()
+		f.inflight--
+		f.mu.Unlock()
+	}
+}
+
+func (f *fakeMistral) peakSpeech() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.peak
 }
 
 func (f *fakeMistral) callCount() int {
@@ -313,6 +336,7 @@ type speechBody struct {
 }
 
 func (f *fakeMistral) speech(w http.ResponseWriter, r *http.Request) {
+	defer f.enter()()
 	if !f.authorized(w, r) {
 		return
 	}
@@ -371,6 +395,19 @@ func mistralCommands() map[string]func(ts *testscript.TestScript, neg bool, args
 				ts.Fatalf("usage: mistral-mode NAME")
 			}
 			mistralOf(ts).setMode(args[0])
+		},
+		"mistral-parallel": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg || len(args) != 2 {
+				ts.Fatalf("usage: mistral-parallel MIN MAX")
+			}
+			lo, err1 := strconv.Atoi(args[0])
+			hi, err2 := strconv.Atoi(args[1])
+			if err1 != nil || err2 != nil {
+				ts.Fatalf("mistral-parallel: numbers expected")
+			}
+			if got := mistralOf(ts).peakSpeech(); got < lo || got > hi {
+				ts.Fatalf("at most %d speech requests were in flight at once, want %d to %d", got, lo, hi)
+			}
 		},
 		"mistral-reset": func(ts *testscript.TestScript, neg bool, args []string) {
 			mistralOf(ts).reset()

@@ -7,6 +7,12 @@ stdout '^ +33333333-3333-4333-8333-333333333333 +Omar +male'
 ! stdout 'Oliver'
 ! stdout 'voice_001'
 
+env MISTRAL_API_KEY=wrong-key
+exits 3 mufradat -C ws voices list
+stderr 'Unauthorized'
+stderr 'hint: check the key with `mufradat -C .*ws doctor`, or import another with `mufradat -C .*ws auth mistral --import FILE`'
+env MISTRAL_API_KEY=fake-mistral-key
+
 exec mufradat -C ws voices list --json
 stdout '"voice": "voice_479"'
 stdout '"name": "Maryam"'
@@ -33,6 +39,14 @@ exec mufradat -C ws config get google.voice
 stdout '^ar-XA-Chirp3-HD-Achernar$'
 exec mufradat -C ws audio --dry-run
 stderr 'with 33333333-3333-4333-8333-333333333333 \(mistral\)'
+
+exec mufradat -C ws config set mistral.voice voice_479
+env FAKE_BROWSER=compare-keep
+exec mufradat -C ws voices compare
+stderr 'the voice was not changed'
+! stderr 'is now'
+exec mufradat -C ws config get mistral.voice
+stdout '^voice_479$'
 
 exec mufradat -C ws config set audio.provider google
 exec mufradat auth google --import key.json
