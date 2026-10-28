@@ -158,7 +158,7 @@ func TestChangesAreCheckedAgain(t *testing.T) {
 
 	h.mustOK("ending", idTired, map[string]any{"if_rev": h.rev(idTired), "source": "catt"})
 	e := h.wait(idTired, func(e entryView) bool { return !e.Checking })
-	if e.State != "edited" || len(e.Flags) != 0 || !strings.Contains(e.Notice, "nothing is flagged") || e.NoticeTone != "good" {
+	if e.State != "edited" || !e.Verified || len(e.Flags) != 0 || !strings.Contains(e.Notice, "nothing is flagged") || e.NoticeTone != "good" {
 		t.Errorf("a clean recheck leaves the edit alone: %+v", e)
 	}
 	if len(ver.seen) != 1 || ver.seen[0] != "بَدَا أَنَّهُ [تَعِبٌ]." {

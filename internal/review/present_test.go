@@ -137,3 +137,23 @@ func TestMissingLettersOutsideTheWordAreIgnored(t *testing.T) {
 		t.Errorf("bareLetters = %v", got)
 	}
 }
+
+func TestTheCardRowHighlightsTheLettersTheReadingsDisagreeOn(t *testing.T) {
+	word, catt, camel := "كَتَبَ", "كَتَبُ", "كُتَبَ"
+	rowOf := func(severity verify.Severity) row {
+		t.Helper()
+		v := issueView(verify.Issue{Field: verify.FieldExample, Kind: verify.KindDiacritics, Severity: severity, Word: word, CATT: catt, CAMeL: camel}, false)
+		if len(v.Rows) < 1 || v.Rows[0].Label != "card" {
+			t.Fatalf("rows = %+v", v.Rows)
+		}
+		return v.Rows[0]
+	}
+	major := rowOf(verify.Major)
+	if got := classes(major.Spans); len(got) != 2 {
+		t.Errorf("a major flag marks the letters either reading changes (the first and the last): %+v", major.Spans)
+	}
+	minor := rowOf(verify.Minor)
+	if got := classes(minor.Spans); len(got) != 1 {
+		t.Errorf("a minor flag marks only what CATT changes (the last letter): %+v", minor.Spans)
+	}
+}
