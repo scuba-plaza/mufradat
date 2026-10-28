@@ -691,3 +691,66 @@ func TestSelectorEntryNumbersStartAtOneAndMustExist(t *testing.T) {
 		}
 	}
 }
+
+type pacedLLM struct {
+	*fakeLLM
+	mu       sync.Mutex
+	inflight int
+	peak     int
+}
+
+func (p *pacedLLM) Complete(ctx context.Context, req llm.Request) (llm.Response, error) {
+	p.mu.Lock()
+	p.inflight++
+	p.peak = max(p.peak, p.inflight)
+	p.mu.Unlock()
+	time.Sleep(40 * time.Millisecond)
+	defer func() {
+		p.mu.Lock()
+		p.inflight--
+		p.mu.Unlock()
+	}()
+	return p.fakeLLM.Complete(ctx, req)
+}
+
+func nouns(count int) []Target {
+	words := []string{"كِتَاب", "قَلَم", "بَاب", "بَيْت", "وَلَد", "بِنْت", "شَمْس", "قَمَر", "نَهْر", "جَبَل", "بَحْر", "شَجَرَة"}
+	var out []Target
+	for _, w := range words[:count] {
+		out = append(out, Target{Draft: note.Note{Lemma: w, POS: note.Noun, Origin: note.OriginNamed}})
+	}
+	return out
+}
+
+func TestRunWithoutOptionsAsksTenWordsAtATimeTwoRequestsAtOnceAndTwoTimesPerWord(t *testing.T) {
+	w := newWorld(t)
+	backend := &pacedLLM{fakeLLM: &fakeLLM{answer: goodAnswers}}
+	res, err := runAuthor(t, w, backend, nouns(12), Options{System: "s"})
+	if err != nil || len(res.Written) != 12 {
+		t.Fatalf("written %d, err %v", len(res.Written), err)
+	}
+	var sizes []int
+	for _, p := range backend.prompts {
+		sizes = append(sizes, len(draftLine.FindAllString(p, -1)))
+	}
+	slices.Sort(sizes)
+	if !slices.Equal(sizes, []int{2, 10}) {
+		t.Errorf("request sizes %v: twelve words are asked ten and two", sizes)
+	}
+
+	one := &pacedLLM{fakeLLM: &fakeLLM{answer: goodAnswers}}
+	if _, err := runAuthor(t, newWorld(t), one, nouns(6), Options{Batch: 1, System: "s"}); err != nil {
+		t.Fatal(err)
+	}
+	if one.peak != 2 {
+		t.Errorf("%d requests were in flight at once, want 2", one.peak)
+	}
+
+	bad := &fakeLLM{answer: func(call int, cards []prompt.Card) (json.RawMessage, error) {
+		return finish(cards, func(c *prompt.Card) { c.English = "" }), nil
+	}}
+	res, err = runAuthor(t, newWorld(t), bad, nouns(1), Options{System: "s"})
+	if err != nil || len(res.Failed) != 1 || len(bad.prompts) != 2 {
+		t.Errorf("a word the model keeps getting wrong: %d failures after %d requests, %v; want 1 after 2", len(res.Failed), len(bad.prompts), err)
+	}
+}
