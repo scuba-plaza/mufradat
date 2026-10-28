@@ -9,16 +9,17 @@ import (
 	"github.com/scuba-plaza/mufradat/internal/note"
 )
 
-func TestKeyDependsOnVoiceRateAndText(t *testing.T) {
-	a := Voice{Name: "ar-XA-A", Rate: 0.9}
+func TestKeyDependsOnProviderVoiceRateAndText(t *testing.T) {
+	a := Voice{Provider: "google", Name: "ar-XA-A", Rate: 0.9}
 	base := Key(a, "كِتَاب")
 	if base != Key(a, "كِتَاب") {
 		t.Fatal("keys must be stable")
 	}
 	for name, other := range map[string]string{
-		"voice": Key(Voice{Name: "ar-XA-B", Rate: 0.9}, "كِتَاب"),
-		"rate":  Key(Voice{Name: "ar-XA-A", Rate: 1}, "كِتَاب"),
-		"text":  Key(a, "كُتُب"),
+		"provider": Key(Voice{Provider: "mistral", Name: "ar-XA-A", Rate: 0.9}, "كِتَاب"),
+		"voice":    Key(Voice{Provider: "google", Name: "ar-XA-B", Rate: 0.9}, "كِتَاب"),
+		"rate":     Key(Voice{Provider: "google", Name: "ar-XA-A", Rate: 1}, "كِتَاب"),
+		"text":     Key(a, "كُتُب"),
 	} {
 		if other == base {
 			t.Errorf("changing the %s must change the key", name)
@@ -26,6 +27,22 @@ func TestKeyDependsOnVoiceRateAndText(t *testing.T) {
 	}
 	if len(base) != keyLength {
 		t.Errorf("key length = %d", len(base))
+	}
+}
+
+func TestKeyIsNotConfusedByWhereOneFieldEndsAndTheNextBegins(t *testing.T) {
+	if Key(Voice{Provider: "ab", Name: "c"}, "d") == Key(Voice{Provider: "a", Name: "bc"}, "d") {
+		t.Error("provider and voice must be separated")
+	}
+	if Key(Voice{Provider: "a", Name: "b"}, "cd") == Key(Voice{Provider: "a", Name: "bc"}, "d") {
+		t.Error("voice and text must be separated")
+	}
+}
+
+func TestNamedKeepsTheProviderAndRate(t *testing.T) {
+	v := Voice{Provider: "google", Name: "ar-XA-A", Rate: 0.9}.Named("ar-XA-B")
+	if v != (Voice{Provider: "google", Name: "ar-XA-B", Rate: 0.9}) {
+		t.Errorf("got %+v", v)
 	}
 }
 
@@ -128,4 +145,22 @@ func mustRead(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return string(raw)
+}
+
+func TestSwitchingProviderAndBackFindsTheOriginalClips(t *testing.T) {
+	s := NewStore(t.TempDir())
+	google := Voice{Provider: "google", Name: "same-name", Rate: 0.9}
+	mistral := Voice{Provider: "mistral", Name: "same-name"}
+	if err := s.Put(Key(google, "x"), []byte("clip-google")); err != nil {
+		t.Fatal(err)
+	}
+	if s.Has(Key(mistral, "x")) {
+		t.Fatal("the other provider must not reuse a clip, even for a voice with the same name")
+	}
+	if err := s.Put(Key(mistral, "x"), []byte("clip-mistral")); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustRead(t, s.Path(Key(google, "x"))); got != "clip-google" {
+		t.Errorf("switching back returned %q", got)
+	}
 }

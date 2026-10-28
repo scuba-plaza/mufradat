@@ -3,6 +3,7 @@ package clips
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -192,5 +193,43 @@ func TestOrphans(t *testing.T) {
 		if o.Key == keep || o.Size != 5 {
 			t.Fatalf("bad orphan %+v", o)
 		}
+	}
+}
+
+type blockedErr struct{}
+
+func (blockedErr) Error() string { return "flagged by moderation" }
+func (blockedErr) Blocked() bool { return true }
+
+func TestSynthesizeSetsBlockedClipsApartAndKeepsGoing(t *testing.T) {
+	store := NewStore(t.TempDir())
+	v := Voice{Provider: "mistral", Name: "v1"}
+	boom := errors.New("temporary")
+	synth := &fakeSynth{fail: map[string]error{"قَلَم": blockedErr{}, "بَيْت": boom}}
+	plan := NewPlan(notesFor("كِتَاب", "قَلَم", "بَيْت", "دَار"), v, store.Has)
+	res, err := Synthesize(context.Background(), plan, store, synth, SynthOptions{Concurrency: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Made != 2 {
+		t.Errorf("made %d, want 2: a blocked clip must not stop the rest", res.Made)
+	}
+	if len(res.Blocked) != 1 || res.Blocked[0].Item.Text != "قَلَم" {
+		t.Errorf("blocked %+v", res.Blocked)
+	}
+	if len(res.Failed) != 1 || res.Failed[0].Item.Text != "بَيْت" || !errors.Is(res.Failed[0].Err, boom) {
+		t.Errorf("failed %+v", res.Failed)
+	}
+	if len(synth.calls) != 4 {
+		t.Errorf("each clip should be tried exactly once, calls %v", synth.calls)
+	}
+}
+
+func TestIsBlockedLooksThroughWrappedErrors(t *testing.T) {
+	if !IsBlocked(fmt.Errorf("clip: %w", blockedErr{})) {
+		t.Error("a wrapped block must still be recognised")
+	}
+	if IsBlocked(errors.New("flagged")) || IsBlocked(nil) {
+		t.Error("only errors that say they are blocks count")
 	}
 }

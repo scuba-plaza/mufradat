@@ -17,8 +17,14 @@ import (
 )
 
 type Voice struct {
-	Name string
-	Rate float64
+	Provider string
+	Name     string
+	Rate     float64
+}
+
+func (v Voice) Named(name string) Voice {
+	v.Name = name
+	return v
 }
 
 type Field string
@@ -40,7 +46,7 @@ var keyEncoding = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz234567").WithPad
 const keyLength = 16
 
 func Key(v Voice, text string) string {
-	sum := sha256.Sum256([]byte("v1\x00" + v.Name + "\x00" + strconv.FormatFloat(v.Rate, 'f', -1, 64) + "\x00" + text))
+	sum := sha256.Sum256([]byte("v1\x00" + v.Provider + "\x00" + v.Name + "\x00" + strconv.FormatFloat(v.Rate, 'f', -1, 64) + "\x00" + text))
 	return keyEncoding.EncodeToString(sum[:])[:keyLength]
 }
 
