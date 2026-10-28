@@ -11,6 +11,9 @@ stdout 'FAIL  mistral key +no Mistral API key; notes cannot be written'
 stdout 'hint: set MISTRAL_API_KEY, or run `mufradat -C .*ws auth mistral --import FILE`'
 exits 3 mufradat -C ws auth mistral
 stderr 'no Mistral API key found'
+exits 3 mufradat -C ws doctor --json
+stdout '"status": "fail"'
+stdout 'no Mistral API key'
 
 exits 1 mufradat auth mistral --import missing.txt
 stderr 'missing.txt does not exist'
@@ -53,6 +56,9 @@ exits 3 mufradat -C ws doctor
 stdout 'FAIL  google credentials +no Google credentials; audio cannot be made'
 stdout 'hint: run `mufradat -C .*ws auth google --import KEY.json`'
 exec mufradat auth google --import key.json
+exec mufradat auth google
+stdout '^imported key$'
+stdout 'home/.config/mufradat/google-credentials.json$'
 exec mufradat -C ws doctor
 stdout 'ok    google credentials +service_account tts@test-project.iam.gserviceaccount.com \(imported key\)'
 stdout 'ok    mistral key'

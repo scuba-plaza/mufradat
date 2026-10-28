@@ -1,6 +1,7 @@
 package googleauth
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -109,8 +110,12 @@ func TestValidateAndImport(t *testing.T) {
 
 	src := write(t, dir, "key.json", raw)
 	dest := filepath.Join(dir, "config", "google-credentials.json")
-	if _, err := Import(context.Background(), src, dest); err != nil {
-		t.Fatal(err)
+	imported, err := Import(context.Background(), src, dest)
+	if err != nil || imported != info {
+		t.Fatalf("Import returned %+v, %v; want the key's details %+v", imported, err, info)
+	}
+	if saved, _ := os.ReadFile(dest); !bytes.Equal(saved, raw) {
+		t.Fatal("the imported file is not a copy of the key")
 	}
 	st, err := os.Stat(dest)
 	if err != nil {
@@ -130,6 +135,10 @@ func TestValidateAndImport(t *testing.T) {
 	after, _ := os.ReadFile(dest)
 	if string(before) != string(after) {
 		t.Fatal("a failed import overwrote the existing key")
+	}
+	blocker := write(t, dir, "blocker", []byte("a file where a folder is needed"))
+	if _, err := Import(context.Background(), src, filepath.Join(blocker, "google-credentials.json")); err == nil {
+		t.Fatal("an import that cannot be saved reported success")
 	}
 }
 

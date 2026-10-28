@@ -45,6 +45,9 @@ grep -count=1 '^serve$' sidecar.log
 
 ! exec mufradat -C ws check --strict
 stderr '1 note with major flags'
+exits 4 mufradat -C ws check --json --strict
+stdout '"major": 1'
+stderr '1 note with major flags'
 exec mufradat -C ws check
 
 exec mufradat -C ws status
