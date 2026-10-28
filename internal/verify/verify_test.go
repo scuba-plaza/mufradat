@@ -210,3 +210,41 @@ func TestFillWithNothingToDoNeverStartsTheEngine(t *testing.T) {
 		t.Fatalf("res=%+v err=%v received=%d", res, err, len(engine.received))
 	}
 }
+
+func TestItemKeysAreStableBecauseRememberedResultsAreFoundByThem(t *testing.T) {
+	for _, c := range []struct {
+		tokens  []string
+		context bool
+		want    string
+	}{
+		{[]string{"كتاب"}, false, "QWIDFLI4OXNMRYCX"},
+		{[]string{"كتاب"}, true, "WDDPPXTMINI5WJZE"},
+		{[]string{"قرأ", "الولد"}, true, "IS3C3C65ZUDLPKZR"},
+	} {
+		if got := ItemKey(c.tokens, c.context); got != c.want {
+			t.Errorf("ItemKey(%q, %v) = %s, want %s: changing it forgets every remembered check", c.tokens, c.context, got, c.want)
+		}
+	}
+}
+
+func TestAFieldWithNoWordsIsNotChecked(t *testing.T) {
+	n := sampleNote("n_a", "كِتَاب", "")
+	n.Forms = []note.Form{{Label: "pl.", Arabic: "-"}}
+	if items := Items(n); len(items) != 1 || items[0].Field != FieldLemma {
+		t.Errorf("items %+v: only the headword has words", items)
+	}
+	if items := Items(sampleNote("n_b", "!", "[؟] ؟")); len(items) != 0 {
+		t.Errorf("items %+v: punctuation is not checked", items)
+	}
+}
+
+func TestUniqueKeepsTheFirstOfEachKeyInOrder(t *testing.T) {
+	a, b := Item{Key: "a", Field: FieldLemma}, Item{Key: "b", Field: FieldForms}
+	got := Unique([]Item{a, b, {Key: "a", Field: FieldExample}, b, a})
+	if len(got) != 2 || got[0].Key != "a" || got[0].Field != FieldLemma || got[1].Key != "b" {
+		t.Errorf("Unique = %+v", got)
+	}
+	if got := Unique(nil); len(got) != 0 {
+		t.Errorf("Unique(nil) = %+v", got)
+	}
+}

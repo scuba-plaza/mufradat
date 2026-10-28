@@ -49,3 +49,10 @@ func TestRejectsEmptyAndUnknown(t *testing.T) {
 		t.Fatal("an unknown kind should fail to load")
 	}
 }
+
+func TestAMissingSetDismissesNothing(t *testing.T) {
+	var s *Set
+	if s.Dismissed("n_aaaaaaaaaaaa", "k") || s.Count() != 0 {
+		t.Error("no set means nothing is dismissed")
+	}
+}
