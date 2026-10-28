@@ -9,6 +9,10 @@ test:
 
 vet:
     go vet ./...
+    go vet -tags integration ./...
+
+integration:
+    go test -tags integration -count=1 ./...
 
 lint:
     golangci-lint run

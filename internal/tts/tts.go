@@ -17,6 +17,8 @@ import (
 const (
 	DefaultBaseURL = "https://texttospeech.googleapis.com"
 	LanguageCode   = "ar-XA"
+	PathSynthesize = "/v1/text:synthesize"
+	PathVoices     = "/v1/voices"
 	maxTextBytes   = 4500
 	maxBodyBytes   = 32 << 20
 )
@@ -98,7 +100,7 @@ func (c *Client) Synthesize(ctx context.Context, req Request) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	raw, err := c.do(ctx, http.MethodPost, "/v1/text:synthesize", body)
+	raw, err := c.do(ctx, http.MethodPost, PathSynthesize, body)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +119,7 @@ func (c *Client) Synthesize(ctx context.Context, req Request) ([]byte, error) {
 }
 
 func (c *Client) Voices(ctx context.Context) ([]VoiceInfo, error) {
-	raw, err := c.do(ctx, http.MethodGet, "/v1/voices?languageCode="+url.QueryEscape(LanguageCode), nil)
+	raw, err := c.do(ctx, http.MethodGet, PathVoices+"?languageCode="+url.QueryEscape(LanguageCode), nil)
 	if err != nil {
 		return nil, err
 	}
