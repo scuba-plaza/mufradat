@@ -10,6 +10,7 @@ stdout 'mufradat/default'
 exists home/.local/share/mufradat/default/mufradat.toml
 exists home/.local/share/mufradat/default/audio
 exists home/.local/share/mufradat/default/state
+! exists home/.local/share/mufradat/default/.gitignore
 
 ! exec mufradat init
 stderr 'already a workspace'
