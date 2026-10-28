@@ -3,8 +3,10 @@ package verify
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/scuba-plaza/mufradat/internal/note"
@@ -246,5 +248,44 @@ func TestUniqueKeepsTheFirstOfEachKeyInOrder(t *testing.T) {
 	}
 	if got := Unique(nil); len(got) != 0 {
 		t.Errorf("Unique(nil) = %+v", got)
+	}
+}
+
+func TestFillSavesEverySixteenReadingsSoACrashLosesLittle(t *testing.T) {
+	cache := NewCache(filepath.Join(t.TempDir(), "r.jsonl"))
+	stored := map[int]int{}
+	_, err := Fill(context.Background(), &fakeEngine{}, cache, manyItems(40), FillOptions{
+		Fingerprint: "fp",
+		Progress: func(done, total int) {
+			loaded, _ := cache.Load("fp")
+			stored[done] = len(loaded.Readings)
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for done, want := range map[int]int{1: 0, 15: 0, 16: 16, 17: 16, 31: 16, 32: 32, 33: 32, 40: 32} {
+		if stored[done] != want {
+			t.Errorf("after %d readings %d are saved, want %d", done, stored[done], want)
+		}
+	}
+	if loaded, _ := cache.Load("fp"); len(loaded.Readings) != 40 {
+		t.Errorf("at the end %d are saved", len(loaded.Readings))
+	}
+}
+
+func TestFillReportsReadingsThatCannotBeSavedEvenWhenTheEngineSucceeds(t *testing.T) {
+	blocker := filepath.Join(t.TempDir(), "blocker")
+	if err := os.WriteFile(blocker, []byte("a file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cache := NewCache(filepath.Join(blocker, "readings.jsonl"))
+	_, err := Fill(context.Background(), &fakeEngine{}, cache, manyItems(3), FillOptions{Fingerprint: "fp"})
+	if err == nil || !strings.HasPrefix(err.Error(), "saving readings: ") {
+		t.Fatalf("err = %v", err)
+	}
+	_, err = Fill(context.Background(), &fakeEngine{breakAt: 2}, cache, manyItems(3), FillOptions{Fingerprint: "fp"})
+	if err == nil || !strings.HasPrefix(err.Error(), "saving readings: ") || strings.Contains(err.Error(), "sidecar died") {
+		t.Fatalf("a failure to save is reported before the engine's own: %v", err)
 	}
 }
