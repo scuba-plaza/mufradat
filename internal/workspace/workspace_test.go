@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/scuba-plaza/mufradat/internal/config"
 	"github.com/scuba-plaza/mufradat/internal/failure"
 )
 
@@ -89,6 +90,20 @@ func TestInitCreatesLayoutAndRefusesTwice(t *testing.T) {
 	}
 	if _, err := Init(InitOptions{Root: root, DeckID: 43}); err == nil {
 		t.Error("second init must fail")
+	}
+}
+
+func TestInitWritesTheDeckIdAndTheNextIdAsTheNoteTypeId(t *testing.T) {
+	w, err := Init(InitOptions{Root: filepath.Join(t.TempDir(), "ws"), DeckID: 1767785937849})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(w.ConfigFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Anki.DeckID != 1767785937849 || cfg.Anki.ModelID != 1767785937850 {
+		t.Errorf("deck %d, note type %d; want the deck id and the one after it", cfg.Anki.DeckID, cfg.Anki.ModelID)
 	}
 }
 
