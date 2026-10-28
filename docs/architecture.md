@@ -12,14 +12,15 @@ cmd/mufradat        main: signal handling and os.Exit, nothing else
 internal/cli            cobra commands: flags, output, exit codes
 internal/app            the composition root: builds every service from env.Env
 internal/author         add: target selection, batching, gates, saving
-internal/claude, llm    the `claude -p` backend, error classes, retries, usage log
+internal/mistral, llm   the Mistral client and chat backend, error classes, retries, usage log
 internal/prompt         the guide, the examples, the JSON schema, answer parsing
 internal/vocab          the vocabulary gate for example sentences
 internal/verify         readings cache and the issues derived from them
 internal/sidecar        the sidecar protocol client
 internal/pyenv          setup, doctor and launch of the Python environment
 internal/review         the review web server and its embedded page
-internal/clips, tts     clip naming and planning; the Google REST client
+internal/clips, tts     clip naming and planning, the Speaker interface; the Google REST client
+internal/httpretry      the retry transport both speech clients use
 internal/deck, apkg     note type, templates and the deterministic .apkg writer
 internal/store          notes.jsonl and decisions.jsonl under a lock
 internal/note           the note model, ids, example markup, validation
@@ -52,7 +53,7 @@ cmd/nocomments          a check that the code ships without comments
 
 1. `add` picks words from `internal/ranking` (or looks the named words up in
    `internal/lexicon`), drafts a note from the dictionary entry and sends batches
-   to Claude. Each answer passes the gates (markup, length, vowel endings,
+   to Mistral. Each answer passes the gates (markup, length, vowel endings,
    headword, vocabulary) and is appended to `notes.jsonl` under the lock.
 2. `check` sends every Arabic word of changed notes to the sidecar, which answers
    with CAMeL's analyses and CATT's and CAMeL's readings. The raw readings are

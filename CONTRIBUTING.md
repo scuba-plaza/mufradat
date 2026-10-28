@@ -35,9 +35,13 @@ go test -race ./...
   type-checked with `tsc --checkJs` in strict mode and the pure modules are
   tested with `node --test`.
 - Tests that need the outside world use fakes: `internal/cli` registers fake
-  `claude`, `uv`, `python`, `camel_data` and `xdg-open` programs and a fake
-  Google server for its `testscript` files (`internal/cli/testdata/script`).
-- Real network and real model runs are opt-in and never part of `go test`.
+  `uv`, `python`, `camel_data` and `xdg-open` programs and strict fake Mistral
+  and Google servers for its `testscript` files (`internal/cli/testdata/script`).
+  The fakes check the method, path, query, headers and exact body, like the
+  real APIs do, and a script can assert exit codes with `exits CODE command`.
+- Real network runs are opt-in and never part of `go test`: the tests behind the
+  `integration` build tag call the real APIs (see
+  [`INTEGRATION_TESTS.md`](INTEGRATION_TESTS.md)).
 
 ## Changing the word list
 

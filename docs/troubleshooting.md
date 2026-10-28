@@ -1,28 +1,40 @@
 # Troubleshooting
 
-Run `mufradat doctor` first; it checks the workspace, the settings, Claude
-Code, the Google credentials and the vowel checkers and says how to fix what it
-finds.
+Run `mufradat doctor` first; it checks the workspace, the settings, the Mistral
+key, the Google credentials (when `audio.provider` is `google`) and the vowel
+checkers and says how to fix what it finds.
 
-## "Your Claude plan's usage limit was reached" (exit 75)
+## "rate limited" or "the service is busy" (exit 75)
 
-Everything `add` finished is already saved. Run the same command again after the
-time it names; it continues with the next words that have no note. Rate limits
-and a busy service are retried by themselves a few times first.
+Everything `add` finished is already saved. Run the same command again a little
+later; it continues with the next words that have no note. Rate limits and
+server errors are retried by themselves a few times first, and `audio` keeps the
+clips it made.
 
-## "Install Claude Code" or "sign in"
+## "no Mistral API key" or "rejected the credentials" (exit 3)
 
-`add` runs `claude -p` with your own login. Install Claude Code, run `claude`
-once to sign in, then try again. `doctor` shows the version it found.
+Create an API key in the Mistral console, then either set `MISTRAL_API_KEY` or
+save the key in a file (a newline at the end is fine) and run
+`mufradat auth mistral --import FILE`. `mufradat auth mistral` shows which source
+the key in use comes from, and `doctor` asks Mistral whether it accepts the key.
 
-## No audio / "no Google credentials"
+## Some clips were "blocked by Mistral's moderation"
+
+Mistral's speech service refuses a few harmless sentences. The decision belongs
+to the service, is the same every time for the same text, and cannot be
+configured, so `audio` does not retry those clips; it makes all the others and
+lists the blocked ones. Reword the example sentence in `review`, or switch with
+`mufradat config set audio.provider google` and run `audio` again. Clips of both
+providers are kept, so switching back finds the Mistral ones.
+
+## No audio / "no Google credentials" (`audio.provider = google`)
 
 Create a service account in a Google Cloud project with the Cloud
 Text-to-Speech API enabled, download its JSON key, and run
 `mufradat auth google --import key.json`. The key is copied into
 `~/.config/mufradat/` with mode 0600, so the original can be deleted. If
 you use `gcloud auth application-default login` credentials and Google asks for
-a billing project, set it with `mufradat config set tts.quota_project
+a billing project, set it with `mufradat config set google.quota_project
 PROJECT --user`.
 
 Use `mufradat audio --dry-run` to see how many characters would be sent

@@ -6,16 +6,15 @@ Standard Arabic words, from any directory on a Linux machine.
 - **Words in frequency order.** The 5000 most useful lemmas, ranked from
   subtitles (everyday speech) and written MSA, with greetings, numbers and days
   pulled up early.
-- **Cards written by Claude.** `add` asks [Claude Code](https://claude.com/claude-code)
-  for the meaning, a hint where one is needed, the forms and a fully vowelled
-  example sentence built from common words. It uses your own Claude login, so a
-  Pro or Max plan is enough and no API key is needed.
+- **Cards written by Mistral.** `add` asks the [Mistral](https://mistral.ai/) chat
+  API for the meaning, a hint where one is needed, the forms and a fully vowelled
+  example sentence built from common words. You need a Mistral API key.
 - **Vowels checked twice.** [CAMeL Tools](https://github.com/CAMeL-Lab/camel_tools)
   and [CATT](https://github.com/abjadai/catt) read every word independently; a
   review page in your browser shows where they disagree with the card.
-- **Audio.** Google Cloud Text-to-Speech reads the word, its forms and the
-  sentence. Clips are named after the voice, so switching voices and back finds
-  the old ones again.
+- **Audio.** Mistral or Google Cloud Text-to-Speech, whichever you choose, reads
+  the word, its forms and the sentence. Clips are named after the provider and
+  the voice, so switching either and back finds the old ones again.
 - **Your data stays yours.** Notes, decisions, audio and the built deck live in a
   workspace directory that you choose. The tool only holds code and the shipped
   word list.
@@ -26,9 +25,10 @@ speech, a rank bucket and its check state.
 
 ## Install
 
-You need [Claude Code](https://claude.com/claude-code), signed in, to write
-notes, and a Google Cloud project with the Text-to-Speech API enabled to make
-audio. Vowel checking is optional and needs Python 3.11 or newer.
+You need a [Mistral API key](https://console.mistral.ai/) to write notes and to
+make audio. Audio can come from Google Cloud Text-to-Speech instead, which needs
+a Google Cloud project with the Text-to-Speech API enabled. Vowel checking is
+optional and needs Python 3.11 or newer.
 
 With Nix (recommended on NixOS, because it sets up the C++ libraries the vowel
 checkers need):
@@ -53,7 +53,7 @@ go install github.com/scuba-plaza/mufradat/cmd/mufradat@latest
 ```sh
 mufradat init ~/arabic          # a workspace for your notes and audio
 cd ~/arabic
-mufradat auth google --import ~/key.json    # Google service-account key
+mufradat auth mistral --import ~/mistral-key.txt   # a file holding only the API key
 mufradat setup                  # optional: the vowel checkers, about 2 minutes
 mufradat add 25                 # the 25 most common words
 mufradat check                  # cross-check the vowels
@@ -88,12 +88,13 @@ mean; elsewhere pass `--entry WORD#N`, `--pos`, `--pick N` or `--yes`.
 | `init [dir] [--git]` | Create a workspace. |
 | `add [N \| WORD...]` | Write the next N most common words, or the words you name. Every finished note is saved at once, so an interrupted run loses nothing. |
 | `check [--strict]` | Cross-check the vowels. Results are remembered; only new or changed text is checked. `--strict` exits 4 while major flags remain. |
-| `review [--all]` | Go through flagged notes (or every note) in your browser: accept, add a missing ending, edit, ask Claude for a better version, hear the clips, remake or remove a clip, undo. |
-| `audio [--dry-run]` | Make the clips that are missing. `audio gc` lists clips no note needs with the current voice, `--delete` removes them. |
+| `review [--all]` | Go through flagged notes (or every note) in your browser: accept, add a missing ending, edit, ask Mistral for a better version, hear the clips, remake or remove a clip, undo. |
+| `audio [--dry-run]` | Make the clips that are missing. `audio gc` lists clips no note needs with the current provider, voice and rate, `--delete` removes them. |
 | `build [-o PATH]` | Write the `.apkg`. The same inputs give identical bytes. |
-| `voices list`, `voices compare` | List Google's Arabic voices, or listen to them side by side and pick one. |
+| `voices list`, `voices compare` | List the Arabic voices of the audio provider, or listen to them side by side and pick one. |
 | `setup` | Install the vowel checkers (CAMeL Tools and CATT). |
-| `auth google --import FILE` | Keep a Google service-account key in the user config directory. |
+| `auth mistral --import FILE` | Keep the Mistral API key from a file in the user config directory. |
+| `auth google --import FILE` | Keep a Google service-account key in the user config directory, for `audio.provider = google`. |
 | `config get`, `config set`, `config path` | Show or change settings. |
 | `status`, `doctor` | Where things stand, and whether everything the tool needs is in place. |
 | `licenses`, `version`, `completion` | The licences of the code, data and font; the version; shell completions. |
@@ -103,8 +104,8 @@ Global flags: `-C/--workspace`, `-v`, `-q`, `--no-color`. `status`, `doctor`,
 diagnostics to standard error. `NO_COLOR` is honoured.
 
 Exit codes: `0` success, `1` failure, `2` wrong usage, `3` not set up,
-`4` `check --strict` found major flags, `75` temporary (your Claude plan's usage
-limit or a busy service; run the command again later), `130` interrupted.
+`4` `check --strict` found major flags, `75` temporary (a busy service or a rate limit;
+run the command again later), `130` interrupted.
 
 ## How the cards are checked
 
@@ -124,7 +125,7 @@ run. Without `setup`, `add`, `audio` and `build` still work.
 `add` keeps example sentences simple: the sentence may only use words the learner
 already knows, that is words up to `author.allow_rank` (default 1500) or up to
 the card's own rank if that is higher. A sentence with rarer words goes back to
-Claude once with the offending words named. Set `author.allow_rank` to 0 to turn
+Mistral once with the offending words named. Set `author.allow_rank` to 0 to turn
 this off.
 
 ## Settings
@@ -136,16 +137,23 @@ then the workspace's `mufradat.toml`. `mufradat config get` lists them.
 |---|---|---|
 | `deck_name` | `Arabic MSA Core` | Name of the Anki deck. |
 | `anki.production_top` | `1000` | Words up to this rank also get a Production card. |
-| `audio.voice`, `audio.rate` | `ar-XA-Chirp3-HD-Achernar`, `0.9` | The voice and speaking rate. Changing them never reuses another voice's clips. |
-| `author.model`, `author.effort` | `sonnet`, `medium` | Passed to Claude Code. |
+| `audio.provider` | `mistral` | `mistral` or `google`. Each provider keeps its own voice, so switching is one setting and the other provider's clips are found again. |
+| `audio.rate` | `0.9` | Speaking rate. Only Google takes it; Mistral has no rate control and ignores it. |
+| `mistral.voice` | `voice_479` | The Mistral voice, written as its slug, name or id. `voices list` shows them. |
+| `google.voice` | `ar-XA-Chirp3-HD-Achernar` | The Google voice. |
+| `author.model` | `mistral-medium-latest` | The Mistral chat model that writes the notes. |
 | `author.batch_size`, `author.concurrency` | `10`, `2` | Words per request and requests at once. |
 | `author.allow_rank` | `1500` | The vocabulary the example sentences may use. `0` turns the check off. |
-| `tts.requests_per_minute`, `tts.concurrency` | `300`, `4` | How hard to push Google. |
-| `tts.quota_project`, `tts.endpoint` | empty | For user credentials that need a billing project, or a regional endpoint. |
+| `tts.requests_per_minute`, `tts.concurrency` | `300`, `4` | How hard to push the speech service, whichever provider speaks. |
+| `mistral.endpoint`, `google.endpoint`, `google.quota_project` | empty | Another API address, such as a regional Google endpoint, and a billing project for user credentials that need one. |
 | `verify.enabled` | `auto` | `on` makes a missing checker an error, `off` skips checking. |
-| `workspace`, `google.credentials_file`, `verify.python` | empty | User config only: the default workspace, a credentials file, and your own Python with the checkers. |
+| `workspace`, `mistral.api_key`, `google.credentials_file`, `verify.python` | empty | User config only: the default workspace, the Mistral API key itself (not a file name; `config get` shows it as `(set)`), a Google credentials file, and your own Python with the checkers. |
 
-Google credentials are looked for in this order: `GOOGLE_APPLICATION_CREDENTIALS`,
+The Mistral key is looked for in this order: `MISTRAL_API_KEY`, `mistral.api_key`,
+then the key imported with `auth mistral --import`. Surrounding whitespace, such
+as the newline at the end of a key file, is ignored.
+
+Google credentials, needed only when `audio.provider` is `google`, are looked for in this order: `GOOGLE_APPLICATION_CREDENTIALS`,
 `google.credentials_file`, the key imported with `auth google --import`, then
 gcloud's application default credentials.
 
@@ -168,8 +176,8 @@ Suggested deck options for `Arabic MSA Core`:
 - [`docs/workspace.md`](docs/workspace.md): what is in a workspace and which
   files are safe to edit or commit.
 - [`docs/architecture.md`](docs/architecture.md): how the pieces fit together.
-- [`docs/troubleshooting.md`](docs/troubleshooting.md): NixOS, usage limits,
-  credentials, slow first runs.
+- [`docs/troubleshooting.md`](docs/troubleshooting.md): NixOS, rate limits,
+  credentials, blocked clips, slow first runs.
 - [`data/SOURCES.md`](data/SOURCES.md): where the word list comes from, its
   licences, and how to rebuild it.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md): building, testing and the project's rules.
