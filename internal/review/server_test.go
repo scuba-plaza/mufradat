@@ -723,3 +723,27 @@ func TestARemakeThatFailsShowsTheReasonAndCanBeTriedAgain(t *testing.T) {
 		t.Error("a failed remake must not leave a clip behind")
 	}
 }
+
+func TestNextStepsFollowsWhatTheSessionChanged(t *testing.T) {
+	const audio = "Next: `mufradat audio` makes clips for any changed text, then `mufradat build`."
+	const build = "Next: `mufradat build` leaves the flags you cleared out of the deck."
+	for _, c := range []struct {
+		name string
+		s    Summary
+		want string
+	}{
+		{"nothing decided", Summary{Total: 3, Open: 3}, ""},
+		{"only kept", Summary{Total: 3, Kept: 2, Open: 1}, build},
+		{"one edit", Summary{Edited: 1}, audio},
+		{"one rewrite", Summary{Rewritten: 1}, audio},
+		{"an edit and a rewrite", Summary{Edited: 1, Rewritten: 1}, audio},
+		{"changes beat kept", Summary{Kept: 5, Edited: 1}, audio},
+	} {
+		if got := NextSteps(c.s, "mufradat"); got != c.want {
+			t.Errorf("%s: NextSteps = %q, want %q", c.name, got, c.want)
+		}
+	}
+	if got := NextSteps(Summary{Edited: 1}, "mufradat -C ws"); !strings.Contains(got, "`mufradat -C ws audio`") || !strings.Contains(got, "`mufradat -C ws build`") {
+		t.Errorf("the command prefix is not used: %q", got)
+	}
+}

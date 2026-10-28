@@ -24,16 +24,28 @@ func TestParse(t *testing.T) {
 	}
 }
 
-func TestParseRejectsGapsAndDuplicates(t *testing.T) {
-	for name, in := range map[string]string{
-		"gap":       "1\ta\n3\tb\n",
-		"duplicate": "1\ta\n2\ta\n",
-		"short":     "1\n",
-		"not a num": "x\ta\n",
+func TestParseRejectsGapsAndDuplicatesAndSaysWhere(t *testing.T) {
+	for name, c := range map[string]struct{ in, want string }{
+		"gap":         {"1\ta\n3\tb\n", `ranking line 2: rank "3" does not follow 1`},
+		"duplicate":   {"1\ta\n2\ta\n", "ranking line 2: a is listed twice"},
+		"short":       {"1\n", "ranking line 1: expected rank and id"},
+		"not a num":   {"x\ta\n", `ranking line 1: rank "x" does not follow 0`},
+		"late header": {"1\ta\nrank\tid\n", `ranking line 2: rank "rank" does not follow 1`},
 	} {
-		if _, err := Parse(strings.NewReader(in)); err == nil {
-			t.Errorf("%s: expected an error", name)
+		_, err := Parse(strings.NewReader(c.in))
+		if err == nil || err.Error() != c.want {
+			t.Errorf("%s: error %v, want %q", name, err, c.want)
 		}
+	}
+}
+
+func TestParseAcceptsRankAndIdAloneAndBlankLines(t *testing.T) {
+	l, err := Parse(strings.NewReader("\n1\ta\n  \n2\tb\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.Len() != 2 || l.Rank("a") != 1 || l.Rank("b") != 2 {
+		t.Errorf("list: %+v", l)
 	}
 }
 
