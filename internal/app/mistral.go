@@ -17,7 +17,6 @@ import (
 const (
 	mistralEnv       = "MISTRAL_API_KEY"
 	llmAttempts      = 3
-	llmBackoff       = 2 * time.Second
 	llmMaxWait       = 10 * time.Minute
 	importedKeySrc   = "imported key"
 	configuredKeySrc = "mistral.api_key"
@@ -122,7 +121,7 @@ func (a *App) LLM() (llm.Backend, error) {
 		return nil, err
 	}
 	retrying := llm.Retrying{
-		Next: mistral.Backend{Client: client, Model: cfg.Author.Model}, Attempts: llmAttempts, Backoff: llmBackoff, MaxWait: llmMaxWait, Sleep: llm.Sleep,
+		Next: mistral.Backend{Client: client, Model: cfg.Author.Model}, Attempts: llmAttempts, Backoff: a.llmBackoff, MaxWait: llmMaxWait, Sleep: llm.Sleep,
 		OnWait: func(d time.Duration, err error) {
 			a.Reporter().Warn("%v; trying again in %s", err, d.Round(time.Second))
 		},

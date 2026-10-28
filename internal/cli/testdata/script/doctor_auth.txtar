@@ -54,7 +54,7 @@ stdout 'FAIL  google credentials +no Google credentials; audio cannot be made'
 stdout 'hint: run `mufradat -C .*ws auth google --import KEY.json`'
 exec mufradat auth google --import key.json
 exec mufradat -C ws doctor
-stdout 'ok    google credentials +service_account tts@test-project'
+stdout 'ok    google credentials +service_account tts@test-project.iam.gserviceaccount.com \(imported key\)'
 stdout 'ok    mistral key'
 
 -- key.txt --

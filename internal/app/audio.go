@@ -128,7 +128,6 @@ func (s mistralSpeaker) Voices(ctx context.Context) ([]clips.VoiceInfo, error) {
 		info := clips.VoiceInfo{Ref: v.ID, Name: v.Name, Gender: v.Gender, Aliases: []string{v.ID}}
 		if v.Slug != "" {
 			info.Ref = v.Slug
-			info.Aliases = append(info.Aliases, v.Slug)
 		}
 		out = append(out, info)
 	}

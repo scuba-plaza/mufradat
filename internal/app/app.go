@@ -3,6 +3,7 @@ package app
 import (
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/scuba-plaza/mufradat/internal/config"
 	"github.com/scuba-plaza/mufradat/internal/env"
@@ -36,10 +37,12 @@ type App struct {
 	ranking  *ranking.List
 	lexicon  *lexicon.Index
 	vocab    *vocab.Checker
+
+	llmBackoff time.Duration
 }
 
 func New(e env.Env) *App {
-	return &App{Env: e}
+	return &App{Env: e, llmBackoff: 2 * time.Second}
 }
 
 func (a *App) Dirs() xdg.Dirs {
