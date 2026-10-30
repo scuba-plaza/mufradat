@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/scuba-plaza/mufradat/internal/httpretry"
@@ -23,22 +21,12 @@ const (
 const (
 	PathChat   = "/v1/chat/completions"
 	PathModels = "/v1/models"
-	PathSpeech = "/v1/audio/speech"
-	PathVoices = "/v2/audio/voices"
 )
-
-type Waiter interface {
-	Wait(ctx context.Context) error
-}
 
 type Client struct {
 	BaseURL string
 	Key     string
 	HTTP    *http.Client
-	Limit   Waiter
-
-	mu     sync.Mutex
-	voices []Voice
 }
 
 func (c *Client) base() string {
@@ -49,15 +37,10 @@ func (c *Client) base() string {
 }
 
 func (c *Client) CheckKey(ctx context.Context) error {
-	return c.do(ctx, http.MethodGet, PathModels, nil, nil, nil)
+	return c.do(ctx, http.MethodGet, PathModels, nil, nil)
 }
 
-func (c *Client) do(ctx context.Context, method, path string, query url.Values, in, out any) error {
-	if c.Limit != nil {
-		if err := c.Limit.Wait(ctx); err != nil {
-			return err
-		}
-	}
+func (c *Client) do(ctx context.Context, method, path string, in, out any) error {
 	var body io.Reader
 	if in != nil {
 		raw, err := json.Marshal(in)
@@ -67,9 +50,6 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 		body = bytes.NewReader(raw)
 	}
 	target := c.base() + path
-	if len(query) > 0 {
-		target += "?" + query.Encode()
-	}
 	req, err := http.NewRequestWithContext(ctx, method, target, body)
 	if err != nil {
 		return err

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -61,8 +60,8 @@ func fakeBrowser() int {
 	base := os.Args[1]
 	mode := os.Getenv("FAKE_BROWSER")
 	logLine(log, "opened "+mode)
-	if provider, ok := strings.CutPrefix(mode, "compare"); ok {
-		return fakeComparer(base, log, strings.TrimPrefix(provider, "-"))
+	if mode == "compare" || mode == "compare-keep" {
+		return fakeComparer(base, log, mode == "compare")
 	}
 
 	list, err := browserState(base, "")
@@ -116,24 +115,21 @@ func fakeBrowser() int {
 	return 0
 }
 
-func fakeComparer(base, log, pick string) int {
+func fakeComparer(base, log string, use bool) int {
 	resp, err := http.Get(base + "api/compare")
 	if err != nil {
 		logLine(log, "error: "+err.Error())
 		return 1
 	}
 	var view struct {
-		Provider string   `json:"provider"`
-		Voice    string   `json:"voice"`
-		Notices  []string `json:"notices"`
-		Samples  []struct {
+		Voice   string `json:"voice"`
+		Samples []struct {
 			ID    string `json:"id"`
 			Label string `json:"label"`
 		} `json:"samples"`
 		Voices []struct {
-			Provider string `json:"provider"`
-			Name     string `json:"name"`
-			Tier     string `json:"tier"`
+			Name string `json:"name"`
+			Tier string `json:"tier"`
 		} `json:"voices"`
 	}
 	err = json.NewDecoder(resp.Body).Decode(&view)
@@ -142,23 +138,15 @@ func fakeComparer(base, log, pick string) int {
 		logLine(log, fmt.Sprintf("error: compare view %v %+v", err, view))
 		return 1
 	}
-	var listed []string
+	logLine(log, fmt.Sprintf("compare current=%s voices=%d samples=%d", view.Voice, len(view.Voices), len(view.Samples)))
+	target := ""
 	for _, v := range view.Voices {
-		listed = append(listed, v.Provider+"/"+v.Name)
-	}
-	logLine(log, fmt.Sprintf("compare current=%s/%s voices=%d samples=%d notices=%d", view.Provider, view.Voice, len(view.Voices), len(view.Samples), len(view.Notices)))
-	logLine(log, "voices "+strings.Join(listed, " "))
-	for _, n := range view.Notices {
-		logLine(log, "notice "+n)
-	}
-	var target struct{ provider, name string }
-	for _, v := range view.Voices {
-		if (v.Provider != view.Provider || v.Name != view.Voice) && (pick == "" || pick == "keep" || v.Provider == pick) {
-			target.provider, target.name = v.Provider, v.Name
+		if v.Name != view.Voice {
+			target = v.Name
 		}
 	}
 	for _, s := range view.Samples {
-		resp, err := http.Get(base + "sample?provider=" + url.QueryEscape(target.provider) + "&voice=" + url.QueryEscape(target.name) + "&id=" + url.QueryEscape(s.ID))
+		resp, err := http.Get(base + "sample?voice=" + url.QueryEscape(target) + "&id=" + url.QueryEscape(s.ID))
 		if err != nil {
 			logLine(log, "error: "+err.Error())
 			return 1
@@ -167,8 +155,8 @@ func fakeComparer(base, log, pick string) int {
 		resp.Body.Close()
 		logLine(log, fmt.Sprintf("sample %s %d %s", s.Label, resp.StatusCode, body))
 	}
-	if pick != "keep" {
-		code, body, err := browserPost(base, "use", "", map[string]any{"provider": target.provider, "voice": target.name})
+	if use {
+		code, body, err := browserPost(base, "use", "", map[string]any{"voice": target})
 		logLine(log, fmt.Sprintf("use %d %v %s", code, err, body))
 	}
 	code, body, err := browserPost(base, "finish", "", nil)

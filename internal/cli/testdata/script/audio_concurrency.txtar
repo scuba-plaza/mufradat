@@ -1,18 +1,19 @@
 exec mufradat init ws
 cp notes.jsonl ws/notes.jsonl
+exec mufradat auth google --import key.json
 exec mufradat -C ws config set tts.requests_per_minute 6000
 
 exec mufradat -C ws config set tts.concurrency 1
 exec mufradat -C ws audio
 stderr 'made 6 clips'
-mistral-parallel 1 1
+google-parallel 1 1
 
 rm ws/audio
-mistral-reset
+google-reset
 exec mufradat -C ws config set tts.concurrency 4
 exec mufradat -C ws audio
 stderr 'made 6 clips'
-mistral-parallel 2 4
+google-parallel 2 4
 
 -- notes.jsonl --
 {"id":"n_aaaaaaaaaaaa","seq":1,"rank":3,"origin":"ranked","lemma":"كِتَاب","pos":"noun","gender":"m","forms":[{"label":"pl.","ar":"كُتُب"}],"english":"book","example":"قَرَأْتُ [الْكِتَابَ] فِي الْبَيْتِ.","example_en":"I read the book at home.","created":"2023-11-14T22:13:20Z","updated":"2023-11-14T22:13:20Z"}

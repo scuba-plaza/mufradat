@@ -3,7 +3,6 @@ package clips
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -200,44 +199,6 @@ func TestOrphans(t *testing.T) {
 	}
 }
 
-type blockedErr struct{}
-
-func (blockedErr) Error() string { return "flagged by moderation" }
-func (blockedErr) Blocked() bool { return true }
-
-func TestSynthesizeSetsBlockedClipsApartAndKeepsGoing(t *testing.T) {
-	store := NewStore(t.TempDir())
-	v := Voice{Provider: "mistral", Name: "v1"}
-	boom := errors.New("temporary")
-	synth := &fakeSynth{fail: map[string]error{"قَلَم": blockedErr{}, "بَيْت": boom}}
-	plan := NewPlan(notesFor("كِتَاب", "قَلَم", "بَيْت", "دَار"), v, store.Has)
-	res, err := Synthesize(context.Background(), plan, store, synth, SynthOptions{Concurrency: 1})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.Made != 2 {
-		t.Errorf("made %d, want 2: a blocked clip must not stop the rest", res.Made)
-	}
-	if len(res.Blocked) != 1 || res.Blocked[0].Item.Text != "قَلَم" {
-		t.Errorf("blocked %+v", res.Blocked)
-	}
-	if len(res.Failed) != 1 || res.Failed[0].Item.Text != "بَيْت" || !errors.Is(res.Failed[0].Err, boom) {
-		t.Errorf("failed %+v", res.Failed)
-	}
-	if len(synth.calls) != 4 {
-		t.Errorf("each clip should be tried exactly once, calls %v", synth.calls)
-	}
-}
-
-func TestIsBlockedLooksThroughWrappedErrors(t *testing.T) {
-	if !IsBlocked(fmt.Errorf("clip: %w", blockedErr{})) {
-		t.Error("a wrapped block must still be recognised")
-	}
-	if IsBlocked(errors.New("flagged")) || IsBlocked(nil) {
-		t.Error("only errors that say they are blocks count")
-	}
-}
-
 type barrierSynth struct {
 	need    int
 	mu      sync.Mutex
@@ -270,16 +231,16 @@ func TestSynthesizeMakesAsManyClipsAtOnceAsAsked(t *testing.T) {
 	}
 }
 
-type plainErr struct{ blocked, fatal bool }
+type plainErr struct{}
 
-func (plainErr) Error() string   { return "refused" }
-func (e plainErr) Blocked() bool { return e.blocked }
-func (e plainErr) Fatal() bool   { return e.fatal }
+func (plainErr) Error() string { return "refused" }
+func (plainErr) Fatal() bool   { return false }
+
 func failingEvery(e error) *fakeSynth {
 	return &fakeSynth{fail: map[string]error{"كِتَاب": e, "قَلَم": e, "بَيْت": e}}
 }
 
-func TestSynthesizeTreatsErrorsThatDenyBeingBlockedOrFatalAsOrdinaryFailures(t *testing.T) {
+func TestSynthesizeTreatsErrorsThatDenyBeingFatalAsOrdinaryFailures(t *testing.T) {
 	store := NewStore(t.TempDir())
 	v := Voice{Name: "v1"}
 	plan := NewPlan(notesFor("كِتَاب", "قَلَم", "بَيْت"), v, store.Has)
@@ -288,8 +249,8 @@ func TestSynthesizeTreatsErrorsThatDenyBeingBlockedOrFatalAsOrdinaryFailures(t *
 	if err != nil {
 		t.Fatalf("an error that says it is not fatal must not stop the run: %v", err)
 	}
-	if len(res.Failed) != 3 || len(res.Blocked) != 0 || len(synth.calls) != 3 {
-		t.Fatalf("failed %d, blocked %d, attempted %d", len(res.Failed), len(res.Blocked), len(synth.calls))
+	if len(res.Failed) != 3 || len(synth.calls) != 3 {
+		t.Fatalf("failed %d, attempted %d", len(res.Failed), len(synth.calls))
 	}
 }
 

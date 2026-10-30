@@ -1,10 +1,8 @@
 exec mufradat init ws
 cp notes.jsonl ws/notes.jsonl
-exec mufradat -C ws config set audio.provider google
-
 exec mufradat -C ws audio --dry-run
 stderr '6 clips wanted, 0 present, 6 to make'
-stderr 'with ar-XA-Chirp3-HD-Achernar \(google, rate 0.9\)'
+stderr 'with ar-XA-Chirp3-HD-Achernar \(rate 0.9\)'
 ! exists ws/audio/synth
 
 exits 3 mufradat -C ws audio
@@ -25,13 +23,19 @@ exec mufradat auth google
 stdout 'imported key'
 
 exec mufradat -C ws status
-stdout 'audio .*6 of 6 clips missing with ar-XA-Chirp3-HD-Achernar \(google, rate 0.9\)'
+stdout 'audio .*6 of 6 clips missing with ar-XA-Chirp3-HD-Achernar \(rate 0.9\)'
 stdout 'next: mufradat -C .*ws audio'
 
 exec mufradat -C ws voices list --json
-stdout '"voice": "ar-XA-Wavenet-A"'
+stdout '"name": "ar-XA-Wavenet-A"'
 stdout '"detail": "24 kHz"'
 stdout '"current": true'
+stdout '(?s)"name": "ar-XA-Chirp3-HD-Achernar",\s+"gender": "female",\s+"detail": "24 kHz",\s+"current": true'
+! stdout '(?s)"name": "ar-XA-Wavenet-A"[^}]*"current": true'
+exec mufradat -C ws voices list
+stdout '\*\s+ar-XA-Chirp3-HD-Achernar\s+female\s+24 kHz'
+stdout 'ar-XA-Wavenet-A\s+female\s+24 kHz'
+! stdout '\*\s+ar-XA-Wavenet-A'
 
 exec mufradat -C ws audio --limit 2
 stderr '2 clips|limited to the first 2'
@@ -48,11 +52,11 @@ stderr '6 clips wanted, 6 present, 0 to make'
 grep -count=6 'ar-XA-Chirp3-HD-Achernar' synth-calls.log
 
 exec mufradat -C ws build
-stderr '2 notes, 4 cards \(2 production\), 6 audio clips with ar-XA-Chirp3-HD-Achernar \(google, rate 0.9\)'
+stderr '2 notes, 4 cards \(2 production\), 6 audio clips with ar-XA-Chirp3-HD-Achernar \(rate 0.9\)'
 ! stderr 'clips are missing'
 
 exec mufradat -C ws status
-stdout 'audio .*6 clips with ar-XA-Chirp3-HD-Achernar \(google, rate 0.9\)'
+stdout 'audio .*6 clips with ar-XA-Chirp3-HD-Achernar \(rate 0.9\)'
 stdout 'build .*arabic-msa-core\.apkg'
 
 exec mufradat -C ws config set google.voice ar-XA-Wavenet-A
@@ -87,7 +91,7 @@ stderr '6 present, 0 to make'
 
 exec mufradat -C ws config set google.voice ar-XA-Nope
 exits 1 mufradat -C ws audio
-stderr 'the google service has no Arabic voice named "ar-XA-Nope"'
+stderr 'the service has no Arabic voice named "ar-XA-Nope"'
 stderr 'hint: see the choices with `mufradat -C .*ws voices list`, then `mufradat -C .*ws config set google.voice NAME`'
 
 ! exec mufradat -C ws config set google.endpoint not-a-url

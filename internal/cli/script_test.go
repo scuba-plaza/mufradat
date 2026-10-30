@@ -3,6 +3,7 @@ package cli_test
 import (
 	"context"
 	"errors"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -51,12 +52,13 @@ func TestScripts(t *testing.T) {
 			e.Setenv("FAKE_BROWSER_LOG", filepath.Join(e.WorkDir, "browser.log"))
 
 			synth := filepath.Join(e.WorkDir, "synth-calls.log")
-			mistral := newFakeMistral(t, filepath.Join(e.WorkDir, "mistral-requests.log"), synth)
+			mistral := newFakeMistral(t, filepath.Join(e.WorkDir, "mistral-requests.log"))
 			e.Values[mistralKey{}] = mistral
 			e.Setenv("MISTRAL_URL", mistral.URL)
 			e.Setenv("MISTRAL_API_KEY", fakeMistralKey)
 
 			google := newFakeGoogle(t, synth)
+			e.Values[googleKey{}] = google
 			e.Setenv("GOOGLE_URL", google.URL)
 			writeKey(t, e.WorkDir, key, google.URL+"/token")
 
@@ -84,6 +86,7 @@ func TestScripts(t *testing.T) {
 
 func scriptCommands() map[string]func(ts *testscript.TestScript, neg bool, args []string) {
 	cmds := mistralCommands()
+	maps.Copy(cmds, googleCommands())
 	cmds["exits"] = func(ts *testscript.TestScript, neg bool, args []string) {
 		if neg || len(args) < 2 {
 			ts.Fatalf("usage: exits CODE command [args...]")

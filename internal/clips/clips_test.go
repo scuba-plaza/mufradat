@@ -9,17 +9,16 @@ import (
 	"github.com/scuba-plaza/mufradat/internal/note"
 )
 
-func TestKeyDependsOnProviderVoiceRateAndText(t *testing.T) {
-	a := Voice{Provider: "google", Name: "ar-XA-A", Rate: 0.9}
+func TestKeyDependsOnVoiceRateAndText(t *testing.T) {
+	a := Voice{Name: "ar-XA-A", Rate: 0.9}
 	base := Key(a, "كِتَاب")
 	if base != Key(a, "كِتَاب") {
 		t.Fatal("keys must be stable")
 	}
 	for name, other := range map[string]string{
-		"provider": Key(Voice{Provider: "mistral", Name: "ar-XA-A", Rate: 0.9}, "كِتَاب"),
-		"voice":    Key(Voice{Provider: "google", Name: "ar-XA-B", Rate: 0.9}, "كِتَاب"),
-		"rate":     Key(Voice{Provider: "google", Name: "ar-XA-A", Rate: 1}, "كِتَاب"),
-		"text":     Key(a, "كُتُب"),
+		"voice": Key(Voice{Name: "ar-XA-B", Rate: 0.9}, "كِتَاب"),
+		"rate":  Key(Voice{Name: "ar-XA-A", Rate: 1}, "كِتَاب"),
+		"text":  Key(a, "كُتُب"),
 	} {
 		if other == base {
 			t.Errorf("changing the %s must change the key", name)
@@ -33,8 +32,7 @@ func TestKeysAreStableBecauseSavedClipsAreFoundByThem(t *testing.T) {
 		text  string
 		want  string
 	}{
-		{Voice{Provider: "mistral", Name: "voice_479"}, "كِتَاب", "zmyf4b53zsvjn7qi"},
-		{Voice{Provider: "google", Name: "ar-XA-Chirp3-HD-Achernar", Rate: 0.9}, "كِتَاب", "cyuluc46y2sc46fx"},
+		{Voice{Name: "ar-XA-Chirp3-HD-Achernar", Rate: 0.9}, "كِتَاب", "cyuluc46y2sc46fx"},
 	}
 	for _, tc := range cases {
 		if got := Key(tc.voice, tc.text); got != tc.want {
@@ -44,17 +42,14 @@ func TestKeysAreStableBecauseSavedClipsAreFoundByThem(t *testing.T) {
 }
 
 func TestKeyIsNotConfusedByWhereOneFieldEndsAndTheNextBegins(t *testing.T) {
-	if Key(Voice{Provider: "ab", Name: "c"}, "d") == Key(Voice{Provider: "a", Name: "bc"}, "d") {
-		t.Error("provider and voice must be separated")
-	}
-	if Key(Voice{Provider: "a", Name: "b"}, "cd") == Key(Voice{Provider: "a", Name: "bc"}, "d") {
+	if Key(Voice{Name: "b"}, "cd") == Key(Voice{Name: "bc"}, "d") {
 		t.Error("voice and text must be separated")
 	}
 }
 
-func TestNamedKeepsTheProviderAndRate(t *testing.T) {
-	v := Voice{Provider: "google", Name: "ar-XA-A", Rate: 0.9}.Named("ar-XA-B")
-	if v != (Voice{Provider: "google", Name: "ar-XA-B", Rate: 0.9}) {
+func TestNamedKeepsTheRate(t *testing.T) {
+	v := Voice{Name: "ar-XA-A", Rate: 0.9}.Named("ar-XA-B")
+	if v != (Voice{Name: "ar-XA-B", Rate: 0.9}) {
 		t.Errorf("got %+v", v)
 	}
 }
@@ -160,28 +155,10 @@ func mustRead(t *testing.T, path string) string {
 	return string(raw)
 }
 
-func TestSwitchingProviderAndBackFindsTheOriginalClips(t *testing.T) {
-	s := NewStore(t.TempDir())
-	google := Voice{Provider: "google", Name: "same-name", Rate: 0.9}
-	mistral := Voice{Provider: "mistral", Name: "same-name"}
-	if err := s.Put(Key(google, "x"), []byte("clip-google")); err != nil {
-		t.Fatal(err)
-	}
-	if s.Has(Key(mistral, "x")) {
-		t.Fatal("the other provider must not reuse a clip, even for a voice with the same name")
-	}
-	if err := s.Put(Key(mistral, "x"), []byte("clip-mistral")); err != nil {
-		t.Fatal(err)
-	}
-	if got := mustRead(t, s.Path(Key(google, "x"))); got != "clip-google" {
-		t.Errorf("switching back returned %q", got)
-	}
-}
-
 func TestKeysListsOnlyClipFiles(t *testing.T) {
 	dir := t.TempDir()
 	store := NewStore(dir)
-	key := Key(Voice{Provider: "mistral", Name: "v"}, "x")
+	key := Key(Voice{Name: "v"}, "x")
 	if err := store.Put(key, []byte("audio")); err != nil {
 		t.Fatal(err)
 	}
@@ -196,14 +173,13 @@ func TestKeysListsOnlyClipFiles(t *testing.T) {
 	}
 }
 
-func TestAVoiceDescribesItselfWithItsProviderAndOnlyAGoogleRate(t *testing.T) {
+func TestAVoiceDescribesItselfWithItsNameAndRate(t *testing.T) {
 	for _, c := range []struct {
 		voice Voice
 		want  string
 	}{
-		{Voice{Provider: "mistral", Name: "voice_479"}, "voice_479 (mistral)"},
-		{Voice{Provider: "google", Name: "ar-XA-Chirp3-HD-Achernar", Rate: 0.9}, "ar-XA-Chirp3-HD-Achernar (google, rate 0.9)"},
-		{Voice{Provider: "google", Name: "ar-XA-Wavenet-A", Rate: 1}, "ar-XA-Wavenet-A (google, rate 1)"},
+		{Voice{Name: "ar-XA-Chirp3-HD-Achernar", Rate: 0.9}, "ar-XA-Chirp3-HD-Achernar (rate 0.9)"},
+		{Voice{Name: "ar-XA-Wavenet-A", Rate: 1}, "ar-XA-Wavenet-A (rate 1)"},
 	} {
 		if got := c.voice.Describe(); got != c.want {
 			t.Errorf("Describe() = %q, want %q", got, c.want)

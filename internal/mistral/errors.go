@@ -62,15 +62,6 @@ func (e *APIError) Kind() Kind {
 	return KindOther
 }
 
-func (e *APIError) Fatal() bool { return e.Kind() == KindAuth }
-
-func (e *APIError) Blocked() bool { return e.Kind() == KindBlocked }
-
-func (e *APIError) Retryable() bool {
-	k := e.Kind()
-	return k == KindRateLimited || k == KindTransient
-}
-
 type errorBody struct {
 	Message json.RawMessage `json:"message"`
 	Type    string          `json:"type"`

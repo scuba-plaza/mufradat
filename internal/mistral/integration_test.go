@@ -3,15 +3,12 @@
 package mistral_test
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http"
-	"slices"
 	"strings"
 	"testing"
 
-	"github.com/scuba-plaza/mufradat/internal/config"
 	"github.com/scuba-plaza/mufradat/internal/itest"
 	"github.com/scuba-plaza/mufradat/internal/llm"
 	"github.com/scuba-plaza/mufradat/internal/mistral"
@@ -23,10 +20,6 @@ const (
 	cheapModel = "mistral-small-latest"
 	tinySchema = `{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"],"additionalProperties":false}`
 )
-
-func isMP3(audio []byte) bool {
-	return bytes.HasPrefix(audio, []byte("ID3")) || (len(audio) > 2 && audio[0] == 0xFF && audio[1]&0xE0 == 0xE0)
-}
 
 func TestChatCompletionsWithATinySchema(t *testing.T) {
 	client := itest.Mistral(t)
@@ -89,40 +82,5 @@ func TestModelsEndpointAcceptsTheKeyAndRejectsABadOne(t *testing.T) {
 	var api *mistral.APIError
 	if err := bad.CheckKey(itest.Context(t)); !errors.As(err, &api) || api.Kind() != mistral.KindAuth {
 		t.Fatalf("got %v, want an authentication error", err)
-	}
-}
-
-func TestVoicesListsTheArabicVoicesAndTheDefaultExists(t *testing.T) {
-	client := itest.Mistral(t)
-	voices, err := client.Voices(itest.Context(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(voices) == 0 {
-		t.Fatal("no Arabic voices")
-	}
-	found := false
-	for _, v := range voices {
-		if !slices.ContainsFunc(v.Languages, func(l string) bool { return strings.HasPrefix(strings.ToLower(l), "ar") }) {
-			t.Errorf("voice %s (%v) is not Arabic", v.Name, v.Languages)
-		}
-		if v.ID == "" || v.Name == "" {
-			t.Errorf("incomplete voice %+v", v)
-		}
-		found = found || v.Slug == config.DefaultMistralVoice
-	}
-	if !found {
-		t.Errorf("the default voice %q is not among %d Arabic voices", config.DefaultMistralVoice, len(voices))
-	}
-}
-
-func TestSpeechSynthesizesOneArabicWordAsMP3(t *testing.T) {
-	client := itest.Mistral(t)
-	audio, err := client.Synthesize(itest.Context(t), mistral.SpeechRequest{Text: "قَلَم", Voice: config.DefaultMistralVoice})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !isMP3(audio) {
-		t.Fatalf("%d bytes that do not start like an MP3: % x", len(audio), audio[:min(8, len(audio))])
 	}
 }

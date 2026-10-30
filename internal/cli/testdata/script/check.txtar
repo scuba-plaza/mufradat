@@ -10,6 +10,7 @@ stderr 'hint: run `mufradat -C .*ws setup`'
 exec mufradat -C ws status
 stdout 'check .*not set up'
 
+exec mufradat auth google --import key.json
 exec mufradat -C ws doctor
 stdout 'warn  vowel checking'
 

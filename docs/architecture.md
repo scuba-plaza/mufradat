@@ -20,7 +20,7 @@ internal/sidecar        the sidecar protocol client
 internal/pyenv          setup, doctor and launch of the Python environment
 internal/review         the review web server and its embedded page
 internal/clips, tts     clip naming and planning, the Speaker interface; the Google REST client
-internal/httpretry      the retry transport both speech clients use
+internal/httpretry      the retry transport and Retry-After parsing the API clients use
 internal/deck, apkg     note type, templates and the deterministic .apkg writer
 internal/store          notes.jsonl and decisions.jsonl under a lock
 internal/note           the note model, ids, example markup, validation

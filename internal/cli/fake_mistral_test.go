@@ -2,7 +2,6 @@ package cli_test
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -13,17 +12,12 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/rogpeppe/go-internal/testscript"
 )
 
 const (
 	fakeMistralKey = "fake-mistral-key"
-	mistralID1     = "11111111-1111-4111-8111-111111111111"
-	mistralID2     = "22222222-2222-4222-8222-222222222222"
-	mistralID3     = "33333333-3333-4333-8333-333333333333"
-	moderated      = "رَجُلٌ طَيِّبْ"
 	fakeExample    = "قَرَأَ [الْوَلَدُ] الْكِتَابَ فِي الْبَيْتِ."
 	fakeRare       = "قَرَأَ [الْوَلَدُ] الْكِتَابَ عَلَى الطَّاوِلَةِ."
 )
@@ -42,44 +36,21 @@ type fakeCard struct {
 	Comment   string            `json:"comment"`
 }
 
-type mistralVoice struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name"`
-	Slug      *string  `json:"slug"`
-	Languages []string `json:"languages"`
-	Gender    string   `json:"gender"`
-	Kind      string   `json:"kind"`
-	Type      string   `json:"type"`
-}
-
-func ptr(s string) *string { return &s }
-
-var mistralVoices = []mistralVoice{
-	{ID: mistralID1, Name: "Maryam", Slug: ptr("voice_479"), Languages: []string{"ar"}, Gender: "female", Kind: "preset", Type: "tts"},
-	{ID: mistralID2, Name: "Oliver", Slug: ptr("voice_001"), Languages: []string{"en_GB", "en_us"}, Gender: "male", Kind: "preset", Type: "tts"},
-	{ID: mistralID3, Name: "Omar", Slug: nil, Languages: []string{"AR_EG"}, Gender: "male", Kind: "custom", Type: "tts"},
-}
-
 type fakeMistral struct {
 	*httptest.Server
 	requests string
-	synth    string
 	mu       sync.Mutex
 	mode     string
 	calls    int
 	problems []string
-	inflight int
-	peak     int
 }
 
-func newFakeMistral(t *testing.T, requests, synth string) *fakeMistral {
+func newFakeMistral(t *testing.T, requests string) *fakeMistral {
 	t.Helper()
-	f := &fakeMistral{requests: requests, synth: synth, mode: "ok"}
+	f := &fakeMistral{requests: requests, mode: "ok"}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/models", f.models)
 	mux.HandleFunc("POST /v1/chat/completions", f.chat)
-	mux.HandleFunc("GET /v2/audio/voices", f.voices)
-	mux.HandleFunc("POST /v1/audio/speech", f.speech)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		f.problem(w, http.StatusNotFound, "unexpected request %s %s", r.Method, r.URL.RequestURI())
 	})
@@ -98,26 +69,6 @@ func (f *fakeMistral) reset() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = 0
-	f.peak = 0
-}
-
-func (f *fakeMistral) enter() func() {
-	f.mu.Lock()
-	f.inflight++
-	f.peak = max(f.peak, f.inflight)
-	f.mu.Unlock()
-	time.Sleep(40 * time.Millisecond)
-	return func() {
-		f.mu.Lock()
-		f.inflight--
-		f.mu.Unlock()
-	}
-}
-
-func (f *fakeMistral) peakSpeech() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.peak
 }
 
 func (f *fakeMistral) callCount() int {
@@ -298,86 +249,6 @@ func (f *fakeMistral) chatReply(w http.ResponseWriter, model, content, finish st
 	})
 }
 
-func (f *fakeMistral) voices(w http.ResponseWriter, r *http.Request) {
-	if !f.authorized(w, r) {
-		return
-	}
-	appendLine(f.requests, "voices")
-	q := r.URL.Query()
-	for k := range q {
-		if k != "page_size" && k != "language" && k != "page_token" {
-			f.problem(w, http.StatusUnprocessableEntity, "unknown query parameter %q", k)
-			return
-		}
-	}
-	if q.Get("page_size") != "100" || q.Get("language") != "ar" {
-		f.problem(w, http.StatusUnprocessableEntity, "query %v", q)
-		return
-	}
-	reply := map[string]any{"data": mistralVoices[:2], "next_page_token": "page2"}
-	switch q.Get("page_token") {
-	case "":
-	case "page2":
-		reply = map[string]any{"data": mistralVoices[2:], "next_page_token": nil}
-	default:
-		f.problem(w, http.StatusUnprocessableEntity, "page_token %q", q.Get("page_token"))
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(reply)
-}
-
-type speechBody struct {
-	Model          string `json:"model"`
-	Input          string `json:"input"`
-	VoiceID        string `json:"voice_id"`
-	ResponseFormat string `json:"response_format"`
-	Stream         bool   `json:"stream"`
-}
-
-func (f *fakeMistral) speech(w http.ResponseWriter, r *http.Request) {
-	defer f.enter()()
-	if !f.authorized(w, r) {
-		return
-	}
-	var req speechBody
-	if !f.decode(w, r, &req) {
-		return
-	}
-	appendLine(f.requests, "speech voice_id="+req.VoiceID)
-	var voice *mistralVoice
-	for i := range mistralVoices {
-		if mistralVoices[i].ID == req.VoiceID {
-			voice = &mistralVoices[i]
-		}
-	}
-	switch {
-	case req.Model != "voxtral-mini-tts-3":
-		f.problem(w, http.StatusBadRequest, "model %q does not support this voice", req.Model)
-		return
-	case req.ResponseFormat != "mp3" || req.Stream:
-		f.problem(w, http.StatusBadRequest, "response_format %q stream %v", req.ResponseFormat, req.Stream)
-		return
-	case strings.TrimSpace(req.Input) == "":
-		f.problem(w, http.StatusBadRequest, "empty input")
-		return
-	case voice == nil:
-		writeMistralError(w, http.StatusNotFound, fmt.Sprintf("Voice '%s' not found", req.VoiceID), "invalid_request_error", "")
-		return
-	case strings.Contains(req.Input, moderated):
-		writeMistralError(w, http.StatusForbidden, "Content flagged by guardrails", "guardrail_violation", "1920")
-		return
-	}
-	name := voice.Name
-	if voice.Slug != nil {
-		name = *voice.Slug
-	}
-	appendLine(f.synth, name)
-	audio := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("MP3[%s]%s", name, req.Input)))
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"audio_data":%q}`, audio)
-}
-
 func mistralOf(ts *testscript.TestScript) *fakeMistral {
 	f, _ := ts.Value(mistralKey{}).(*fakeMistral)
 	if f == nil {
@@ -395,19 +266,6 @@ func mistralCommands() map[string]func(ts *testscript.TestScript, neg bool, args
 				ts.Fatalf("usage: mistral-mode NAME")
 			}
 			mistralOf(ts).setMode(args[0])
-		},
-		"mistral-parallel": func(ts *testscript.TestScript, neg bool, args []string) {
-			if neg || len(args) != 2 {
-				ts.Fatalf("usage: mistral-parallel MIN MAX")
-			}
-			lo, err1 := strconv.Atoi(args[0])
-			hi, err2 := strconv.Atoi(args[1])
-			if err1 != nil || err2 != nil {
-				ts.Fatalf("mistral-parallel: numbers expected")
-			}
-			if got := mistralOf(ts).peakSpeech(); got < lo || got > hi {
-				ts.Fatalf("at most %d speech requests were in flight at once, want %d to %d", got, lo, hi)
-			}
 		},
 		"mistral-reset": func(ts *testscript.TestScript, neg bool, args []string) {
 			mistralOf(ts).reset()

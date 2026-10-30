@@ -8,7 +8,6 @@ import (
 
 	"github.com/scuba-plaza/mufradat/internal/failure"
 	"github.com/scuba-plaza/mufradat/internal/fsutil"
-	"github.com/scuba-plaza/mufradat/internal/httpretry"
 	"github.com/scuba-plaza/mufradat/internal/jsonl"
 	"github.com/scuba-plaza/mufradat/internal/llm"
 	"github.com/scuba-plaza/mufradat/internal/mistral"
@@ -88,7 +87,7 @@ func (a *App) timeout() time.Duration {
 	return 0
 }
 
-func (a *App) mistralClient(retry bool, limit mistral.Waiter) (*mistral.Client, error) {
+func (a *App) mistralClient() (*mistral.Client, error) {
 	cfg, err := a.Config()
 	if err != nil {
 		return nil, err
@@ -97,13 +96,9 @@ func (a *App) mistralClient(retry bool, limit mistral.Waiter) (*mistral.Client, 
 	if err != nil {
 		return nil, err
 	}
-	rt := a.transport()
-	if retry {
-		rt = httpretry.New(rt)
-	}
 	return &mistral.Client{
-		BaseURL: cfg.Mistral.Endpoint, Key: key.Value, Limit: limit,
-		HTTP: &http.Client{Transport: rt, Timeout: a.timeout()},
+		BaseURL: cfg.Mistral.Endpoint, Key: key.Value,
+		HTTP: &http.Client{Transport: a.transport(), Timeout: a.timeout()},
 	}, nil
 }
 
@@ -116,7 +111,7 @@ func (a *App) LLM() (llm.Backend, error) {
 	if err != nil {
 		return nil, err
 	}
-	client, err := a.mistralClient(false, nil)
+	client, err := a.mistralClient()
 	if err != nil {
 		return nil, err
 	}

@@ -21,11 +21,11 @@ func reviewedNote() note.Note {
 	}
 }
 
-func reviewAudioFor(t *testing.T, fx *mistralFixture) (review.Audio, *App) {
+func reviewAudioFor(t *testing.T, fx *googleFixture) (review.Audio, *App) {
 	t.Helper()
-	a, _ := appWith(t, map[string]string{"MISTRAL_API_KEY": "secret-key"})
+	a, _ := appWith(t, map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": serviceAccountFile(t, fx.URL+"/token")})
 	withWorkspace(t, a)
-	setUser(t, a, map[string]string{"mistral.endpoint": fx.URL})
+	setUser(t, a, map[string]string{"google.endpoint": fx.URL})
 	audio, err := a.reviewAudio()
 	if err != nil {
 		t.Fatal(err)
@@ -34,7 +34,7 @@ func reviewAudioFor(t *testing.T, fx *mistralFixture) (review.Audio, *App) {
 }
 
 func TestTheReviewListsMakesFindsAndRemovesTheClipsOfANote(t *testing.T) {
-	fx := newMistralFixture(t)
+	fx := newGoogleFixture(t)
 	audio, _ := reviewAudioFor(t, fx)
 	n := reviewedNote()
 	ctx := context.Background()
@@ -57,10 +57,15 @@ func TestTheReviewListsMakesFindsAndRemovesTheClipsOfANote(t *testing.T) {
 	}
 	want("after making the forms clip", false, true, false)
 	fx.mu.Lock()
-	sent, voiceID := fx.speak["input"], fx.speak["voice_id"]
+	body := fx.synthBody
 	fx.mu.Unlock()
-	if sent != "كُتُب، كُتْب" || voiceID != "11111111-1111-4111-8111-111111111111" {
-		t.Errorf("the service was asked to say %q with voice %q", sent, voiceID)
+	wantBody := map[string]any{
+		"input":       map[string]any{"text": "كُتُب، كُتْب"},
+		"voice":       map[string]any{"languageCode": "ar-XA", "name": "ar-XA-Chirp3-HD-Achernar"},
+		"audioConfig": map[string]any{"audioEncoding": "MP3", "speakingRate": 0.9},
+	}
+	if !reflect.DeepEqual(body, wantBody) {
+		t.Errorf("the service was asked for %v, want %v", body, wantBody)
 	}
 	path, ok := audio.Path(n, "forms")
 	if data, err := os.ReadFile(path); !ok || err != nil || string(data) != "a" {
@@ -92,7 +97,7 @@ func TestTheReviewListsMakesFindsAndRemovesTheClipsOfANote(t *testing.T) {
 }
 
 func TestTheReviewOffersNoSentenceClipForANoteWithoutAnExample(t *testing.T) {
-	audio, _ := reviewAudioFor(t, newMistralFixture(t))
+	audio, _ := reviewAudioFor(t, newGoogleFixture(t))
 	n := reviewedNote()
 	n.Example, n.Forms = "", nil
 	got := audio.Clips(n)
@@ -113,11 +118,11 @@ func TestARemadeClipThatTheServiceRefusesExplainsHowToFixIt(t *testing.T) {
 		message string
 		hint    string
 	}{
-		{"bad key", 401, `{"message":"Unauthorized"}`, failure.ExitNotSetUp, "Unauthorized", "auth mistral --import FILE"},
-		{"moderation", 403, `{"object":"error","message":"blocked","type":"guardrail_violation","code":1920}`, failure.ExitFailure, "blocked", "config set audio.provider google"},
+		{"bad key", 401, `{"error":{"code":401,"message":"Request had invalid authentication credentials","status":"UNAUTHENTICATED"}}`, failure.ExitNotSetUp, "invalid authentication credentials", "auth google --import KEY.json"},
+		{"api disabled", 403, `{"error":{"code":403,"message":"Text-to-Speech API has not been used","status":"PERMISSION_DENIED","details":[{"reason":"SERVICE_DISABLED"}]}}`, failure.ExitTemporary, "has not been used", "google.quota_project"},
 	} {
-		fx := newMistralFixture(t)
-		fx.speechStatus, fx.speechReply = c.status, c.reply
+		fx := newGoogleFixture(t)
+		fx.synthStatus, fx.synthReply = c.status, c.reply
 		audio, _ := reviewAudioFor(t, fx)
 		err := audio.Remake(context.Background(), reviewedNote(), "word")
 		if err == nil || failure.Code(err) != c.code || !strings.Contains(err.Error(), c.message) || !strings.Contains(failure.Hint(err), c.hint) {
@@ -130,31 +135,31 @@ func TestARemadeClipThatTheServiceRefusesExplainsHowToFixIt(t *testing.T) {
 }
 
 func TestTheReviewVoiceListNamesTheCurrentVoiceAndSavesAChoice(t *testing.T) {
-	fx := newMistralFixture(t)
+	fx := newGoogleFixture(t)
 	_, a := reviewAudioFor(t, fx)
 	voices := reviewVoices{app: a}
-	if got := voices.Current(); got != "voice_479" {
+	if got := voices.Current(); got != "ar-XA-Chirp3-HD-Achernar" {
 		t.Errorf("current voice %q", got)
 	}
 	list, err := voices.List(context.Background())
 	want := []review.VoiceOption{
-		{Name: "voice_479", Label: "Maryam", Gender: "female"},
-		{Name: "22222222-2222-4222-8222-222222222222", Label: "Omar", Gender: "male"},
+		{Name: "ar-XA-A", Label: "ar-XA-A", Gender: "female"},
+		{Name: "ar-XA-B", Label: "ar-XA-B", Gender: "male"},
 	}
 	if err != nil || !reflect.DeepEqual(list, want) {
 		t.Fatalf("list %+v, %v; want %+v", list, err, want)
 	}
-	if err := voices.Set("Omar"); err != nil {
+	if err := voices.Set("ar-XA-B"); err != nil {
 		t.Fatal(err)
 	}
-	if got := voices.Current(); got != "Omar" {
+	if got := voices.Current(); got != "ar-XA-B" {
 		t.Errorf("after choosing, the current voice is %q", got)
 	}
 	ws, err := a.Workspace()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if raw, _ := os.ReadFile(ws.ConfigFile()); !strings.Contains(string(raw), "voice = 'Omar'") {
+	if raw, _ := os.ReadFile(ws.ConfigFile()); !strings.Contains(string(raw), "voice = 'ar-XA-B'") {
 		t.Errorf("the choice is not in the workspace config:\n%s", raw)
 	}
 	if _, err := config.Load(ws.ConfigFile()); err != nil {

@@ -26,10 +26,10 @@ func TestDefaultSettingsAreExactlyTheDocumentedOnes(t *testing.T) {
 	want := map[string]any{
 		"schema": int64(1), "workspace": "", "deck_name": "Arabic MSA Core",
 		"anki.deck_id": int64(0), "anki.model_id": int64(0), "anki.production_top": int64(1000),
-		"audio.provider": "mistral", "audio.rate": 0.9,
+		"audio.rate":              0.9,
 		"tts.requests_per_minute": int64(300), "tts.concurrency": int64(4),
 		"google.credentials_file": "", "google.quota_project": "", "google.endpoint": "", "google.voice": "ar-XA-Chirp3-HD-Achernar",
-		"mistral.api_key": "", "mistral.endpoint": "", "mistral.voice": "voice_479",
+		"mistral.api_key": "", "mistral.endpoint": "",
 		"author.model": "mistral-medium-latest", "author.batch_size": int64(10), "author.concurrency": int64(2), "author.allow_rank": int64(1500),
 		"verify.enabled": "auto", "verify.python": "",
 	}
@@ -49,7 +49,7 @@ func TestDefaultSettingsAreExactlyTheDocumentedOnes(t *testing.T) {
 
 func TestLoadLayersWorkspaceOverUserOverDefaults(t *testing.T) {
 	dir := t.TempDir()
-	user := write(t, dir, "user.toml", "[author]\nmodel = \"mistral-small-latest\"\nbatch_size = 7\n[audio]\nrate = 1.1\n[mistral]\nvoice = \"maryam\"\n")
+	user := write(t, dir, "user.toml", "[author]\nmodel = \"mistral-small-latest\"\nbatch_size = 7\n[audio]\nrate = 1.1\n[mistral]\nendpoint = \"http://127.0.0.1:9\"\n")
 	ws := write(t, dir, "ws.toml", "[author]\nmodel = \"mistral-large-latest\"\n[google]\nvoice = \"ar-XA-Wavenet-A\"\n")
 	cfg, err := Load(user, ws)
 	if err != nil {
@@ -61,7 +61,7 @@ func TestLoadLayersWorkspaceOverUserOverDefaults(t *testing.T) {
 	if cfg.Author.BatchSize != 7 {
 		t.Errorf("user value should survive when the workspace is silent, got %d", cfg.Author.BatchSize)
 	}
-	if cfg.Audio.Rate != 1.1 || cfg.Mistral.Voice != "maryam" || cfg.Google.Voice != "ar-XA-Wavenet-A" {
+	if cfg.Audio.Rate != 1.1 || cfg.Mistral.Endpoint != "http://127.0.0.1:9" || cfg.Google.Voice != "ar-XA-Wavenet-A" {
 		t.Errorf("unexpected layering: %+v", cfg)
 	}
 	if cfg.Author.Concurrency != Default().Author.Concurrency {
@@ -74,8 +74,8 @@ func TestLoadIgnoresMissingFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Audio.Provider != "mistral" {
-		t.Errorf("provider = %q", cfg.Audio.Provider)
+	if cfg.Audio.Rate != 0.9 {
+		t.Errorf("rate = %v", cfg.Audio.Rate)
 	}
 }
 
@@ -116,8 +116,6 @@ func TestValidateNamesTheOffendingSetting(t *testing.T) {
 		want   string
 	}{
 		{"schema", func(c *Config) { c.Schema = 99 }, "schema 99"},
-		{"provider", func(c *Config) { c.Audio.Provider = "elevenlabs" }, `audio.provider "elevenlabs" must be mistral or google`},
-		{"empty provider", func(c *Config) { c.Audio.Provider = "" }, "audio.provider"},
 		{"rate", func(c *Config) { c.Audio.Rate = 9 }, "audio.rate 9 is outside 0.25 to 2"},
 		{"verify", func(c *Config) { c.Verify.Enabled = "maybe" }, `verify.enabled "maybe"`},
 		{"batch", func(c *Config) { c.Author.BatchSize = 0 }, "author.batch_size"},
@@ -125,7 +123,6 @@ func TestValidateNamesTheOffendingSetting(t *testing.T) {
 		{"tts concurrency", func(c *Config) { c.TTS.Concurrency = 0 }, "tts.concurrency"},
 		{"tts rpm", func(c *Config) { c.TTS.RequestsPerMinute = 0 }, "tts.requests_per_minute"},
 		{"google voice", func(c *Config) { c.Google.Voice = "" }, "google.voice must not be empty"},
-		{"mistral voice", func(c *Config) { c.Mistral.Voice = "" }, "mistral.voice must not be empty"},
 		{"google endpoint", func(c *Config) { c.Google.Endpoint = "not-a-url" }, `google.endpoint "not-a-url"`},
 		{"mistral endpoint", func(c *Config) { c.Mistral.Endpoint = "ftp://x" }, `mistral.endpoint "ftp://x" must be an http(s) URL such as https://api.mistral.ai`},
 		{"google endpoint example", func(c *Config) { c.Google.Endpoint = "not-a-url" }, "such as https://eu-texttospeech.googleapis.com"},
@@ -150,11 +147,10 @@ func TestValidateNamesTheOffendingSetting(t *testing.T) {
 		t.Fatalf("defaults must validate: %v", err)
 	}
 	cfg := Default()
-	cfg.Audio.Provider = "google"
 	cfg.Mistral.Endpoint = "http://127.0.0.1:9"
 	cfg.Google.Endpoint = "https://eu-texttospeech.googleapis.com"
 	if err := cfg.Validate(); err != nil {
-		t.Fatalf("google provider with endpoints must validate: %v", err)
+		t.Fatalf("both endpoints must validate: %v", err)
 	}
 }
 
@@ -170,7 +166,6 @@ func TestValidateAcceptsTheEdgesOfEverySetting(t *testing.T) {
 		"allow rank 0":          func(c *Config) { c.Author.AllowRank = 0 },
 		"verify on":             func(c *Config) { c.Verify.Enabled = "on" },
 		"verify off":            func(c *Config) { c.Verify.Enabled = "off" },
-		"google provider":       func(c *Config) { c.Audio.Provider = "google" },
 		"plain http endpoint":   func(c *Config) { c.Mistral.Endpoint = "http://127.0.0.1:8080" },
 	}
 	for name, mutate := range cases {
@@ -198,11 +193,11 @@ func TestLoadReportsTheFileThatCannotBeUsed(t *testing.T) {
 }
 
 func TestGetNamesTheKnownKeysWhenAskedForAnUnknownOne(t *testing.T) {
-	v, err := Get(Default(), "audio.provider")
-	if err != nil || v != "mistral" {
-		t.Fatalf("audio.provider = %v, %v", v, err)
+	v, err := Get(Default(), "audio.rate")
+	if err != nil || v != 0.9 {
+		t.Fatalf("audio.rate = %v, %v", v, err)
 	}
-	if _, err := Get(Default(), "audio.voice"); err == nil || !strings.Contains(err.Error(), `unknown key "audio.voice"`) || !strings.Contains(err.Error(), "audio.provider, audio.rate") {
+	if _, err := Get(Default(), "audio.voice"); err == nil || !strings.Contains(err.Error(), `unknown key "audio.voice"`) || !strings.Contains(err.Error(), "audio.rate, author.allow_rank") {
 		t.Errorf("got %v", err)
 	}
 }
@@ -212,9 +207,7 @@ func TestSetFileWritesTypedValuesAndKeepsOthers(t *testing.T) {
 	for key, value := range map[string]string{
 		"author.batch_size": "4",
 		"audio.rate":        "1.25",
-		"audio.provider":    "google",
 		"google.voice":      "ar-XA-Standard-A",
-		"mistral.voice":     "maryam",
 	} {
 		if err := SetFile(path, key, value); err != nil {
 			t.Fatal(err)
@@ -224,8 +217,7 @@ func TestSetFileWritesTypedValuesAndKeepsOthers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Author.BatchSize != 4 || cfg.Audio.Rate != 1.25 || cfg.Audio.Provider != "google" ||
-		cfg.Google.Voice != "ar-XA-Standard-A" || cfg.Mistral.Voice != "maryam" {
+	if cfg.Author.BatchSize != 4 || cfg.Audio.Rate != 1.25 || cfg.Google.Voice != "ar-XA-Standard-A" {
 		t.Errorf("unexpected config: %+v", cfg)
 	}
 }
@@ -236,7 +228,6 @@ func TestSetFileRejectsBadInput(t *testing.T) {
 		{"author.batch_size", "many", `author.batch_size: "many" is not an integer`},
 		{"audio.rate", "fast", `audio.rate: "fast" is not a number`},
 		{"audio.rate", "99", "audio.rate: audio.rate 99 is outside 0.25 to 2"},
-		{"audio.provider", "azure", `audio.provider: audio.provider "azure" must be mistral or google`},
 		{"no.such.key", "1", `unknown key "no.such.key"`},
 		{"audio.voice", "x", `unknown key "audio.voice"`},
 		{"author.effort", "high", `unknown key "author.effort"`},
@@ -265,7 +256,7 @@ func TestSecretKeysAreMasked(t *testing.T) {
 	if !IsSecret("mistral.api_key") {
 		t.Error("mistral.api_key holds the key itself and must be treated as secret")
 	}
-	for _, k := range []string{"google.credentials_file", "mistral.voice", "mistral.endpoint"} {
+	for _, k := range []string{"google.credentials_file", "google.voice", "mistral.endpoint"} {
 		if IsSecret(k) {
 			t.Errorf("%s is not a secret", k)
 		}
@@ -288,7 +279,7 @@ func TestAFileThatHoldsTheMistralKeyIsReadableByItsOwnerOnly(t *testing.T) {
 		return info.Mode().Perm()
 	}
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := SetFile(path, "audio.provider", "google"); err != nil {
+	if err := SetFile(path, "google.voice", "ar-XA-Standard-A"); err != nil {
 		t.Fatal(err)
 	}
 	if got := mode(path); got != 0o644 {
@@ -300,7 +291,7 @@ func TestAFileThatHoldsTheMistralKeyIsReadableByItsOwnerOnly(t *testing.T) {
 	if got := mode(path); got != 0o600 {
 		t.Errorf("a file with the API key in it must be private: %v", got)
 	}
-	if err := SetFile(path, "audio.provider", "mistral"); err != nil {
+	if err := SetFile(path, "google.voice", "ar-XA-Wavenet-A"); err != nil {
 		t.Fatal(err)
 	}
 	if got := mode(path); got != 0o600 {

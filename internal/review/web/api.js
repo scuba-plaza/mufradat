@@ -88,26 +88,24 @@ export async function loadComparison() {
 }
 
 /**
- * @param {string} provider
  * @param {string} voice
  * @returns {Promise<import('./types.js').Result>}
  */
-export async function use(provider, voice) {
+export async function use(voice) {
   return /** @type {import('./types.js').Result} */ (
     await request('api/use', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, voice }),
+      body: JSON.stringify({ voice }),
     })
   );
 }
 
 /**
- * @param {string} provider
  * @param {string} voice
  * @param {string} id
  * @returns {string}
  */
-export function sampleURL(provider, voice, id) {
-  return 'sample?provider=' + encodeURIComponent(provider) + '&voice=' + encodeURIComponent(voice) + '&id=' + encodeURIComponent(id);
+export function sampleURL(voice, id) {
+  return 'sample?voice=' + encodeURIComponent(voice) + '&id=' + encodeURIComponent(id);
 }

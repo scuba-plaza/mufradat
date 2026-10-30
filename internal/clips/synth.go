@@ -50,9 +50,8 @@ type Failure struct {
 }
 
 type Result struct {
-	Made    int
-	Failed  []Failure
-	Blocked []Failure
+	Made   int
+	Failed []Failure
 }
 
 type SynthOptions struct {
@@ -65,11 +64,6 @@ type fatalError struct{ err error }
 func (e fatalError) Error() string { return e.err.Error() }
 func (e fatalError) Unwrap() error { return e.err }
 func (e fatalError) Fatal() bool   { return true }
-
-func IsBlocked(err error) bool {
-	var b interface{ Blocked() bool }
-	return errors.As(err, &b) && b.Blocked()
-}
 
 func isFatal(err error) bool {
 	var f interface{ Fatal() bool }
@@ -107,11 +101,7 @@ func Synthesize(ctx context.Context, plan Plan, store *Store, synth Synthesizer,
 		if err == nil {
 			res.Made++
 		} else if !errors.Is(err, context.Canceled) || ctx.Err() == nil {
-			if IsBlocked(err) {
-				res.Blocked = append(res.Blocked, Failure{Item: item, Err: err})
-			} else {
-				res.Failed = append(res.Failed, Failure{Item: item, Err: err})
-			}
+			res.Failed = append(res.Failed, Failure{Item: item, Err: err})
 		}
 		if opts.Progress != nil {
 			opts.Progress(done, len(plan.Missing))

@@ -23,9 +23,9 @@ func newVoicesList(a *app.App) *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List the Arabic voices of the audio provider",
-		Long: `List the Arabic voices the provider in audio.provider offers. The first column
-is what to put in google.voice or mistral.voice; * marks the voice in use.`,
+		Short: "List the Arabic voices the service offers",
+		Long: `List the Arabic voices Google offers. The first column marks the voice in use;
+the name is what to put in google.voice.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			speaker, err := a.Speaker(cmd.Context())
@@ -42,7 +42,6 @@ is what to put in google.voice or mistral.voice; * marks the voice in use.`,
 			}
 			if asJSON {
 				type row struct {
-					Voice   string `json:"voice"`
 					Name    string `json:"name"`
 					Gender  string `json:"gender"`
 					Detail  string `json:"detail"`
@@ -50,21 +49,17 @@ is what to put in google.voice or mistral.voice; * marks the voice in use.`,
 				}
 				rows := make([]row, 0, len(voices))
 				for _, v := range voices {
-					rows = append(rows, row{v.Ref, v.Name, v.Gender, v.Detail, v.Is(current.Name)})
+					rows = append(rows, row{v.Name, v.Gender, v.Detail, v.Name == current.Name})
 				}
 				return writeJSON(a.Env.Stdout, rows)
 			}
 			rows := make([][]string, 0, len(voices))
 			for _, v := range voices {
 				mark := " "
-				if v.Is(current.Name) {
+				if v.Name == current.Name {
 					mark = "*"
 				}
-				name := v.Name
-				if name == v.Ref {
-					name = ""
-				}
-				rows = append(rows, []string{mark, v.Ref, name, v.Gender, v.Detail})
+				rows = append(rows, []string{mark, v.Name, v.Gender, v.Detail})
 			}
 			ui.Table(a.Env.Stdout, rows)
 			return nil
@@ -81,14 +76,9 @@ func newVoicesCompare(a *app.App) *cobra.Command {
 		Use:   "compare",
 		Short: "Listen to the Arabic voices side by side and pick one",
 		Long: `Open a page in your browser, served only on this machine, where each Arabic voice
-of both providers, Mistral and Google, can say a word and a sentence from your
-notes. A provider that is not set up is left out, with a note on the page that
-says how to set it up. Clips are made when you press play and kept in the
-workspace, so hearing a voice twice costs nothing.
-
-'Use this voice' saves it as google.voice or mistral.voice in the workspace and,
-for a voice of the other provider, switches audio.provider to it. Clips the
-other provider already made are kept and found again if you switch back.
+of the service can say a word and a sentence from your notes. Clips are made
+when you press play and kept in the workspace, so hearing a voice twice costs
+nothing. 'Use this voice' saves it as google.voice in the workspace.
 
 Clips already made keep their voice until you remake them in 'review'.`,
 		Args: cobra.NoArgs,
@@ -99,7 +89,6 @@ Clips already made keep their voice until you remake them in 'review'.`,
 				return err
 			}
 			r := a.Reporter()
-			before := deps.Choices.Current()
 			used, err := review.Compare(ctx, deps, func(url string) {
 				fmt.Fprintf(a.Env.Stdout, "comparing voices at %s\n", url)
 				if !noOpen {
@@ -109,13 +98,10 @@ Clips already made keep their voice until you remake them in 'review'.`,
 				}
 				r.Event("press 'Done' on the page or Ctrl+C here when you have chosen")
 			})
-			switch {
-			case used.Voice == "":
+			if used != "" {
+				r.Event("google.voice is now %s; `%s audio` makes the clips with it", used, a.CommandPrefix())
+			} else {
 				r.Event("the voice was not changed")
-			case used.Provider == before.Provider:
-				r.Event("%s.voice is now %s; `%s audio` makes the clips with it", used.Provider, used.Voice, a.CommandPrefix())
-			default:
-				r.Event("audio.provider is now %s and %s.voice is %s; `%s audio` makes the clips with it, and the clips of the other provider are kept", used.Provider, used.Provider, used.Voice, a.CommandPrefix())
 			}
 			return err
 		},

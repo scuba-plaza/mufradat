@@ -86,7 +86,7 @@ func (b Backend) Complete(ctx context.Context, req llm.Request) (llm.Response, e
 		body.ResponseFormat = &responseFormat{Type: "json_schema", JSONSchema: jsonSchema{Name: schemaName, Schema: req.Schema, Strict: true}}
 	}
 	var reply chatResponse
-	if err := b.Client.do(ctx, http.MethodPost, PathChat, nil, body, &reply); err != nil {
+	if err := b.Client.do(ctx, http.MethodPost, PathChat, body, &reply); err != nil {
 		return llm.Response{}, chatError(err)
 	}
 	if len(reply.Choices) == 0 {

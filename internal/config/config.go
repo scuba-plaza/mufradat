@@ -14,13 +14,7 @@ const (
 )
 
 const (
-	ProviderMistral = "mistral"
-	ProviderGoogle  = "google"
-)
-
-const (
 	DefaultGoogleVoice   = "ar-XA-Chirp3-HD-Achernar"
-	DefaultMistralVoice  = "voice_479"
 	DefaultAuthorModel   = "mistral-medium-latest"
 	DefaultRate          = 0.9
 	DefaultProductionTop = 1000
@@ -47,8 +41,7 @@ type Anki struct {
 }
 
 type Audio struct {
-	Provider string  `toml:"provider"`
-	Rate     float64 `toml:"rate"`
+	Rate float64 `toml:"rate"`
 }
 
 type TTS struct {
@@ -78,7 +71,6 @@ type Google struct {
 type Mistral struct {
 	APIKey   string `toml:"api_key"`
 	Endpoint string `toml:"endpoint"`
-	Voice    string `toml:"voice"`
 }
 
 func Default() Config {
@@ -86,10 +78,9 @@ func Default() Config {
 		Schema:   SchemaVersion,
 		DeckName: DefaultDeckName,
 		Anki:     Anki{ProductionTop: DefaultProductionTop},
-		Audio:    Audio{Provider: ProviderMistral, Rate: DefaultRate},
+		Audio:    Audio{Rate: DefaultRate},
 		TTS:      TTS{RequestsPerMinute: 300, Concurrency: 4},
 		Google:   Google{Voice: DefaultGoogleVoice},
-		Mistral:  Mistral{Voice: DefaultMistralVoice},
 		Author: Author{
 			Model:       DefaultAuthorModel,
 			BatchSize:   10,
@@ -119,19 +110,11 @@ func (c Config) Validate() error {
 	if c.Anki.ProductionTop < 0 {
 		return fmt.Errorf("anki.production_top must not be negative")
 	}
-	switch c.Audio.Provider {
-	case ProviderMistral, ProviderGoogle:
-	default:
-		return fmt.Errorf("audio.provider %q must be %s or %s", c.Audio.Provider, ProviderMistral, ProviderGoogle)
-	}
 	if c.Audio.Rate < 0.25 || c.Audio.Rate > 2 {
 		return fmt.Errorf("audio.rate %v is outside 0.25 to 2", c.Audio.Rate)
 	}
 	if c.Google.Voice == "" {
 		return fmt.Errorf("google.voice must not be empty")
-	}
-	if c.Mistral.Voice == "" {
-		return fmt.Errorf("mistral.voice must not be empty")
 	}
 	if err := validateEndpoint("google.endpoint", c.Google.Endpoint, "https://eu-texttospeech.googleapis.com"); err != nil {
 		return err

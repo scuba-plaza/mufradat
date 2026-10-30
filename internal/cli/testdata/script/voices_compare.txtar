@@ -1,60 +1,31 @@
 exec mufradat init ws
 cp notes.jsonl ws/notes.jsonl
 exec mufradat auth google --import key.json
-exec mufradat -C ws config set audio.provider google
 
-env FAKE_BROWSER=compare-google
+env FAKE_BROWSER=compare
 exec mufradat -C ws voices compare
 stdout 'comparing voices at http://127.0.0.1:[0-9]+/[A-Z2-7]+/'
 ! stderr 'could not open a browser'
 stderr 'google.voice is now ar-XA-Wavenet-A'
-! stderr 'audio.provider is now'
-grep 'compare current=google/ar-XA-Chirp3-HD-Achernar voices=4 samples=4 notices=0' browser.log
-grep 'voices google/ar-XA-Chirp3-HD-Achernar google/ar-XA-Wavenet-A mistral/voice_479 mistral/33333333-3333-4333-8333-333333333333$' browser.log
+grep 'compare current=ar-XA-Chirp3-HD-Achernar voices=2 samples=4' browser.log
 grep 'sample word 200 MP3\[ar-XA-Wavenet-A\]كِتَاب' browser.log
 grep 'sample sentence 200 MP3\[ar-XA-Wavenet-A\]قَرَأْتُ الْكِتَابَ' browser.log
 grep -count=4 'ar-XA-Wavenet-A' synth-calls.log
 grep 'use 200' browser.log
 exec mufradat -C ws config get google.voice
 stdout 'ar-XA-Wavenet-A'
-exec mufradat -C ws config get audio.provider
-stdout 'google'
 exec mufradat -C ws audio --dry-run
 stderr 'with ar-XA-Wavenet-A'
 
 rm browser.log
-env FAKE_BROWSER=compare-mistral
-exec mufradat -C ws voices compare
-stderr 'audio.provider is now mistral and mistral.voice is'
-stderr 'clips of the other provider are kept'
-grep 'compare current=google/ar-XA-Wavenet-A voices=4 samples=4 notices=0' browser.log
-grep 'voices google/ar-XA-Chirp3-HD-Achernar google/ar-XA-Wavenet-A mistral/voice_479 mistral/33333333-3333-4333-8333-333333333333$' browser.log
-grep 'sample word 200 MP3\[Omar\]كِتَاب' browser.log
-exec mufradat -C ws config get audio.provider
-stdout 'mistral'
-exec mufradat -C ws config get mistral.voice
-stdout '33333333-3333-4333-8333-333333333333'
-exec mufradat -C ws config get google.voice
-stdout 'ar-XA-Wavenet-A'
-exec mufradat -C ws audio --dry-run
-stderr '6 clips wanted, 0 present, 6 to make'
-stderr 'with 33333333-3333-4333-8333-333333333333 \(mistral\)'
-
-rm browser.log
-env FAKE_BROWSER=compare-keep
-exec mufradat -C ws voices compare
-stderr 'the voice was not changed'
-exec mufradat -C ws config get audio.provider
-stdout 'mistral'
-
-rm browser.log
-env FAKE_BROWSER=compare
-rm home/.config/mufradat/google-credentials.json
+exec mufradat -C ws config set google.voice ar-XA-Chirp3-HD-Achernar
 exec mufradat -C ws voices compare --text 'مَرْحَبًا'
-grep 'samples=1 notices=1' browser.log
-grep 'notice Google voices are not listed: no Google credentials found' browser.log
-! grep 'google/' browser.log
+grep 'samples=1' browser.log
+grep -count=5 'ar-XA-Wavenet-A' synth-calls.log
 
+exec mufradat -C ws config set google.voice ar-XA-Chirp3-HD-Achernar
+exec mufradat -C ws voices compare
+grep -count=5 'ar-XA-Wavenet-A' synth-calls.log
 exists ws/state/voice-samples
 
 -- notes.jsonl --

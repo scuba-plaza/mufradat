@@ -1,9 +1,6 @@
 package clips
 
-import (
-	"context"
-	"strings"
-)
+import "context"
 
 type SpeechRequest struct {
 	Text  string
@@ -12,26 +9,9 @@ type SpeechRequest struct {
 }
 
 type VoiceInfo struct {
-	Ref     string
-	Name    string
-	Gender  string
-	Detail  string
-	Aliases []string
-}
-
-func (v VoiceInfo) Is(s string) bool {
-	if s == "" {
-		return false
-	}
-	if s == v.Ref {
-		return true
-	}
-	for _, a := range v.Aliases {
-		if s == a {
-			return true
-		}
-	}
-	return v.Name != v.Ref && strings.EqualFold(s, v.Name)
+	Name   string
+	Gender string
+	Detail string
 }
 
 type Speaker interface {

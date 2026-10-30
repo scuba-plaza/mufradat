@@ -95,21 +95,3 @@
   border-top: 1px solid var(--line);
   background: var(--bg);
 }
-
-.compare .provider {
-  margin: 30px 0 4px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--line);
-  color: var(--strong);
-  font-size: 1.05rem;
-}
-
-.compare .notice {
-  margin: 0 0 14px;
-  padding: 9px 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel);
-  color: var(--muted);
-  font-size: 0.9rem;
-}

@@ -10,7 +10,6 @@ import (
 	"github.com/scuba-plaza/mufradat/internal/env"
 	"github.com/scuba-plaza/mufradat/internal/failure"
 	"github.com/scuba-plaza/mufradat/internal/llm"
-	"github.com/scuba-plaza/mufradat/internal/mistral"
 	"github.com/scuba-plaza/mufradat/internal/tts"
 )
 
@@ -75,37 +74,6 @@ func TestSpeechFailureForGoogle(t *testing.T) {
 		if !errors.Is(got, tc.err) {
 			t.Errorf("%s: the original error is lost", tc.name)
 		}
-	}
-}
-
-func TestSpeechFailureForMistral(t *testing.T) {
-	a := testApp(t)
-	cases := []struct {
-		name string
-		err  error
-		code int
-		hint string
-	}{
-		{"bad key", &mistral.APIError{Status: 401, Message: "Unauthorized"}, failure.ExitNotSetUp, "auth mistral --import FILE"},
-		{"forbidden", &mistral.APIError{Status: 403, Message: "Forbidden"}, failure.ExitNotSetUp, "auth mistral --import FILE"},
-		{"rate limited", &mistral.APIError{Status: 429}, failure.ExitTemporary, "run the command again"},
-		{"outage", &mistral.APIError{Status: 502}, failure.ExitTemporary, "run the command again"},
-		{"unreachable", &mistral.APIError{Message: "could not reach the service"}, failure.ExitTemporary, "run the command again"},
-		{"moderation", &mistral.APIError{Status: 403, Type: "guardrail_violation", Code: "1920", Message: "flagged"}, failure.ExitFailure, "rejected this text; edit the note, or switch with `mufradat config set audio.provider google`"},
-		{"unknown voice", &mistral.VoiceError{Voice: "voice_999"}, failure.ExitFailure, "config set mistral.voice NAME"},
-		{"validation", &mistral.APIError{Status: 422, Message: "bad"}, failure.ExitFailure, ""},
-	}
-	for _, tc := range cases {
-		got := a.SpeechFailure(fmt.Errorf("clip: %w", tc.err))
-		if failure.Code(got) != tc.code || !strings.Contains(failure.Hint(got), tc.hint) {
-			t.Errorf("%s: exit %d hint %q, want exit %d hint containing %q", tc.name, failure.Code(got), failure.Hint(got), tc.code, tc.hint)
-		}
-		if !errors.Is(got, tc.err) {
-			t.Errorf("%s: the original error is lost", tc.name)
-		}
-	}
-	if strings.Contains(failure.Hint(a.SpeechFailure(&mistral.APIError{Status: 403, Type: "guardrail_violation"})), "key") {
-		t.Error("a moderation block must never tell the user to check their key")
 	}
 }
 

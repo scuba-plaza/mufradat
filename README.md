@@ -12,9 +12,9 @@ Standard Arabic words, from any directory on a Linux machine.
 - **Vowels checked twice.** [CAMeL Tools](https://github.com/CAMeL-Lab/camel_tools)
   and [CATT](https://github.com/abjadai/catt) read every word independently; a
   review page in your browser shows where they disagree with the card.
-- **Audio.** Mistral or Google Cloud Text-to-Speech, whichever you choose, reads
-  the word, its forms and the sentence. Clips are named after the provider and
-  the voice, so switching either and back finds the old ones again.
+- **Audio.** Google Cloud Text-to-Speech reads the word, its forms and the
+  sentence. Clips are named after the voice, so switching it and back finds the
+  old ones again.
 - **Your data stays yours.** Notes, decisions, audio and the built deck live in a
   workspace directory that you choose. The tool only holds code and the shipped
   word list.
@@ -25,10 +25,9 @@ speech, a rank bucket and its check state.
 
 ## Install
 
-You need a [Mistral API key](https://console.mistral.ai/) to write notes and to
-make audio. Audio can come from Google Cloud Text-to-Speech instead, which needs
-a Google Cloud project with the Text-to-Speech API enabled. Vowel checking is
-optional and needs Python 3.11 or newer.
+You need a [Mistral API key](https://console.mistral.ai/) to write notes and a
+Google Cloud project with the Text-to-Speech API enabled to make audio. Vowel
+checking is optional and needs Python 3.11 or newer.
 
 With Nix (recommended on NixOS, because it sets up the C++ libraries the vowel
 checkers need):
@@ -89,12 +88,12 @@ mean; elsewhere pass `--entry WORD#N`, `--pos`, `--pick N` or `--yes`.
 | `add [N \| WORD...]` | Write the next N most common words, or the words you name. Every finished note is saved at once, so an interrupted run loses nothing. |
 | `check [--strict]` | Cross-check the vowels. Results are remembered; only new or changed text is checked. `--strict` exits 4 while major flags remain. |
 | `review [--all]` | Go through flagged notes (or every note) in your browser: accept, add a missing ending, edit, ask Mistral for a better version, hear the clips, remake or remove a clip, undo. |
-| `audio [--dry-run]` | Make the clips that are missing. `audio gc` lists clips no note needs with the current provider, voice and rate, `--delete` removes them. |
+| `audio [--dry-run]` | Make the clips that are missing. `audio gc` lists clips no note needs with the current voice and rate, `--delete` removes them. |
 | `build [-o PATH]` | Write the `.apkg`. The same inputs give identical bytes. |
-| `voices list`, `voices compare` | List the Arabic voices of the audio provider, or listen to the voices of both providers side by side and pick one; picking a voice of the other provider switches `audio.provider` to it. |
+| `voices list`, `voices compare` | List the Arabic voices Google offers, or listen to them side by side and pick one. |
 | `setup` | Install the vowel checkers (CAMeL Tools and CATT). |
 | `auth mistral --import FILE` | Keep the Mistral API key from a file in the user config directory. |
-| `auth google --import FILE` | Keep a Google service-account key in the user config directory, for `audio.provider = google`. |
+| `auth google --import FILE` | Keep a Google service-account key in the user config directory. |
 | `config get`, `config set`, `config path` | Show or change settings. |
 | `status`, `doctor` | Where things stand, and whether everything the tool needs is in place. |
 | `licenses`, `version`, `completion` | The licences of the code, data and font; the version; shell completions. |
@@ -137,14 +136,12 @@ then the workspace's `mufradat.toml`. `mufradat config get` lists them.
 |---|---|---|
 | `deck_name` | `Arabic MSA Core` | Name of the Anki deck. |
 | `anki.production_top` | `1000` | Words up to this rank also get a Production card. |
-| `audio.provider` | `mistral` | `mistral` or `google`. Each provider keeps its own voice, so switching is one setting and the other provider's clips are found again. |
-| `audio.rate` | `0.9` | Speaking rate. Only Google takes it; Mistral has no rate control and ignores it. |
-| `mistral.voice` | `voice_479` | The Mistral voice, written as its slug, name or id. `voices list` shows them. |
+| `audio.rate` | `0.9` | Speaking rate. |
 | `google.voice` | `ar-XA-Chirp3-HD-Achernar` | The Google voice. |
 | `author.model` | `mistral-medium-latest` | The Mistral chat model that writes the notes. |
 | `author.batch_size`, `author.concurrency` | `10`, `2` | Words per request and requests at once. |
 | `author.allow_rank` | `1500` | The vocabulary the example sentences may use. `0` turns the check off. |
-| `tts.requests_per_minute`, `tts.concurrency` | `300`, `4` | How hard to push the speech service, whichever provider speaks. |
+| `tts.requests_per_minute`, `tts.concurrency` | `300`, `4` | How hard to push the speech service. |
 | `mistral.endpoint`, `google.endpoint`, `google.quota_project` | empty | Another API address, such as a regional Google endpoint, and a billing project for user credentials that need one. |
 | `verify.enabled` | `auto` | `on` makes a missing checker an error, `off` skips checking. |
 | `workspace`, `mistral.api_key`, `google.credentials_file`, `verify.python` | empty | User config only: the default workspace, the Mistral API key itself (not a file name; `config get` shows it as `(set)`), a Google credentials file, and your own Python with the checkers. |
@@ -153,7 +150,7 @@ The Mistral key is looked for in this order: `MISTRAL_API_KEY`, `mistral.api_key
 then the key imported with `auth mistral --import`. Surrounding whitespace, such
 as the newline at the end of a key file, is ignored.
 
-Google credentials, needed only when `audio.provider` is `google`, are looked for in this order: `GOOGLE_APPLICATION_CREDENTIALS`,
+Google credentials are looked for in this order: `GOOGLE_APPLICATION_CREDENTIALS`,
 `google.credentials_file`, the key imported with `auth google --import`, then
 gcloud's application default credentials.
 

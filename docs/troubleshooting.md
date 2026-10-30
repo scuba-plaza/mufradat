@@ -1,8 +1,8 @@
 # Troubleshooting
 
 Run `mufradat doctor` first; it checks the workspace, the settings, the Mistral
-key, the Google credentials (when `audio.provider` is `google`) and the vowel
-checkers and says how to fix what it finds.
+key, the Google credentials and the vowel checkers and says how to fix what it
+finds.
 
 ## "rate limited" or "the service is busy" (exit 75)
 
@@ -18,16 +18,7 @@ save the key in a file (a newline at the end is fine) and run
 `mufradat auth mistral --import FILE`. `mufradat auth mistral` shows which source
 the key in use comes from, and `doctor` asks Mistral whether it accepts the key.
 
-## Some clips were "blocked by Mistral's moderation"
-
-Mistral's speech service refuses a few harmless sentences. The decision belongs
-to the service, is the same every time for the same text, and cannot be
-configured, so `audio` does not retry those clips; it makes all the others and
-lists the blocked ones. Reword the example sentence in `review`, or switch with
-`mufradat config set audio.provider google` and run `audio` again. Clips of both
-providers are kept, so switching back finds the Mistral ones.
-
-## No audio / "no Google credentials" (`audio.provider = google`)
+## No audio / "no Google credentials"
 
 Create a service account in a Google Cloud project with the Cloud
 Text-to-Speech API enabled, download its JSON key, and run

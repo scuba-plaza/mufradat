@@ -14,7 +14,6 @@ import (
 
 const (
 	testKey    = "test-key"
-	speechPath = "/v1/audio/speech"
 	modelsPath = "/v1/models"
 )
 

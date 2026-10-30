@@ -155,17 +155,16 @@ func TestImportingAMistralKeyKeepsItTrimmedAndPrivate(t *testing.T) {
 	}
 }
 
-func TestMistralClientUsesTheConfiguredEndpointTimeoutAndLimiter(t *testing.T) {
+func TestMistralClientUsesTheConfiguredEndpointAndTimeout(t *testing.T) {
 	a, _ := appWith(t, map[string]string{"MISTRAL_API_KEY": "k"})
 	a.Env.HTTP = &http.Client{Timeout: 7 * time.Second}
 	withWorkspace(t, a)
 	setUser(t, a, map[string]string{"mistral.endpoint": "http://127.0.0.1:9"})
-	waiter := &struct{ mistral.Waiter }{}
-	client, err := a.mistralClient(false, waiter)
+	client, err := a.mistralClient()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if client.BaseURL != "http://127.0.0.1:9" || client.Key != "k" || client.HTTP.Timeout != 7*time.Second || client.Limit != mistral.Waiter(waiter) {
+	if client.BaseURL != "http://127.0.0.1:9" || client.Key != "k" || client.HTTP.Timeout != 7*time.Second {
 		t.Errorf("client %+v", client)
 	}
 }

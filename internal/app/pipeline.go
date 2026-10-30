@@ -13,7 +13,6 @@ import (
 	"github.com/scuba-plaza/mufradat/internal/fsutil"
 	"github.com/scuba-plaza/mufradat/internal/googleauth"
 	"github.com/scuba-plaza/mufradat/internal/lexicon"
-	"github.com/scuba-plaza/mufradat/internal/mistral"
 	"github.com/scuba-plaza/mufradat/internal/note"
 	"github.com/scuba-plaza/mufradat/internal/ranking"
 	"github.com/scuba-plaza/mufradat/internal/status"
@@ -43,32 +42,7 @@ func (a *App) Voice() (clips.Voice, error) {
 	if err != nil {
 		return clips.Voice{}, err
 	}
-	return voiceFor(cfg, cfg.Audio.Provider, configuredVoice(cfg, cfg.Audio.Provider))
-}
-
-func configuredVoice(cfg config.Config, provider string) string {
-	if provider == config.ProviderGoogle {
-		return cfg.Google.Voice
-	}
-	return cfg.Mistral.Voice
-}
-
-func voiceFor(cfg config.Config, provider, name string) (clips.Voice, error) {
-	switch provider {
-	case config.ProviderGoogle:
-		return clips.Voice{Provider: config.ProviderGoogle, Name: name, Rate: cfg.Audio.Rate}, nil
-	case config.ProviderMistral:
-		return clips.Voice{Provider: config.ProviderMistral, Name: name}, nil
-	}
-	return clips.Voice{}, fmt.Errorf("audio.provider %q is not supported", provider)
-}
-
-func (a *App) VoiceSetting() (string, error) {
-	cfg, err := a.Config()
-	if err != nil {
-		return "", err
-	}
-	return cfg.Audio.Provider + ".voice", nil
+	return clips.Voice{Name: cfg.Google.Voice, Rate: cfg.Audio.Rate}, nil
 }
 
 func (a *App) Ranking() (*ranking.List, error) {
@@ -296,39 +270,17 @@ func (a *App) fillAudio(snap *status.Snapshot, set *note.Set) error {
 	snap.AudioReady = reason == "" || len(plan.Missing) == 0
 	if !snap.AudioReady {
 		snap.AudioReason = reason
-		snap.AudioSetup = audioSetupCommand(voice.Provider)
 	}
 	return nil
 }
 
 func (a *App) audioNotReady() string {
-	cfg, err := a.Config()
-	if err != nil {
-		return err.Error()
-	}
-	if cfg.Audio.Provider == config.ProviderGoogle {
-		_, err := a.GoogleCredentials()
-		switch {
-		case err == nil:
-			return ""
-		case errors.Is(err, googleauth.ErrNone):
-			return "no Google credentials"
-		}
-		return err.Error()
-	}
-	_, err = a.MistralKey()
+	_, err := a.GoogleCredentials()
 	switch {
 	case err == nil:
 		return ""
-	case errors.Is(err, mistral.ErrNoKey):
-		return "no Mistral API key"
+	case errors.Is(err, googleauth.ErrNone):
+		return "no Google credentials"
 	}
 	return err.Error()
-}
-
-func audioSetupCommand(provider string) string {
-	if provider == config.ProviderGoogle {
-		return "auth google --import KEY.json"
-	}
-	return "auth mistral --import FILE"
 }

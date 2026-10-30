@@ -37,33 +37,25 @@ func clipFailures(n int, prefix string) []clips.Failure {
 	return out
 }
 
-func TestClipFailuresAreListedCappedAndSummarisedByKind(t *testing.T) {
-	const (
-		retryFailed  = "run the command again to retry the failed clips"
-		switchToGoog = "edit those notes, or use the Google provider with `mufradat config set audio.provider google`"
-	)
+func TestClipFailuresAreListedCappedAndCounted(t *testing.T) {
+	const retryFailed = "run the command again to retry the failed clips"
 	cases := []struct {
 		name         string
 		failed       int
-		blocked      int
 		wantMessage  string
 		wantHint     string
 		wantWarnings []string
 		wantNot      []string
 	}{
 		{name: "nothing failed"},
-		{"one failed", 1, 0, "1 clip failed", retryFailed, []string{"f1: refused"}, []string{"more"}},
-		{"ten failed are all listed", 10, 0, "10 clips failed", retryFailed, []string{"f1: refused", "f10: refused"}, []string{"more"}},
-		{"eleven failed list ten and count the rest", 11, 0, "11 clips failed", retryFailed, []string{"f10: refused", "and 1 more"}, []string{"f11"}},
-		{"twelve failed", 12, 0, "12 clips failed", retryFailed, []string{"and 2 more"}, []string{"f11", "f12"}},
-		{"one blocked", 0, 1, "1 clip was blocked by Mistral's moderation", switchToGoog, []string{"b1: refused"}, []string{"failed"}},
-		{"several blocked", 0, 3, "3 clips were blocked by Mistral's moderation", switchToGoog, []string{"b3: refused"}, []string{"failed"}},
-		{"both kinds", 2, 1, "2 clips failed; 1 clip was blocked by Mistral's moderation", switchToGoog + "; run the command again to retry the others", []string{"f2: refused", "b1: refused"}, nil},
-		{"blocked are capped on their own", 0, 12, "12 clips were blocked by Mistral's moderation", switchToGoog, []string{"b10: refused", "and 2 more"}, []string{"b11"}},
+		{"one failed", 1, "1 clip failed", retryFailed, []string{"f1: refused"}, []string{"more"}},
+		{"ten failed are all listed", 10, "10 clips failed", retryFailed, []string{"f1: refused", "f10: refused"}, []string{"more"}},
+		{"eleven failed list ten and count the rest", 11, "11 clips failed", retryFailed, []string{"f10: refused", "and 1 more"}, []string{"f11"}},
+		{"twelve failed", 12, "12 clips failed", retryFailed, []string{"and 2 more"}, []string{"f11", "f12"}},
 	}
 	for _, tc := range cases {
 		a, stderr := reportingApp(t)
-		res := clips.Result{Failed: clipFailures(tc.failed, "f"), Blocked: clipFailures(tc.blocked, "b")}
+		res := clips.Result{Failed: clipFailures(tc.failed, "f")}
 		err := reportClipFailures(a, res)
 		if tc.wantMessage == "" {
 			if err != nil {

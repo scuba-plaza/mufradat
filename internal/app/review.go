@@ -11,7 +11,6 @@ import (
 	"github.com/scuba-plaza/mufradat/internal/author"
 	"github.com/scuba-plaza/mufradat/internal/clips"
 	"github.com/scuba-plaza/mufradat/internal/config"
-	"github.com/scuba-plaza/mufradat/internal/failure"
 	"github.com/scuba-plaza/mufradat/internal/fsutil"
 	"github.com/scuba-plaza/mufradat/internal/note"
 	"github.com/scuba-plaza/mufradat/internal/proc"
@@ -260,17 +259,14 @@ func (v reviewVoices) List(ctx context.Context) ([]review.VoiceOption, error) {
 	if err != nil {
 		return nil, v.app.SpeechFailure(err)
 	}
-	return voiceOptions(v.app.verifyConfig().Audio.Provider, voices), nil
+	return voiceOptions(voices), nil
 }
 
-func voiceOptions(provider string, voices []clips.VoiceInfo) []review.VoiceOption {
+func voiceOptions(voices []clips.VoiceInfo) []review.VoiceOption {
 	out := make([]review.VoiceOption, 0, len(voices))
 	for _, vi := range voices {
-		opt := review.VoiceOption{Name: vi.Ref, Label: vi.Name, Gender: vi.Gender}
-		if provider == config.ProviderGoogle {
-			opt.Label, opt.Tier = googleVoiceLabel(vi.Ref)
-		}
-		out = append(out, opt)
+		label, tier := googleVoiceLabel(vi.Name)
+		out = append(out, review.VoiceOption{Name: vi.Name, Label: label, Tier: tier, Gender: vi.Gender})
 	}
 	return out
 }
@@ -288,153 +284,52 @@ func (v reviewVoices) Set(name string) error {
 	if err != nil {
 		return err
 	}
-	key, err := v.app.VoiceSetting()
-	if err != nil {
-		return err
-	}
-	if err := config.SetFile(ws.ConfigFile(), key, name); err != nil {
+	if err := config.SetFile(ws.ConfigFile(), "google.voice", name); err != nil {
 		return err
 	}
 	v.app.InvalidateConfig()
 	return nil
 }
 
-type compareChoices struct{ app *App }
-
-func (c compareChoices) Current() review.Choice {
-	voice, err := c.app.Voice()
-	if err != nil {
-		return review.Choice{}
-	}
-	return review.Choice{Provider: voice.Provider, Voice: voice.Name}
-}
-
-func (c compareChoices) List(ctx context.Context) ([]review.VoiceOption, []string, error) {
-	cfg, err := c.app.Config()
-	if err != nil {
-		return nil, nil, err
-	}
-	order := []string{cfg.Audio.Provider}
-	for _, p := range []string{config.ProviderMistral, config.ProviderGoogle} {
-		if p != cfg.Audio.Provider {
-			order = append(order, p)
-		}
-	}
-	var options []review.VoiceOption
-	var notices []string
-	var first error
-	for _, provider := range order {
-		listed, err := c.providerVoices(ctx, cfg, provider)
-		if err != nil {
-			if first == nil {
-				first = err
-			}
-			notices = append(notices, notListed(provider, err))
-			continue
-		}
-		options = append(options, listed...)
-	}
-	if len(options) == 0 {
-		return nil, nil, first
-	}
-	return options, notices, nil
-}
-
-func (c compareChoices) providerVoices(ctx context.Context, cfg config.Config, provider string) ([]review.VoiceOption, error) {
-	speaker, err := c.app.speakerFor(ctx, cfg, provider)
-	if err != nil {
-		return nil, err
-	}
-	voices, err := speaker.Voices(ctx)
-	if err != nil {
-		return nil, c.app.SpeechFailure(err)
-	}
-	options := voiceOptions(provider, voices)
-	for i := range options {
-		options[i].Provider = provider
-	}
-	return options, nil
-}
-
-func notListed(provider string, err error) string {
-	label := strings.ToUpper(provider[:1]) + provider[1:]
-	msg := fmt.Sprintf("%s voices are not listed: %s", label, err.Error())
-	if hint := failure.Hint(err); hint != "" {
-		msg += " (" + hint + ")"
-	}
-	return msg
-}
-
-func (c compareChoices) Use(choice review.Choice) error {
-	cfg, err := c.app.Config()
-	if err != nil {
-		return err
-	}
-	if _, err := voiceFor(cfg, choice.Provider, choice.Voice); err != nil {
-		return err
-	}
-	ws, err := c.app.Workspace()
-	if err != nil {
-		return err
-	}
-	if err := config.SetFile(ws.ConfigFile(), choice.Provider+".voice", choice.Voice); err != nil {
-		return err
-	}
-	if choice.Provider != cfg.Audio.Provider {
-		if err := config.SetFile(ws.ConfigFile(), "audio.provider", choice.Provider); err != nil {
-			return err
-		}
-	}
-	c.app.InvalidateConfig()
-	return nil
-}
-
 type voiceSampler struct {
-	app      *App
-	mu       sync.Mutex
-	speakers map[string]clips.Speaker
+	app     *App
+	mu      sync.Mutex
+	speaker clips.Speaker
 }
 
-func (s *voiceSampler) speak(ctx context.Context, cfg config.Config, provider string) (clips.Speaker, error) {
+func (s *voiceSampler) speak(ctx context.Context) (clips.Speaker, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if speaker, ok := s.speakers[provider]; ok {
-		return speaker, nil
+	if s.speaker != nil {
+		return s.speaker, nil
 	}
-	speaker, err := s.app.speakerFor(context.WithoutCancel(ctx), cfg, provider)
+	speaker, err := s.app.Speaker(context.WithoutCancel(ctx))
 	if err != nil {
 		return nil, err
 	}
-	if s.speakers == nil {
-		s.speakers = map[string]clips.Speaker{}
-	}
-	s.speakers[provider] = speaker
+	s.speaker = speaker
 	return speaker, nil
 }
 
-func (s *voiceSampler) Sample(ctx context.Context, choice review.Choice, text string) (string, error) {
+func (s *voiceSampler) Sample(ctx context.Context, voice, text string) (string, error) {
 	ws, err := s.app.Workspace()
 	if err != nil {
 		return "", err
 	}
-	cfg, err := s.app.Config()
+	current, err := s.app.Voice()
 	if err != nil {
 		return "", err
 	}
-	voice, err := voiceFor(cfg, choice.Provider, choice.Voice)
-	if err != nil {
-		return "", err
-	}
-	key := clips.Key(voice, text)
+	key := clips.Key(current.Named(voice), text)
 	path := filepath.Join(ws.VoiceSamplesDir(), clips.FileName(key))
 	if fsutil.Exists(path) {
 		return path, nil
 	}
-	speaker, err := s.speak(ctx, cfg, choice.Provider)
+	speaker, err := s.speak(ctx)
 	if err != nil {
 		return "", err
 	}
-	data, err := speaker.Synthesize(ctx, clips.SpeechRequest{Text: text, Voice: choice.Voice, Rate: voice.Rate})
+	data, err := speaker.Synthesize(ctx, clips.SpeechRequest{Text: text, Voice: voice, Rate: current.Rate})
 	if err != nil {
 		return "", s.app.SpeechFailure(err)
 	}
@@ -490,5 +385,5 @@ func (a *App) PrepareCompare(texts []string) (review.CompareDeps, error) {
 	if err != nil {
 		return review.CompareDeps{}, err
 	}
-	return review.CompareDeps{Choices: compareChoices{app: a}, Sampler: &voiceSampler{app: a}, Samples: samples, Font: assets.Font}, nil
+	return review.CompareDeps{Voices: reviewVoices{app: a}, Sampler: &voiceSampler{app: a}, Samples: samples, Font: assets.Font}, nil
 }

@@ -142,12 +142,11 @@ func (s *session) audio(w http.ResponseWriter, r *http.Request) {
 }
 
 type request struct {
-	IfRev    string `json:"if_rev"`
-	Note     *edit  `json:"note"`
-	Source   string `json:"source"`
-	Clip     string `json:"clip"`
-	Voice    string `json:"voice"`
-	Provider string `json:"provider"`
+	IfRev  string `json:"if_rev"`
+	Note   *edit  `json:"note"`
+	Source string `json:"source"`
+	Clip   string `json:"clip"`
+	Voice  string `json:"voice"`
 }
 
 func readRequest(w http.ResponseWriter, r *http.Request) (request, error) {

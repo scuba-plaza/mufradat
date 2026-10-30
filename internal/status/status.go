@@ -33,7 +33,6 @@ type Snapshot struct {
 
 	AudioReady   bool
 	AudioReason  string
-	AudioSetup   string
 	AudioVoice   string
 	ClipsWanted  int
 	ClipsMissing int
@@ -105,10 +104,7 @@ func Compute(s Snapshot) State {
 		audio.Status, audio.Detail = Skipped, "nothing to speak"
 	case !s.AudioReady:
 		audio.Status, audio.Detail = Skipped, s.AudioReason
-		audio.Command = cmd("audio")
-		if s.AudioSetup != "" {
-			audio.Command = cmd(s.AudioSetup)
-		}
+		audio.Command = cmd("auth google --import KEY.json")
 	case s.ClipsMissing > 0:
 		audio.Status = Todo
 		audio.Detail = fmt.Sprintf("%d of %d clips missing", s.ClipsMissing, s.ClipsWanted) + voiceNote(s.AudioVoice)

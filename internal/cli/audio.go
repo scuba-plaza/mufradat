@@ -22,11 +22,9 @@ func newAudio(a *app.App) *cobra.Command {
 		Short: "Make the missing audio clips",
 		Long: `Make every audio clip the notes need that does not exist yet.
 
-Clips are named after the provider, voice, speaking rate and spoken text, so
-changing the provider or the voice never reuses another one's clips and
-changing back finds them again. Mistral takes no speaking rate, so audio.rate
-only applies to Google. Clips are paid for: they are kept, never refreshed
-behind your back.`,
+Clips are named after the voice, speaking rate and spoken text, so changing the
+voice never reuses another voice's clips and changing it back finds them again.
+Clips are paid for: they are kept, never refreshed behind your back.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runAudio(cmd.Context(), a, dryRun, limit)
@@ -82,12 +80,8 @@ func runAudio(ctx context.Context, a *app.App, dryRun bool, limit int) error {
 		return a.SpeechFailure(err)
 	}
 	if !hasVoice(voices, voice.Name) {
-		setting, err := a.VoiceSetting()
-		if err != nil {
-			return err
-		}
-		return failure.Newf(failure.ExitFailure, fmt.Sprintf("see the choices with `%s voices list`, then `%s config set %s NAME`", a.CommandPrefix(), a.CommandPrefix(), setting),
-			"the %s service has no Arabic voice named %q", voice.Provider, voice.Name)
+		return failure.Newf(failure.ExitFailure, fmt.Sprintf("see the choices with `%s voices list`, then `%s config set google.voice NAME`", a.CommandPrefix(), a.CommandPrefix()),
+			"the service has no Arabic voice named %q", voice.Name)
 	}
 	cfg, err := a.Config()
 	if err != nil {
@@ -107,23 +101,15 @@ func runAudio(ctx context.Context, a *app.App, dryRun bool, limit int) error {
 
 func reportClipFailures(a *app.App, res clips.Result) error {
 	r := a.Reporter()
-	for _, group := range [][]clips.Failure{res.Failed, res.Blocked} {
-		for i, f := range group {
-			if i == maxListedFailures {
-				r.Warn("and %d more", len(group)-maxListedFailures)
-				break
-			}
-			r.Warn("%s: %v", f.Item.Text, f.Err)
+	for i, f := range res.Failed {
+		if i == maxListedFailures {
+			r.Warn("and %d more", len(res.Failed)-maxListedFailures)
+			break
 		}
+		r.Warn("%s: %v", f.Item.Text, f.Err)
 	}
-	failed, blocked := len(res.Failed), len(res.Blocked)
-	switch {
-	case failed > 0 && blocked > 0:
-		return failure.Newf(failure.ExitFailure, blockedHint(a)+"; run the command again to retry the others", "%s; %s", failedClips(failed), blockedClips(blocked))
-	case blocked > 0:
-		return failure.Newf(failure.ExitFailure, blockedHint(a), "%s", blockedClips(blocked))
-	case failed > 0:
-		return failure.Newf(failure.ExitFailure, "run the command again to retry the failed clips", "%s", failedClips(failed))
+	if len(res.Failed) > 0 {
+		return failure.Newf(failure.ExitFailure, "run the command again to retry the failed clips", "%s", failedClips(len(res.Failed)))
 	}
 	return nil
 }
@@ -135,20 +121,9 @@ func failedClips(n int) string {
 	return fmt.Sprintf("%d clips failed", n)
 }
 
-func blockedClips(n int) string {
-	if n == 1 {
-		return "1 clip was blocked by Mistral's moderation"
-	}
-	return fmt.Sprintf("%d clips were blocked by Mistral's moderation", n)
-}
-
-func blockedHint(a *app.App) string {
-	return fmt.Sprintf("edit those notes, or use the Google provider with `%s config set audio.provider google`", a.CommandPrefix())
-}
-
 func hasVoice(voices []clips.VoiceInfo, name string) bool {
 	for _, v := range voices {
-		if v.Is(name) {
+		if v.Name == name {
 			return true
 		}
 	}
@@ -160,9 +135,9 @@ func newAudioGC(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "gc",
 		Short: "Find clips no note needs any more",
-		Long: `List the clips that no note needs with the current provider, voice and rate.
-That includes clips made with another provider or voice, so they are only
-deleted with --delete.`,
+		Long: `List the clips that no note needs with the current voice and rate. That
+includes clips made with another voice or rate, so they are only deleted with
+--delete.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st, err := a.Store()

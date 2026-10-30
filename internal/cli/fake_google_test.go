@@ -13,9 +13,13 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	"github.com/rogpeppe/go-internal/testscript"
 )
 
 type fakeGoogle struct {
@@ -23,6 +27,8 @@ type fakeGoogle struct {
 	synth    string
 	mu       sync.Mutex
 	problems []string
+	inflight int
+	peak     int
 }
 
 func newFakeGoogle(t *testing.T, synth string) *fakeGoogle {
@@ -41,6 +47,31 @@ func newFakeGoogle(t *testing.T, synth string) *fakeGoogle {
 	f.Server = httptest.NewServer(mux)
 	t.Cleanup(f.Close)
 	return f
+}
+
+func (f *fakeGoogle) enter() func() {
+	f.mu.Lock()
+	f.inflight++
+	f.peak = max(f.peak, f.inflight)
+	f.mu.Unlock()
+	time.Sleep(40 * time.Millisecond)
+	return func() {
+		f.mu.Lock()
+		f.inflight--
+		f.mu.Unlock()
+	}
+}
+
+func (f *fakeGoogle) resetPeak() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.peak = 0
+}
+
+func (f *fakeGoogle) peakSynthesis() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.peak
 }
 
 func (f *fakeGoogle) violations() string {
@@ -94,6 +125,7 @@ type synthesizeBody struct {
 }
 
 func (f *fakeGoogle) synthesize(w http.ResponseWriter, r *http.Request) {
+	defer f.enter()()
 	if !f.authorized(w, r) {
 		return
 	}
@@ -157,5 +189,36 @@ func writeKey(t *testing.T, dir string, key *rsa.PrivateKey, tokenURL string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, "key.json"), serviceAccountKey(t, key, tokenURL), 0o600); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func googleOf(ts *testscript.TestScript) *fakeGoogle {
+	f, _ := ts.Value(googleKey{}).(*fakeGoogle)
+	if f == nil {
+		ts.Fatalf("no fake Google server in this script")
+	}
+	return f
+}
+
+type googleKey struct{}
+
+func googleCommands() map[string]func(ts *testscript.TestScript, neg bool, args []string) {
+	return map[string]func(ts *testscript.TestScript, neg bool, args []string){
+		"google-parallel": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg || len(args) != 2 {
+				ts.Fatalf("usage: google-parallel MIN MAX")
+			}
+			lo, err1 := strconv.Atoi(args[0])
+			hi, err2 := strconv.Atoi(args[1])
+			if err1 != nil || err2 != nil {
+				ts.Fatalf("google-parallel: numbers expected")
+			}
+			if got := googleOf(ts).peakSynthesis(); got < lo || got > hi {
+				ts.Fatalf("at most %d speech requests were in flight at once, want %d to %d", got, lo, hi)
+			}
+		},
+		"google-reset": func(ts *testscript.TestScript, neg bool, args []string) {
+			googleOf(ts).resetPeak()
+		},
 	}
 }

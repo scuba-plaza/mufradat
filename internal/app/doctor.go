@@ -18,15 +18,13 @@ import (
 )
 
 func (a *App) DoctorChecks() []doctor.Check {
-	checks := []doctor.Check{
+	return []doctor.Check{
 		{Name: "workspace", Run: a.checkWorkspace},
 		{Name: "configuration", Run: a.checkConfig},
 		{Name: "mistral key", Run: a.checkMistral},
+		{Name: "google credentials", Run: a.checkGoogle},
+		{Name: "vowel checking", Run: a.checkVerify},
 	}
-	if a.verifyConfig().Audio.Provider == config.ProviderGoogle {
-		checks = append(checks, doctor.Check{Name: "google credentials", Run: a.checkGoogle})
-	}
-	return append(checks, doctor.Check{Name: "vowel checking", Run: a.checkVerify})
 }
 
 func (a *App) checkWorkspace(context.Context) doctor.Result {

@@ -22,11 +22,11 @@ func newAuthMistral(a *app.App) *cobra.Command {
 	var importFile string
 	cmd := &cobra.Command{
 		Use:   "mistral",
-		Short: "Show or import the Mistral API key used for notes and audio",
-		Long: `Notes are written by Mistral, and so is the audio unless audio.provider is
-google. The key is looked for in this order: the MISTRAL_API_KEY environment
-variable, the mistral.api_key setting of the user config file (the key itself,
-not a file name), then the key imported with --import.
+		Short: "Show or import the Mistral API key used to write notes",
+		Long: `Notes are written by Mistral. The key is looked for in this order: the
+MISTRAL_API_KEY environment variable, the mistral.api_key setting of the user
+config file (the key itself, not a file name), then the key imported with
+--import.
 
 --import copies the key from a file (surrounding whitespace such as a trailing
 newline is ignored) into the user config directory (mode 0600).`,
@@ -56,10 +56,10 @@ func newAuthGoogle(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "google",
 		Short: "Show or import the Google Cloud credentials used for audio",
-		Long: `Audio comes from Google Cloud Text-to-Speech when audio.provider is google.
-Credentials are looked for in this order: GOOGLE_APPLICATION_CREDENTIALS, the
-google.credentials_file setting, the key imported with --import, then gcloud
-application default credentials.
+		Long: `Audio comes from Google Cloud Text-to-Speech. Credentials are looked for in
+this order: GOOGLE_APPLICATION_CREDENTIALS, the google.credentials_file
+setting, the key imported with --import, then gcloud application default
+credentials.
 
 --import copies a service-account key into the user config directory (mode
 0600) so it does not have to stay next to your other files.`,

@@ -40,6 +40,7 @@ stderr '2 notes checked: 4 new, 2 remembered'
 
 ! exec mufradat setup --force --python nosuchpython
 stderr 'no suitable Python found'
+exec mufradat auth google --import key.json
 exec mufradat -C ws doctor
 stdout 'ok    vowel checking'
 

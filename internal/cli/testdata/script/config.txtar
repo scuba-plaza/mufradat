@@ -1,10 +1,8 @@
 exec mufradat init ws
-exec mufradat -C ws config get audio.provider
-stdout '^mistral$'
+exec mufradat -C ws config get audio.rate
+stdout '^0.9$'
 exec mufradat -C ws config get google.voice
 stdout '^ar-XA-Chirp3-HD-Achernar$'
-exec mufradat -C ws config get mistral.voice
-stdout '^voice_479$'
 exec mufradat -C ws config get author.model
 stdout '^mistral-medium-latest$'
 
@@ -15,8 +13,6 @@ grep 'model = ' ws/mufradat.toml
 
 ! exec mufradat -C ws config set audio.rate 9
 stderr 'outside 0.25 to 2'
-! exec mufradat -C ws config set audio.provider azure
-stderr 'audio.provider "azure" must be mistral or google'
 ! exec mufradat -C ws config set mistral.endpoint not-a-url
 stderr 'mistral.endpoint "not-a-url" must be an http\(s\) URL'
 ! exec mufradat -C ws config set nonsense 1

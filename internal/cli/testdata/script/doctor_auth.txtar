@@ -1,9 +1,19 @@
 exec mufradat init ws
 
-exec mufradat -C ws doctor
+exits 3 mufradat -C ws doctor
+stdout 'FAIL  google credentials +no Google credentials; audio cannot be made'
+stdout 'hint: run `mufradat -C .*ws auth google --import KEY.json`'
 stdout 'ok    mistral key +accepted by Mistral \(MISTRAL_API_KEY\)'
-! stdout 'google credentials'
 grep -count=1 '^models$' mistral-requests.log
+
+exec mufradat auth google --import key.json
+exec mufradat auth google
+stdout '^imported key$'
+stdout 'home/.config/mufradat/google-credentials.json$'
+exec mufradat -C ws doctor
+stdout 'ok    google credentials +service_account tts@test-project.iam.gserviceaccount.com \(imported key\)'
+stdout 'ok    mistral key +accepted by Mistral \(MISTRAL_API_KEY\)'
+grep -count=2 '^models$' mistral-requests.log
 
 env MISTRAL_API_KEY=
 exits 3 mufradat -C ws doctor
@@ -37,9 +47,6 @@ exits 3 mufradat -C ws doctor
 stdout 'FAIL  mistral key +Mistral rejected the key from MISTRAL_API_KEY \(Unauthorized\)'
 exits 3 mufradat -C ws add 1
 stderr 'the service rejected the credentials: Unauthorized'
-exits 3 mufradat -C ws audio
-stderr 'mistral: Unauthorized \(HTTP 401\)'
-stderr 'hint: check the key with `mufradat -C .*ws doctor`, or import another with `mufradat -C .*ws auth mistral --import FILE`'
 
 env MISTRAL_API_KEY='abc def'
 exits 3 mufradat auth mistral
@@ -50,18 +57,9 @@ exec mufradat -C ws config set mistral.endpoint http://127.0.0.1:1
 exec mufradat -C ws doctor
 stdout 'warn  mistral key +could not check the key from MISTRAL_API_KEY with Mistral'
 exec mufradat -C ws config set mistral.endpoint $MISTRAL_URL
-
-exec mufradat -C ws config set audio.provider google
-exits 3 mufradat -C ws doctor
-stdout 'FAIL  google credentials +no Google credentials; audio cannot be made'
-stdout 'hint: run `mufradat -C .*ws auth google --import KEY.json`'
-exec mufradat auth google --import key.json
-exec mufradat auth google
-stdout '^imported key$'
-stdout 'home/.config/mufradat/google-credentials.json$'
 exec mufradat -C ws doctor
-stdout 'ok    google credentials +service_account tts@test-project.iam.gserviceaccount.com \(imported key\)'
 stdout 'ok    mistral key'
+
 
 -- key.txt --
 fake-mistral-key

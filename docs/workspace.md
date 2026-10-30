@@ -56,13 +56,11 @@ reliably on network file systems such as NFS; keep the workspace on a local disk
 
 ## Audio
 
-A clip's name is derived from the provider, the voice, the speaking rate and the
-exact spoken text. Change the provider or the voice and new clips are made for
-it; change it back and the old ones are found again. Mistral takes no speaking
-rate, so `audio.rate` does not enter the name of a Mistral clip. `mufradat audio
-gc` lists clips no note needs with the current provider, voice and rate and
-`--delete` removes them. `audio --dry-run` says how many characters would be
-sent to the speech service before anything is.
+A clip's name is derived from the voice, the speaking rate and the exact spoken
+text. Change the voice or the rate and new clips are made for it; change it back
+and the old ones are found again. `mufradat audio gc` lists clips no note needs
+with the current voice and rate and `--delete` removes them. `audio --dry-run`
+says how many characters would be sent to Google before anything is.
 
 ## Deleting things
 
