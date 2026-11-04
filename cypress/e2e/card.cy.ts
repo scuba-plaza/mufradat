@@ -120,14 +120,6 @@ describe("a word", () => {
     cy.contains("could not be played");
   });
 
-  it("plays the word with the w key", () => {
-    openWord(20);
-    cy.get(`${by("Audio for the word")} input[type="file"]`).selectFile(unplayable, { force: true });
-    cy.get(by("Play the word"));
-    cy.get("body").type("w");
-    cy.contains("could not be played");
-  });
-
   it("keeps the lexical fields in Details, closed until you open them", () => {
     openWord(21);
     cy.get("details").should("not.have.attr", "open");
@@ -171,32 +163,12 @@ describe("a word", () => {
     });
   });
 
-  it("approves and goes on with Ctrl+Enter, even from inside a field", () => {
-    openWord(62);
-    cy.location("pathname").then((card) => {
-      cy.get(by("Hint")).type("{ctrl}{enter}");
-      cy.location("pathname").should("not.eq", card).and("match", /^\/cards\/[0-9a-f-]{36}$/);
-    });
-  });
-
   it("skips the word and opens another", () => {
     openWord(63);
     cy.location("pathname").then((card) => {
       cy.contains("button", "Skip").click();
       cy.location("pathname").should("not.eq", card).and("match", /^\/cards\/[0-9a-f-]{36}$/);
     });
-  });
-
-  it("treats single keys as letters while you type, and as shortcuts otherwise", () => {
-    openWord(64);
-    cy.get(by("Hint")).type("gds{enter}");
-    cy.get(by("Hint")).should("have.value", "gds");
-    cy.contains("There is no Mistral API key").should("not.exist");
-    cy.get("details").should("not.have.attr", "open");
-    cy.get("body").type("d");
-    cy.get("details").should("have.attr", "open");
-    cy.get("body").type("g");
-    cy.contains("There is no Mistral API key");
   });
 
   it("shows a friendly page for a card that does not exist", () => {

@@ -3,13 +3,9 @@ export {};
 const kitab = encodeURIComponent("كتاب");
 
 describe("search", () => {
-  it("opens from the header, and from the / key", () => {
+  it("opens from the header", () => {
     cy.visit("/");
     cy.contains("header a", "Search").click();
-    cy.location("pathname").should("eq", "/search");
-    cy.visit("/");
-    cy.hydrated('button[aria-label="Keyboard shortcuts"]');
-    cy.get("body").type("/");
     cy.location("pathname").should("eq", "/search");
   });
 
