@@ -15,10 +15,14 @@ With Nix: `nix-build -E 'with import <nixpkgs> {}; callPackage ./nix/default.nix
 
 1. Press Continue on the home page to open the next word that is not approved, pick a word from the list (rank, Arabic, English, status), or search your cards and Wiktionary. Opening a word creates its bare card from Wiktionary; skipping a word puts it at the end of the queue.
 2. Edit the card where it is shown. Text saves when you leave it or press Enter. Regenerating never overwrites what you typed. The lexical fields (part of speech, gender, root, verb form) are under Details, closed until you open them. The forms are edited in a dialog: Edit forms.
-3. Optionally generate an example (Mistral), and generate or upload audio per clip (Google TTS, MP3 upload). A failure is shown under its text and changes nothing else. The bar at the bottom says what the card still needs.
+3. Optionally generate an example (Mistral), and generate or upload audio per clip (Google TTS, MP3 upload). A clip that has audio shows a play button and an options button with Generate again, Upload MP3… and Remove audio; removing a clip takes the card's approval back and leaves the audio file in place. A failure is shown under its text and changes nothing else. The bar at the bottom says what the card still needs.
    Mistral names the word of the card in its sentence and the app marks it, also when it is attached to another word (بِالْقَلَمِ) or has another ending. When the word cannot be told for certain the sentence is kept unmarked and the card says so: select the word and choose Mark target.
 4. Approve and next. Editing an approved card takes the approval back.
 5. Export to Anki: every approved card, written to `exports/` in the workspace. The same cards always give the same bytes.
+
+## Layout
+
+One centered column, 44rem wide on small screens and 58rem from 1024px up, where text, controls and spacing are about 1.2 times as large, the size that 120% zoom gives on a 1920×1200 screen at 100% zoom. The sizes are CSS variables in `src/app/globals.css`, set once and overridden once for the larger screens; browser zoom and the system text size still apply.
 
 ## Keyboard
 
