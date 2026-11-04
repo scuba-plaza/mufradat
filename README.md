@@ -14,7 +14,7 @@ With Nix: `nix-build -E 'with import <nixpkgs> {}; callPackage ./nix/default.nix
 ## The flow
 
 1. Press Continue on the home page to open the next word that is not approved, pick a word from the list (rank, Arabic, English, status), or search your cards and Wiktionary. Opening a word creates its bare card from Wiktionary; skipping a word puts it at the end of the queue.
-2. Edit the card where it is shown. Text saves when you leave it or press Enter. Regenerating never overwrites what you typed. The lexical fields (part of speech, gender, root, verb form, forms) are under Details, closed until you open them.
+2. Edit the card where it is shown. Text saves when you leave it or press Enter. Regenerating never overwrites what you typed. The lexical fields (part of speech, gender, root, verb form) are under Details, closed until you open them. The forms are edited in a dialog: Edit forms, or `f`.
 3. Optionally generate an example (Mistral), and generate or upload audio per clip (Google TTS, MP3 upload). A failure is shown under its text and changes nothing else. The bar at the bottom says what the card still needs.
    Mistral names the word of the card in its sentence and the app marks it, also when it is attached to another word (بِالْقَلَمِ) or has another ending. When the word cannot be told for certain the sentence is kept unmarked and the card says so: select the word and choose Mark target.
 4. Approve and next. Editing an approved card takes the approval back.
@@ -22,7 +22,7 @@ With Nix: `nix-build -E 'with import <nixpkgs> {}; callPackage ./nix/default.nix
 
 ## Keyboard
 
-`?` opens the list of shortcuts; `/` opens the search. On a word, Ctrl+Enter approves it and goes on, also from inside a field; while no field has focus, `g` generates an example, `w` and `e` play the word and the example, `d` shows or hides the details, `s` skips the word.
+`?` opens the list of shortcuts; `/` opens the search. On a word, Ctrl+Enter approves it and goes on, also from inside a field; while no field has focus, `g` generates an example, `w` and `e` play the word and the example, `f` edits the forms, `d` shows or hides the details, `s` skips the word.
 
 ## Pages
 
@@ -61,6 +61,6 @@ With Nix: `nix-build -E 'with import <nixpkgs> {}; callPackage ./nix/default.nix
 The specs run in one browser everywhere, locally and in CI: the Chrome for Testing version pinned in `cypress/browser.json`, which `pnpm e2e` downloads once into `~/.cache/mufradat/browsers`. To move to a newer Chrome, change that version; both places follow.
 Cypress downloads its own binary on `pnpm install`; on NixOS that and the downloaded Chrome need `nix-ld`. Set `CYPRESS_INSTALL_BINARY=0` to skip the download when only the unit tests are needed.
 
-The colours are CSS variables in `src/app/globals.css` (light, and dark under `prefers-color-scheme`) and the Tailwind names in `tailwind.config.js` point at them, so no component names a colour of its own. Fonts: Scheherazade New for Arabic (in `public/`, the Anki card uses it too) and Source Serif 4 for English text (`src/app/fonts/`, SIL Open Font License).
+The design follows the Notion design system: warm neutrals, soft surfaces, small corners and the system UI font. The colours are CSS variables in `src/app/globals.css` (light, and dark under `prefers-color-scheme`) and the Tailwind names in `tailwind.config.js` point at them, so no component names a colour of its own. Every text, border, focus and fill pair meets WCAG 2.2 AA in both schemes. Controls are 36px high and grow to 44px on touch screens. Arabic uses Scheherazade New (in `public/`, the Anki card uses it too).
 
 The card templates and CSS in `data/template/` are the note type "Arabic MSA Word"; the export test pins them.

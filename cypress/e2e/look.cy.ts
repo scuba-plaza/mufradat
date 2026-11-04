@@ -42,9 +42,4 @@ describe("the look of the pages", () => {
     cy.visit("/");
     cy.get(`${list} [lang="ar"]`).first().then(fontLoaded);
   });
-
-  it("loads the serif font that English text asks for", () => {
-    cy.visit("/");
-    cy.contains(`${list} > li`, "in, within").find("span.font-serif").first().then(fontLoaded);
-  });
 });

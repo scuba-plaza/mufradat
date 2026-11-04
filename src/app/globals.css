@@ -2,47 +2,90 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Colours as RGB triplets, so Tailwind can add opacity. Cool paper, ink, one blue for actions, one yellow for the word being learned. */
 :root {
   color-scheme: light dark;
-  --paper: 243 244 246;
-  --ink: 22 26 34;
-  --quiet: 89 96 109;
-  --rule: 213 217 224;
-  --lapis: 36 59 154;
-  --on-lapis: 255 255 255;
-  --saffron: 242 182 50;
-  --saffron-ink: 138 82 0;
-  --brick: 179 38 30;
+  --paper: 255 255 255;
+  --surface: 247 246 243;
+  --hover: 239 239 236;
+  --ink: 25 25 25;
+  --quiet: 107 106 103;
+  --rule: 227 226 224;
+  --rule-strong: 140 138 134;
+  --accent: 43 112 153;
+  --focus: 43 112 153;
+  --primary: 25 25 25;
+  --on-primary: 255 255 255;
+  --highlight: 248 231 160;
+  --warn: 154 91 0;
+  --danger: 193 63 58;
+  --progress: 43 112 153;
+  --ok-bg: 237 243 236;
+  --ok-ink: 47 107 75;
+  --wip-bg: 251 243 219;
+  --wip-ink: 122 82 0;
+  --radius-control: 4px;
+  --radius-surface: 6px;
+  --radius-modal: 8px;
+  --control-h: 36px;
+  --control-h-sm: 32px;
+  --row-h: 36px;
+  --t-fast: 120ms;
+  --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --shadow-modal: 0 12px 40px rgba(15, 15, 15, 0.12), 0 4px 12px rgba(15, 15, 15, 0.07);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: 16 19 25;
-    --ink: 233 236 242;
-    --quiet: 155 163 178;
-    --rule: 37 43 54;
-    --lapis: 142 162 255;
-    --on-lapis: 11 14 20;
-    --saffron-ink: 242 182 50;
-    --brick: 255 154 146;
+    --paper: 25 25 25;
+    --surface: 32 32 32;
+    --hover: 47 47 47;
+    --ink: 235 235 235;
+    --quiet: 155 155 155;
+    --rule: 44 44 44;
+    --rule-strong: 107 107 107;
+    --accent: 98 166 209;
+    --focus: 98 166 209;
+    --primary: 235 235 235;
+    --on-primary: 25 25 25;
+    --highlight: 90 74 18;
+    --warn: 242 201 76;
+    --danger: 229 115 115;
+    --progress: 98 166 209;
+    --ok-bg: 31 46 37;
+    --ok-ink: 108 187 143;
+    --wip-bg: 51 43 20;
+    --wip-ink: 242 201 76;
+    --shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.56), 0 4px 12px rgba(0, 0, 0, 0.36);
+  }
+}
+
+@media (pointer: coarse) {
+  :root {
+    --control-h: 44px;
+    --control-h-sm: 44px;
+    --row-h: 52px;
   }
 }
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
   body {
-    @apply bg-paper font-sans text-[15px] leading-6 text-ink antialiased;
+    @apply bg-paper font-sans text-ink antialiased;
+    font-size: 15px;
+    line-height: 1.5;
   }
   :focus-visible {
-    @apply outline outline-2 outline-offset-2 outline-lapis;
+    outline: 2px solid rgb(var(--focus));
+    outline-offset: 2px;
   }
   ::selection {
-    @apply bg-lapis/25;
+    background: rgb(var(--accent) / 0.25);
   }
-  /* The word being learned, marked like a highlighter: a band across the middle of the line, with no padding, so Arabic letters still join across its edges. */
   mark {
-    @apply text-inherit;
-    background: linear-gradient(transparent 22%, rgb(var(--saffron) / 0.4) 22% 82%, transparent 82%);
+    color: inherit;
+    background: linear-gradient(transparent 22%, rgb(var(--highlight)) 22% 82%, transparent 82%);
   }
   @media (prefers-reduced-motion: reduce) {
     * {
@@ -53,35 +96,170 @@
 }
 
 @layer components {
-  /* Arabic text; its size comes from text-ar-sm, -md, -lg or -xl, which also set the line height. */
   .ar {
     font-family: var(--font-arabic), serif;
     direction: rtl;
   }
-  /* A quiet text button or link. */
+
+  .topbar {
+    @apply bg-paper;
+  }
+  .topbar-inner {
+    @apply mx-auto flex max-w-[44rem] items-center justify-between px-5;
+    min-height: 48px;
+  }
+  .wordmark {
+    @apply -ml-2 px-2 py-1 font-semibold;
+    letter-spacing: -0.01em;
+    border-radius: var(--radius-control);
+  }
+
   .action {
-    @apply inline-flex items-center gap-1 rounded px-1 py-0.5 text-sm text-quiet underline-offset-4 hover:text-ink hover:underline disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap bg-transparent text-sm font-medium text-ink;
+    min-height: var(--control-h-sm);
+    padding: 0 0.75rem;
+    border: 1px solid rgb(var(--rule));
+    border-radius: var(--radius-control);
+    transition: background-color var(--t-fast) var(--ease);
   }
-  /* The one filled button on a screen. */
+  .action:hover {
+    background: rgb(var(--hover));
+  }
+  .action:disabled {
+    @apply cursor-not-allowed opacity-40;
+  }
+
+  .action-quiet {
+    @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium text-quiet;
+    min-height: var(--control-h-sm);
+    padding: 0 0.75rem;
+    border-radius: var(--radius-control);
+    transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+  }
+  .action-quiet:hover {
+    @apply text-ink;
+    background: rgb(var(--hover));
+  }
+
   .action-main {
-    @apply inline-flex items-center justify-center rounded-md bg-lapis px-4 py-2 text-sm font-medium text-on-lapis hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium text-on-primary;
+    min-height: var(--control-h);
+    padding: 0 1rem;
+    background: rgb(var(--primary));
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    transition: opacity var(--t-fast) var(--ease);
   }
-  /* A small single-line field in a form. */
+  .action-main:hover {
+    opacity: 0.88;
+  }
+  .action-main:disabled {
+    @apply cursor-not-allowed opacity-40;
+  }
+
   .field {
-    @apply border-b border-rule bg-transparent px-1 py-0.5 text-sm placeholder:text-quiet;
+    @apply w-full bg-surface text-sm text-ink;
+    min-height: var(--control-h);
+    padding: 0 0.75rem;
+    border: 1px solid rgb(var(--rule-strong));
+    border-radius: var(--radius-control);
+    transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
   }
-  /* Text edited where it is shown: it looks like text until hovered, and a blue line under it marks the focus. */
+  .field::placeholder {
+    @apply text-quiet;
+  }
+  .field:focus-visible {
+    outline: none;
+    border-color: rgb(var(--focus));
+    box-shadow: 0 0 0 1px rgb(var(--focus));
+  }
+
   .edit {
-    @apply w-full rounded-none border-b-2 border-transparent bg-transparent px-1 outline-none placeholder:text-quiet hover:border-rule focus:border-lapis;
+    @apply w-full bg-transparent;
+    padding-inline: 0.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    outline: none;
+    transition: background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
   }
-  /* A row of a list that is one link; the page lays out its columns. */
+  .edit::placeholder {
+    @apply text-quiet;
+  }
+  .edit:hover {
+    background: rgb(var(--hover));
+  }
+  .edit:focus {
+    @apply bg-paper;
+    border-color: rgb(var(--focus));
+    box-shadow: 0 0 0 1px rgb(var(--focus));
+  }
+  @media (hover: none) {
+    .edit {
+      border-bottom-color: rgb(var(--rule-strong));
+    }
+  }
+
+  .panel {
+    @apply bg-surface;
+    border-radius: var(--radius-surface);
+  }
+
+  .table-box {
+    overflow: hidden;
+    border-radius: var(--radius-surface);
+  }
+  .table-head {
+    @apply grid items-center gap-x-3 px-3 text-xs font-medium text-quiet;
+    min-height: 32px;
+    border-bottom: 1px solid rgb(var(--rule));
+    letter-spacing: 0.04em;
+  }
   .entry {
-    @apply grid items-center gap-x-3 px-2 py-0.5 hover:bg-ink/5;
+    @apply grid items-center gap-x-3 px-3;
+    min-height: var(--row-h);
+    border-radius: var(--radius-control);
+    transition: background-color var(--t-fast) var(--ease);
   }
+  .entry:hover {
+    background: rgb(var(--hover));
+  }
+
   .status {
-    @apply inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-quiet;
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-quiet;
   }
+  .status[data-status="approved"] {
+    color: rgb(var(--ok-ink));
+  }
+  .status[data-status="draft"],
+  .status[data-status="incomplete"] {
+    color: rgb(var(--wip-ink));
+  }
+  @media (min-width: 640px) {
+    .status {
+      padding: 0.125rem 0.5rem;
+      border-radius: var(--radius-control);
+    }
+    .status[data-status="approved"] {
+      background: rgb(var(--ok-bg));
+    }
+    .status[data-status="draft"],
+    .status[data-status="incomplete"] {
+      background: rgb(var(--wip-bg));
+    }
+    .status svg {
+      display: none;
+    }
+  }
+
   .keycap {
-    @apply inline-block min-w-6 rounded border border-b-2 border-rule px-1.5 py-0.5 text-center text-xs font-medium;
+    @apply inline-block min-w-6 bg-surface text-center text-xs font-medium text-ink;
+    padding: 0.125rem 0.375rem;
+    border: 1px solid rgb(var(--rule-strong));
+    border-bottom-width: 2px;
+    border-radius: 3px;
+  }
+
+  .num {
+    font-variant-numeric: tabular-nums;
   }
 }

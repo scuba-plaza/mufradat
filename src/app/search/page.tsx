@@ -16,13 +16,14 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
   const entries = lookup(q);
   return (
     <>
+      <h1 className="sr-only">Search</h1>
       <form action="/search" role="search" className="py-6">
         <input
           name="q"
           defaultValue={q}
           aria-label="Search"
           autoFocus
-          className="w-full border-b border-rule bg-transparent py-2 font-serif text-xl placeholder:text-quiet"
+          className="field py-2 text-xl"
           placeholder="Search your cards and Wiktionary, in Arabic or English"
         />
       </form>
@@ -32,11 +33,11 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
           {cards.length === 0 ? (
             <p className="px-2">Nothing matches.</p>
           ) : (
-            <div>
+            <div className="table-box">
               {cards.map((n) => (
                 <a key={n.id} href={`/cards/${n.id}`} className={row}>
                   <span className="ar justify-self-end text-ar-sm" lang="ar" dir="rtl">{n.lemma}</span>
-                  <span className="truncate font-serif">{n.english}</span>
+                  <span className="truncate">{n.english}</span>
                   <span className="flex items-center gap-3 text-xs text-quiet">{n.rank > 0 && n.rank}<StatusMark status={n.status} /></span>
                 </a>
               ))}
@@ -48,11 +49,11 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
           {entries.length === 0 ? (
             <p className="px-2">Nothing matches.</p>
           ) : (
-            <div>
+            <div className="table-box">
               {entries.map((e) => (
                 <a key={e.lemma + e.pos} href={`/open?lemma=${encodeURIComponent(e.lemma)}&pos=${e.pos}`} className={row}>
                   <span className="ar justify-self-end text-ar-sm" lang="ar" dir="rtl">{e.lemma}</span>
-                  <span className="truncate font-serif">{e.english}</span>
+                  <span className="truncate">{e.english}</span>
                   <span className="text-xs text-quiet">{e.pos}{e.rank ? `, rank ${e.rank}` : ""}</span>
                 </a>
               ))}

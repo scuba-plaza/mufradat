@@ -17,6 +17,7 @@ const GROUPS = [
       { keys: ["g"], does: "Generate an example" },
       { keys: ["w"], does: "Play the word" },
       { keys: ["e"], does: "Play the example" },
+      { keys: ["f"], does: "Edit the forms" },
       { keys: ["d"], does: "Show or hide the details" },
       { keys: ["s"], does: "Skip this word" },
     ],
@@ -45,14 +46,14 @@ export default function Shortcuts() {
 
   return (
     <>
-      <button className="action" aria-label="Keyboard shortcuts" onClick={() => dialog.current?.showModal()}>?</button>
+      <button className="action-quiet" aria-label="Keyboard shortcuts" onClick={() => dialog.current?.showModal()}>?</button>
       <dialog
         ref={dialog}
         aria-label="Keyboard shortcuts"
-        className="w-[calc(100%-2.5rem)] max-w-md rounded-lg border border-rule bg-paper p-6 text-ink backdrop:bg-ink/40"
+        className="w-[calc(100%-2.5rem)] max-w-md rounded-modal border border-rule bg-surface p-6 text-ink shadow-modal backdrop:bg-black/70"
         onClick={(e) => e.target === dialog.current && dialog.current.close()}
       >
-        <h2 className="font-serif text-xl">Keyboard shortcuts</h2>
+        <h2 className="text-xl font-semibold tracking-title">Keyboard shortcuts</h2>
         {GROUPS.map((group) => (
           <section key={group.title} className="mt-5">
             <h3 className="text-sm text-quiet">{group.title}</h3>

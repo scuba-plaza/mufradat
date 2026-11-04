@@ -19,7 +19,7 @@ export default function ActionBar(props: {
     <div className="fixed inset-x-0 bottom-0 border-t border-rule bg-paper">
       <div className="mx-auto max-w-[44rem] px-5">
         {props.problems.length > 0 && (
-          <ul role="alert" className="pt-2 text-sm text-brick">
+          <ul role="alert" className="pt-2 text-sm text-danger">
             {props.problems.map((p) => <li key={p}>{p}</li>)}
           </ul>
         )}

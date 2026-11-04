@@ -36,7 +36,7 @@ export default function ExampleText(props: { value: string; onSave: (v: string) 
     return (
       <>
         <div role="group" aria-label="Example">
-          <button type="button" onClick={() => setEditing(true)} onFocus={() => setEditing(true)} className="block w-full rounded px-1 text-center hover:bg-ink/5">
+          <button type="button" onClick={() => setEditing(true)} onFocus={() => setEditing(true)} className="block min-h-control w-full rounded-control px-1 text-center hover:bg-hover">
             {draft === "" ? (
               <span className="text-sm text-quiet">Add an example, or generate one</span>
             ) : (
@@ -47,7 +47,7 @@ export default function ExampleText(props: { value: string; onSave: (v: string) 
           </button>
         </div>
         {draft !== "" && !parts && (
-          <p className="mt-1 text-sm text-saffron-ink">It is not clear which word to highlight. Click the sentence, select the word and choose Mark target.</p>
+          <p className="mt-1 text-sm text-warn">It is not clear which word to highlight. Click the sentence, select the word and choose Mark target.</p>
         )}
       </>
     );
@@ -68,7 +68,7 @@ export default function ExampleText(props: { value: string; onSave: (v: string) 
           e.preventDefault();
           e.currentTarget.blur();
         }}
-        className="edit ar resize-none border-lapis text-center text-ar-lg"
+        className="edit ar resize-none text-center text-ar-lg"
       />
       <p className="mt-1 flex flex-wrap items-center justify-center gap-x-3 text-sm text-quiet">
         <span>Select the word you are teaching, or put it in [square brackets].</span>

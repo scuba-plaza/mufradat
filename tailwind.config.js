@@ -6,11 +6,26 @@ module.exports = {
   theme: {
     extend: {
       colors: Object.fromEntries(
-        ["paper", "ink", "quiet", "rule", "lapis", "on-lapis", "saffron", "saffron-ink", "brick"].map((name) => [name, token(name)]),
+        [
+          "paper", "surface", "hover", "ink", "quiet", "rule", "rule-strong", "accent", "focus", "primary", "on-primary",
+          "highlight", "warn", "danger", "progress", "ok-bg", "ok-ink", "wip-bg", "wip-ink",
+        ].map((name) => [name, token(name)]),
       ),
       fontFamily: {
-        serif: ["var(--font-serif)", "Georgia", "serif"],
+        sans: [
+          "ui-sans-serif", "-apple-system", "BlinkMacSystemFont", '"Segoe UI"', "Helvetica", "Arial", "sans-serif",
+          '"Apple Color Emoji"', '"Segoe UI Emoji"',
+        ],
       },
+      letterSpacing: { title: "-0.01em" },
+      borderRadius: {
+        control: "var(--radius-control)",
+        surface: "var(--radius-surface)",
+        modal: "var(--radius-modal)",
+      },
+      boxShadow: { modal: "var(--shadow-modal)" },
+      minHeight: { control: "var(--control-h)", "control-sm": "var(--control-h-sm)" },
+      minWidth: { "control-sm": "var(--control-h-sm)" },
       // Arabic with its vowel marks needs more line height than Latin text of the same size, so every
       // Arabic size carries its own: rows and fields, a hero word, a sentence, and the headword of a card.
       fontSize: {

@@ -7,6 +7,7 @@ import { api, post } from "./api";
 import Clip from "./Clip";
 import Details from "./Details";
 import ExampleText from "./ExampleText";
+import FormsDialog from "./FormsDialog";
 import InlineText from "./InlineText";
 import { keyIsShortcut } from "./typing";
 
@@ -20,6 +21,7 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
   const [exampleBusy, setExampleBusy] = useState(false);
   const [exampleProblem, setExampleProblem] = useState("");
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [formsOpen, setFormsOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const skipForm = useRef<HTMLFormElement>(null);
   const queue = useRef<Promise<void>>(Promise.resolve());
@@ -87,6 +89,10 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
       if (e.key === "g") generateExample();
       else if (e.key === "w") play("the word");
       else if (e.key === "e") play("the example");
+      else if (e.key === "f") {
+        e.preventDefault();
+        setFormsOpen(true);
+      }
       else if (e.key === "d") setDetailsOpen((open) => !open);
       else if (e.key === "s") skipForm.current?.requestSubmit();
     }
@@ -100,6 +106,7 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
 
   return (
     <div className="pb-36">
+      <h1 className="sr-only">{note.lemma}</h1>
       <div className="flex items-center justify-between gap-4 px-1 py-2 text-sm text-quiet">
         <span>{note.rank > 0 ? `Word ${note.rank} of ${total}` : ""}</span>
         <span role="status">{SAVE_TEXT[saved]}</span>
@@ -108,35 +115,46 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
       <div className="mt-8 text-center">
         <InlineText label="Arabic headword" value={note.lemma} arabic className="text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
         {clip("word", "the word", note.lemma)}
-        <InlineText label="English meaning" placeholder="Add the English meaning" value={note.english} className="mt-2 text-center font-serif text-2xl" onSave={(english) => save({ english })} />
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-quiet">
-          <span>{POS_LABELS[note.pos]}</span>
-          {note.forms.map((f) => (
-            <span key={f.id} className="inline-flex items-center gap-2">
-              {f.label}
-              <span className="ar text-ar-sm text-ink" lang="ar" dir="rtl">{f.arabic}</span>
-              {clip(f.id, f.label, f.arabic)}
-            </span>
-          ))}
-        </div>
-        <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-6 text-center font-serif text-quiet" onSave={(hint) => save({ hint })} />
+        <InlineText label="English meaning" placeholder="Add the English meaning" value={note.english} className="mt-2 text-center text-2xl font-medium tracking-title" onSave={(english) => save({ english })} />
+        <p className="mt-3 text-sm text-quiet">{POS_LABELS[note.pos]}</p>
+        {note.forms.length > 0 ? (
+          <section aria-label="Forms" className="panel mx-auto mt-5 max-w-lg px-4 py-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-medium text-quiet">Forms</h2>
+              <button className="action-quiet" aria-haspopup="dialog" onClick={() => setFormsOpen(true)}>Edit forms</button>
+            </div>
+            <div className="mt-2 flex flex-wrap items-start justify-center gap-x-8 gap-y-3">
+              {note.forms.map((f) => (
+                <div key={f.id} className="flex flex-col items-center">
+                  <span className="text-xs text-quiet">{f.label}</span>
+                  <span className="ar text-ar-sm" lang="ar" dir="rtl">{f.arabic}</span>
+                  <Clip readOnly note={note} slot={f.id} name={f.label} text={f.arabic} onNote={setNote} />
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : (
+          <button className="action mt-4" aria-haspopup="dialog" onClick={() => setFormsOpen(true)}>Add forms</button>
+        )}
+        <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-6 text-center text-quiet" onSave={(hint) => save({ hint })} />
       </div>
 
       <div className="mt-12 text-center">
         <ExampleText value={note.example} onSave={(example) => save({ example })} />
         {note.example.trim() !== "" && (
           <>
-            <InlineText label="Example in English" placeholder="Add the English translation" value={note.exampleEn} className="mt-2 text-center font-serif text-lg" onSave={(exampleEn) => save({ exampleEn })} />
+            <InlineText label="Example in English" placeholder="Add the English translation" value={note.exampleEn} className="mt-2 text-center text-lg" onSave={(exampleEn) => save({ exampleEn })} />
             {clip("example", "the example", plainExample(note.example))}
           </>
         )}
         <button className="action mt-6" disabled={exampleBusy} onClick={generateExample}>
           {exampleBusy ? "Asking Mistral…" : note.example ? "New example" : "Generate example"}
         </button>
-        {(exampleProblem || note.exampleError) && <p className="mt-1 text-sm text-brick">{exampleProblem || note.exampleError}</p>}
+        {(exampleProblem || note.exampleError) && <p className="mt-1 text-sm text-danger">{exampleProblem || note.exampleError}</p>}
       </div>
 
       <Details note={note} open={detailsOpen} onToggle={setDetailsOpen} save={save} />
+      <FormsDialog note={note} open={formsOpen} onClose={() => setFormsOpen(false)} save={save} onNote={setNote} />
       <ActionBar note={note} problems={problems} leaving={leaving} onApprove={approve} skipForm={skipForm} />
     </div>
   );

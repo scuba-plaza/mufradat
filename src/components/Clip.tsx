@@ -10,6 +10,7 @@ export default function Clip(props: {
   name: string;
   text: string;
   onNote: (n: Note) => void;
+  readOnly?: boolean;
 }) {
   const { note, slot, name, text } = props;
   const clip = note.audio[slot];
@@ -50,17 +51,31 @@ export default function Clip(props: {
     <button className="action" disabled={busy} onClick={() => file.current?.click()}>Upload</button>
   );
 
+  if (props.readOnly) {
+    return (
+      <span role="group" aria-label={`Audio for ${name}`} className="inline-flex min-h-control-sm items-center gap-1">
+        {has && (
+          <button className="action-quiet min-w-control-sm px-2" aria-label={`Play ${name}`} onClick={play}>
+            <svg viewBox="0 0 10 10" width="12" height="12" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>
+          </button>
+        )}
+        {needsWork && <span className="text-xs text-warn">{has ? "outdated" : "no audio"}</span>}
+        {problem && <span role="alert" className="text-xs text-danger">{problem}</span>}
+      </span>
+    );
+  }
+
   return (
     <div role="group" aria-label={`Audio for ${name}`} className="flex flex-col items-center gap-0.5">
-      <div className="flex items-center gap-3 text-sm">
+      <div className="flex items-center gap-2 text-sm">
         {has && (
-          <button className="action p-2" aria-label={`Play ${name}`} onClick={play}>
+          <button className="action min-w-control-sm px-2" aria-label={`Play ${name}`} onClick={play}>
             <svg viewBox="0 0 10 10" width="12" height="12" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>
           </button>
         )}
         {needsWork ? (
           <>
-            {has && <span className="text-saffron-ink">Audio is out of date</span>}
+            {has && <span className="text-warn">Audio is out of date</span>}
             {generate}{upload}
           </>
         ) : (
@@ -82,7 +97,7 @@ export default function Clip(props: {
           if (f) run(() => api(`/api/audio/${note.id}/${slot}`, { method: "PUT", body: f }));
         }}
       />
-      {(problem || clip?.error) && <p className="text-sm text-brick">{problem || clip?.error}</p>}
+      {(problem || clip?.error) && <p className="text-sm text-danger">{problem || clip?.error}</p>}
     </div>
   );
 }
