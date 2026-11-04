@@ -14,15 +14,11 @@ With Nix: `nix-build -E 'with import <nixpkgs> {}; callPackage ./nix/default.nix
 ## The flow
 
 1. Press Continue on the home page to open the next word that is not approved, pick a word from the list (rank, Arabic, English, status), or search your cards and Wiktionary. Opening a word creates its bare card from Wiktionary; skipping a word puts it at the end of the queue.
-2. Edit the card where it is shown. Text saves when you leave it or press Enter. Regenerating never overwrites what you typed. The lexical fields (part of speech, gender, root, verb form) are under Details, closed until you open them. The forms are edited in a dialog: Edit forms, or `f`.
+2. Edit the card where it is shown. Text saves when you leave it or press Enter. Regenerating never overwrites what you typed. The lexical fields (part of speech, gender, root, verb form) are under Details, closed until you open them. The forms are edited in a dialog: Edit forms.
 3. Optionally generate an example (Mistral), and generate or upload audio per clip (Google TTS, MP3 upload). A failure is shown under its text and changes nothing else. The bar at the bottom says what the card still needs.
    Mistral names the word of the card in its sentence and the app marks it, also when it is attached to another word (بِالْقَلَمِ) or has another ending. When the word cannot be told for certain the sentence is kept unmarked and the card says so: select the word and choose Mark target.
 4. Approve and next. Editing an approved card takes the approval back.
 5. Export to Anki: every approved card, written to `exports/` in the workspace. The same cards always give the same bytes.
-
-## Keyboard
-
-`?` opens the list of shortcuts; `/` opens the search. On a word, Ctrl+Enter approves it and goes on, also from inside a field; while no field has focus, `g` generates an example, `w` and `e` play the word and the example, `f` edits the forms, `d` shows or hides the details, `s` skips the word.
 
 ## Pages
 

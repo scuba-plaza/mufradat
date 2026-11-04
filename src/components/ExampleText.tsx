@@ -64,7 +64,7 @@ export default function ExampleText(props: { value: string; onSave: (v: string) 
         onChange={(e) => setDraft(e.target.value)}
         onBlur={leave}
         onKeyDown={(e) => {
-          if (e.key !== "Enter" || e.ctrlKey || e.metaKey || e.nativeEvent.isComposing) return;
+          if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
           e.preventDefault();
           e.currentTarget.blur();
         }}

@@ -1,4 +1,3 @@
-import type { RefObject } from "react";
 import { skipWord } from "@/app/actions";
 import { missingParts } from "@/lib/missing";
 import type { Note } from "@/lib/types";
@@ -10,7 +9,6 @@ export default function ActionBar(props: {
   problems: string[];
   leaving: boolean;
   onApprove: () => void;
-  skipForm: RefObject<HTMLFormElement | null>;
 }) {
   const { note } = props;
   const approved = note.status === "approved";
@@ -33,7 +31,7 @@ export default function ActionBar(props: {
           ) : (
             <div className="flex items-center gap-3">
               {note.rank > 0 && (
-                <form ref={props.skipForm} action={skipWord}>
+                <form action={skipWord}>
                   <input type="hidden" name="rank" value={note.rank} />
                   <button className="action">Skip</button>
                 </form>

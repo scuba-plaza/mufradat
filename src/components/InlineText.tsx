@@ -19,7 +19,7 @@ export default function InlineText(props: {
       placeholder={props.placeholder}
       onChange={(e) => setV(e.target.value)}
       onBlur={() => v !== props.value && props.onSave(v)}
-      onKeyDown={(e) => e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.nativeEvent.isComposing && e.currentTarget.blur()}
+      onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && e.currentTarget.blur()}
       className={`edit ${props.arabic ? "ar" : ""} ${props.className ?? ""}`}
       {...(props.arabic ? { lang: "ar", dir: "rtl" } : {})}
     />

@@ -251,14 +251,6 @@
     }
   }
 
-  .keycap {
-    @apply inline-block min-w-6 bg-surface text-center text-xs font-medium text-ink;
-    padding: 0.125rem 0.375rem;
-    border: 1px solid rgb(var(--rule-strong));
-    border-bottom-width: 2px;
-    border-radius: 3px;
-  }
-
   .num {
     font-variant-numeric: tabular-nums;
   }

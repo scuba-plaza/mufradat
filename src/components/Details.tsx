@@ -5,13 +5,11 @@ import InlineText from "./InlineText";
 /** What a card needs rarely changed: its kind of word, gender, root and verb form. Closed until asked for. */
 export default function Details(props: {
   note: Note;
-  open: boolean;
-  onToggle: (open: boolean) => void;
   save: (patch: Record<string, unknown>) => void;
 }) {
   const { note, save } = props;
   return (
-    <details open={props.open} onToggle={(e) => props.onToggle(e.currentTarget.open)} className="mt-12 text-sm">
+    <details className="mt-12 text-sm">
       <summary className="-ml-2 inline-flex min-h-control-sm cursor-pointer items-center rounded-control px-2 text-quiet hover:bg-hover hover:text-ink">Details</summary>
       <div className="mt-4 grid max-w-sm gap-4">
         <label className="grid gap-1">

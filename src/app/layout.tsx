@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import Shortcuts from "@/components/Shortcuts";
 import "./globals.css";
 
 export const metadata: Metadata = { title: { default: "Mufradat", template: "%s · Mufradat" } };
@@ -18,7 +17,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <a href="/" className="wordmark">Mufradat</a>
             <nav className="flex items-center gap-2">
               <a href="/search" className="action-quiet">Search</a>
-              <Shortcuts />
             </nav>
           </div>
         </header>

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { POS_LABELS, type Note } from "@/lib/types";
 import { plainExample } from "@/lib/validate";
 import ActionBar from "./ActionBar";
@@ -9,7 +9,6 @@ import Details from "./Details";
 import ExampleText from "./ExampleText";
 import FormsDialog from "./FormsDialog";
 import InlineText from "./InlineText";
-import { keyIsShortcut } from "./typing";
 
 const SAVE_TEXT = { idle: "", saving: "Saving…", saved: "Saved", failed: "Not saved" };
 
@@ -20,10 +19,8 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
   const [problems, setProblems] = useState<string[]>([]);
   const [exampleBusy, setExampleBusy] = useState(false);
   const [exampleProblem, setExampleProblem] = useState("");
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [formsOpen, setFormsOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
-  const skipForm = useRef<HTMLFormElement>(null);
   const queue = useRef<Promise<void>>(Promise.resolve());
 
   /** Changes happen one at a time, in the order they were made, so that approving never overtakes a save. */
@@ -74,31 +71,6 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
       }
     });
   }
-
-  const play = (name: string) => document.querySelector<HTMLButtonElement>(`button[aria-label="Play ${name}"]`)?.click();
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        // Leaving the field first lets it save what was typed before the approval is sent.
-        (document.activeElement as HTMLElement | null)?.blur();
-        return approve();
-      }
-      if (!keyIsShortcut(e)) return;
-      if (e.key === "g") generateExample();
-      else if (e.key === "w") play("the word");
-      else if (e.key === "e") play("the example");
-      else if (e.key === "f") {
-        e.preventDefault();
-        setFormsOpen(true);
-      }
-      else if (e.key === "d") setDetailsOpen((open) => !open);
-      else if (e.key === "s") skipForm.current?.requestSubmit();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
 
   const clip = (slot: string, name: string, text: string) => (
     <Clip note={note} slot={slot} name={name} text={text} onNote={setNote} />
@@ -153,9 +125,9 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
         {(exampleProblem || note.exampleError) && <p className="mt-1 text-sm text-danger">{exampleProblem || note.exampleError}</p>}
       </div>
 
-      <Details note={note} open={detailsOpen} onToggle={setDetailsOpen} save={save} />
+      <Details note={note} save={save} />
       <FormsDialog note={note} open={formsOpen} onClose={() => setFormsOpen(false)} save={save} onNote={setNote} />
-      <ActionBar note={note} problems={problems} leaving={leaving} onApprove={approve} skipForm={skipForm} />
+      <ActionBar note={note} problems={problems} leaving={leaving} onApprove={approve} />
     </div>
   );
 }
