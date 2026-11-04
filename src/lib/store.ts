@@ -171,12 +171,16 @@ export function openStore(dir: string) {
     return touch(id);
   }
 
-  /** Stores a clip for the word, the example or one form. Failures leave the previous clip alone. */
-  function setAudio(id: string, slot: Slot, bytes: Uint8Array, source: AudioSource): Note {
-    const n = need(id);
+  function needSlot(n: Note, slot: Slot): void {
     if (!(slot === "word" || slot === "example" || n.forms.some((f) => f.id === slot))) {
       throw new Error("That audio slot does not belong to this card.");
     }
+  }
+
+  /** Stores a clip for the word, the example or one form. Failures leave the previous clip alone. */
+  function setAudio(id: string, slot: Slot, bytes: Uint8Array, source: AudioSource): Note {
+    const n = need(id);
+    needSlot(n, slot);
     const problem = mp3Problem(bytes);
     if (problem) throw new Error(problem);
     const key = audioKey(bytes);
@@ -188,6 +192,14 @@ export function openStore(dir: string) {
       `INSERT INTO audio (note_id, slot, key, source, text, error) VALUES (?, ?, ?, ?, ?, NULL)
        ON CONFLICT (note_id, slot) DO UPDATE SET key = excluded.key, source = excluded.source, text = excluded.text, error = NULL`,
     ).run(id, slot, key, source, text);
+    return touch(id);
+  }
+
+  function removeAudio(id: string, slot: Slot): Note {
+    const n = need(id);
+    needSlot(n, slot);
+    if (!n.audio[slot]?.key) return n;
+    db.prepare("DELETE FROM audio WHERE note_id = ? AND slot = ?").run(id, slot);
     return touch(id);
   }
 
@@ -272,7 +284,7 @@ export function openStore(dir: string) {
   }
 
   return {
-    root, findNote, approvedNotes, rankedCards, close: () => db.close(), skipRank, nextRank, search, getNote, createNote, updateNote, setAudio, setAudioError, setExampleError,
+    root, findNote, approvedNotes, rankedCards, close: () => db.close(), skipRank, nextRank, search, getNote, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
     applyGeneratedExample, approve,
   };
 }

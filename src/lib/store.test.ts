@@ -2,6 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { audioPath } from "./audio";
+import { missingParts } from "./missing";
 import { openStore } from "./store";
 
 const mp3 = Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]);
@@ -155,6 +157,61 @@ describe("audio", () => {
     const withForm = s.setAudio(n.id, n.forms[0].id, mp3, "tts");
     expect(withForm.audio[n.forms[0].id].key).not.toBeNull();
     expect(() => s.setAudio(m.id, n.forms[0].id, mp3, "tts")).toThrow(/slot/);
+  });
+
+  describe("removing a clip", () => {
+    const approvedWithClips = () => {
+      const s = openStore(":memory:");
+      const n = s.createNote({ ...kitab, forms: [] });
+      s.updateNote(n.id, { example: "هٰذَا [كِتَابٌ] جَمِيلٌ", exampleEn: "this is a nice book" });
+      s.setAudio(n.id, "word", mp3, "tts");
+      s.setAudio(n.id, "example", other, "tts");
+      s.approve(n.id);
+      return { s, id: n.id };
+    };
+
+    it("takes the card back from approved and reports the audio as missing again", () => {
+      const { s, id } = approvedWithClips();
+      const removed = s.removeAudio(id, "word");
+      expect(removed.audio.word).toBeUndefined();
+      expect(removed.audio.example.key).not.toBeNull();
+      expect(removed.status).toBe("incomplete");
+      expect(missingParts(removed)).toEqual(["audio for the word"]);
+    });
+
+    it("keeps the audio file, which another card may share", () => {
+      const { s, id } = approvedWithClips();
+      const sibling = s.createNote({ ...kitab, lemma: "قَلَم", forms: [] });
+      const key = s.setAudio(sibling.id, "word", mp3, "tts").audio.word.key!;
+      s.removeAudio(id, "word");
+      expect(fs.existsSync(audioPath(s.root, key))).toBe(true);
+      expect(s.getNote(sibling.id)!.audio.word.key).toBe(key);
+    });
+
+    it("forgets a failure message together with the clip", () => {
+      const { s, id } = approvedWithClips();
+      s.setAudioError(id, "word", "Google rejected the credentials (401).");
+      expect(s.removeAudio(id, "word").audio.word).toBeUndefined();
+    });
+
+    it("changes nothing when the slot has no clip", () => {
+      const { s, id } = approvedWithClips();
+      const empty = s.createNote({ ...kitab, lemma: "قَلَم", forms: [] });
+      s.updateNote(empty.id, { example: "هٰذَا [قَلَمٌ] جَمِيلٌ", exampleEn: "this is a nice pen" });
+      s.approve(empty.id);
+      const before = s.getNote(empty.id)!;
+      expect(s.removeAudio(empty.id, "word")).toEqual(before);
+      expect(s.getNote(id)!.status).toBe("approved");
+    });
+
+    it("refuses a slot that belongs to another card", () => {
+      const s = openStore(":memory:");
+      const n = s.createNote(kitab);
+      const m = s.createNote({ ...kitab, lemma: "قَلَم" });
+      s.setAudio(n.id, n.forms[0].id, mp3, "tts");
+      expect(() => s.removeAudio(m.id, n.forms[0].id)).toThrow("That audio slot does not belong to this card.");
+      expect(s.getNote(n.id)!.audio[n.forms[0].id].key).not.toBeNull();
+    });
   });
 
   it("keeps a failed example generation visible and clears it on success", () => {
