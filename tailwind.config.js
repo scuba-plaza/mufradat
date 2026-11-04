@@ -48,7 +48,7 @@ module.exports = {
         "ar-sm": ["var(--ar-sm)", "1.4"],
         "ar-md": ["var(--ar-md)", "1.7"],
         "ar-lg": ["var(--ar-lg)", "1.8"],
-        "ar-xl": ["var(--ar-xl)", "1.7"],
+        "ar-xl": ["var(--ar-xl)", "1.5"],
       },
     },
   },

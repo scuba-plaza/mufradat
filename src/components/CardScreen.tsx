@@ -85,7 +85,7 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
       </div>
 
       <div className="mt-6 text-center">
-        <InlineText label="Arabic headword" value={note.lemma} arabic className="text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
+        <InlineText label="Arabic headword" value={note.lemma} arabic className="mb-2 text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
         {clip("word", "the word", note.lemma)}
         <InlineText label="English meaning" placeholder="Add the English meaning" value={note.english} className="mt-2 text-center text-2xl font-medium tracking-title" onSave={(english) => save({ english })} />
         {note.forms.length > 0 ? (

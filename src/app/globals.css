@@ -252,11 +252,11 @@
   .edit:focus {
     @apply bg-paper;
     border-color: rgb(var(--focus));
-    box-shadow: 0 0 0 1px rgb(var(--focus));
+    box-shadow: inset 0 0 0 1px rgb(var(--focus));
   }
   @media (hover: none) {
     .edit {
-      border-bottom-color: rgb(var(--rule-strong));
+      background: rgb(var(--hover));
     }
   }
 
