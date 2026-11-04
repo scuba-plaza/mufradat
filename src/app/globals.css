@@ -147,7 +147,8 @@
     min-height: var(--topbar-h);
   }
   .wordmark {
-    @apply -ml-2 px-2 py-1 font-semibold;
+    @apply -ml-2 inline-flex items-center px-2 font-semibold;
+    min-height: var(--control-h-sm);
     letter-spacing: -0.01em;
     border-radius: var(--radius-control);
   }
@@ -257,6 +258,11 @@
   @media (hover: none) {
     .edit {
       background: rgb(var(--hover));
+    }
+  }
+  @media (pointer: coarse) {
+    .edit {
+      min-height: var(--control-h);
     }
   }
 

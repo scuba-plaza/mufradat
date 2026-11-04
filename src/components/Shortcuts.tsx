@@ -7,7 +7,7 @@ export default function Shortcuts() {
 
   return (
     <>
-      <button className="action-quiet" aria-label="Keyboard shortcuts" onClick={() => dialog.current?.showModal()}>?</button>
+      <button className="action-quiet min-w-control-sm" aria-label="Keyboard shortcuts" onClick={() => dialog.current?.showModal()}>?</button>
       <dialog
         ref={dialog}
         aria-label="Keyboard shortcuts"
