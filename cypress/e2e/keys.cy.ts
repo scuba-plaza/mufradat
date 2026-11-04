@@ -1,0 +1,103 @@
+export {};
+
+const by = (label: string) => `[aria-label="${label}"]`;
+const unplayable = { contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]), fileName: "clip.mp3", mimeType: "audio/mpeg" };
+const help = 'button[aria-label="Keyboard shortcuts"]';
+
+function openWord(rank: number) {
+  cy.visit(`/open?rank=${rank}`);
+  cy.hydrated(by("Hint"));
+}
+
+describe("the keys of a card", () => {
+  it("goes to the next word with Ctrl+→", () => {
+    openWord(90);
+    cy.get("body").type("{ctrl}{rightarrow}");
+    cy.contains("Word 91 of 5000");
+  });
+
+  it("goes to the previous word with Ctrl+←", () => {
+    openWord(92);
+    cy.get("body").type("{ctrl}{leftarrow}");
+    cy.contains("Word 91 of 5000");
+  });
+
+  it("leaves the card it goes from as it was", () => {
+    openWord(93);
+    cy.location("pathname").then((card) => {
+      cy.get("body").type("{ctrl}{rightarrow}");
+      cy.contains("Word 94 of 5000");
+      cy.visit(card);
+      cy.contains("button", "Skip");
+      cy.contains("button", "Approve and next");
+    });
+  });
+
+  it("stays on the first word on Ctrl+←, and on the last on Ctrl+→", () => {
+    for (const [rank, keys] of [[1, "{ctrl}{leftarrow}"], [5000, "{ctrl}{rightarrow}"]] as const) {
+      openWord(rank);
+      cy.location("pathname").then((card) => {
+        cy.get("body").type(keys);
+        cy.wait(300);
+        cy.contains(`Word ${rank} of 5000`);
+        cy.location("pathname").should("eq", card);
+      });
+    }
+  });
+
+  it("plays the word with Ctrl+↑", () => {
+    openWord(94);
+    cy.get(`${by("Audio for the word")} input[type="file"]`).selectFile(unplayable, { force: true });
+    cy.get(by("Play the word"));
+    cy.get("body").type("{ctrl}{uparrow}");
+    cy.get(by("Audio for the word")).should("contain", "could not be played");
+  });
+
+  it("plays the example with Ctrl+↓", () => {
+    openWord(95);
+    cy.get(by("Example")).click();
+    cy.get(`textarea${by("Example")}`).type("الْكِتَابُ [فِي] الْحَقِيبَةِ").blur();
+    cy.get(`${by("Audio for the example")} input[type="file"]`).selectFile(unplayable, { force: true });
+    cy.get(by("Play the example"));
+    cy.get("body").type("{ctrl}{downarrow}");
+    cy.get(by("Audio for the example")).should("contain", "could not be played");
+  });
+
+  it("does not act on them while a field has focus", () => {
+    openWord(96);
+    cy.location("pathname").then((card) => {
+      cy.get(by("Hint")).type("a hint{ctrl}{rightarrow}");
+      cy.wait(300);
+      cy.location("pathname").should("eq", card);
+      cy.get(by("Hint")).should("have.value", "a hint");
+    });
+  });
+
+  it("does not act on them while a dialog is open", () => {
+    openWord(97);
+    cy.location("pathname").then((card) => {
+      cy.contains("button", "forms").click();
+      cy.get("dialog[open]");
+      cy.get("body").type("{ctrl}{rightarrow}");
+      cy.wait(300);
+      cy.location("pathname").should("eq", card);
+    });
+  });
+});
+
+describe("the list of keys", () => {
+  it("opens from the ? button in the header, lists each key, and closes with Close", () => {
+    cy.visit("/");
+    cy.hydrated(help);
+    cy.get("dialog[open]").should("not.exist");
+    cy.get(help).click();
+    cy.get("dialog[open]").within(() => {
+      cy.contains("Previous word").parent().should("contain", "Ctrl").and("contain", "←");
+      cy.contains("Next word").parent().should("contain", "Ctrl").and("contain", "→");
+      cy.contains("Play the word").parent().should("contain", "Ctrl").and("contain", "↑");
+      cy.contains("Play the example").parent().should("contain", "Ctrl").and("contain", "↓");
+      cy.contains("button", "Close").click();
+    });
+    cy.get("dialog[open]").should("not.exist");
+  });
+});

@@ -20,6 +20,10 @@ With Nix: `nix-build -E 'with import <nixpkgs> {}; callPackage ./nix/default.nix
 4. Approve and next. Editing an approved card takes the approval back.
 5. Export to Anki: every approved card, written to `exports/` in the workspace. The same cards always give the same bytes.
 
+## Keyboard
+
+On a word, while no field has focus and no dialog is open: Ctrl+← and Ctrl+→ open the previous and the next word of the frequency list, leaving the current one as it is, Ctrl+↑ plays the word and Ctrl+↓ plays the example. The keys are matched by their position, so they work in any keyboard layout. The ? button in the top bar lists them.
+
 ## Pages
 
 - `/` the frequency list, 100 words a page, with the next word on top. It opens on that word's page; `/?page=N` is a page and `/?rank=N` is the page of a rank, with its row marked

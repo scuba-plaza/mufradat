@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Note } from "@/lib/types";
 import { plainExample } from "@/lib/validate";
 import ActionBar from "./ActionBar";
@@ -9,6 +9,7 @@ import Details from "./Details";
 import ExampleText from "./ExampleText";
 import FormsDialog from "./FormsDialog";
 import InlineText from "./InlineText";
+import { keyPressed } from "./keys";
 
 const SAVE_TEXT = { idle: "", saving: "Saving…", saved: "Saved", failed: "Not saved" };
 
@@ -71,6 +72,22 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
       }
     });
   }
+
+  useEffect(() => {
+    const play = (name: string) => document.querySelector<HTMLButtonElement>(`button[aria-label="Play ${name}"]`)?.click();
+    const go = (rank: number) => later(async () => window.location.assign(`/open?rank=${rank}`));
+    function onKey(e: KeyboardEvent) {
+      const key = keyPressed(e);
+      if (!key) return;
+      e.preventDefault();
+      if (key === "previous" && note.rank > 1) go(note.rank - 1);
+      else if (key === "next" && note.rank > 0 && note.rank < total) go(note.rank + 1);
+      else if (key === "playWord") play("the word");
+      else if (key === "playExample") play("the example");
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [note.rank, total]);
 
   const clip = (slot: string, name: string, text: string) => (
     <Clip note={note} slot={slot} name={name} text={text} onNote={setNote} />
