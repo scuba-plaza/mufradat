@@ -47,19 +47,21 @@ export default function ActionBar(props: {
             <StatusMark status={note.status} />
             {!approved && <span>{missing.length > 0 ? `Still needs ${missing.join(", ")}` : "Ready to approve"}</span>}
           </p>
-          {approved ? (
-            <a href="/next" className="action-main">Next</a>
-          ) : (
-            <div className="flex items-center gap-3">
-              {note.rank > 0 && (
-                <form action={skipWord}>
-                  <input type="hidden" name="rank" value={note.rank} />
-                  <button className="action">Skip</button>
-                </form>
-              )}
-              <button className="action-main" disabled={props.leaving} onClick={props.onApprove}>Approve and next</button>
-            </div>
-          )}
+          <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto">
+            {approved ? (
+              <a href="/next" className="action-main col-start-2 w-full sm:w-44">Next</a>
+            ) : (
+              <>
+                {note.rank > 0 && (
+                  <form action={skipWord} className="contents">
+                    <input type="hidden" name="rank" value={note.rank} />
+                    <button className="action min-h-control w-full sm:w-44">Skip</button>
+                  </form>
+                )}
+                <button className="action-main col-start-2 w-full sm:w-44" disabled={props.leaving} onClick={props.onApprove}>Approve and next</button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
