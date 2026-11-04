@@ -10,6 +10,25 @@ function openWord(rank: number) {
 }
 
 describe("the layout of a card", () => {
+  describe("the forms panel", () => {
+    const minimumGap = 4;
+
+    for (const [width, height] of [[1920, 1100], [390, 844]]) {
+      it(`keeps each label clear of its Arabic at ${width}px`, () => {
+        cy.viewport(width, height);
+        openWord(6);
+        cy.get(`${by("Forms")} .ar`).should(($forms) => {
+          expect($forms.length).to.be.at.least(2);
+          $forms.each((_, form) => {
+            const label = form.previousElementSibling!;
+            const gap = form.getBoundingClientRect().top - label.getBoundingClientRect().bottom;
+            expect(gap, `gap between the label ${label.textContent} and its Arabic`).to.be.at.least(minimumGap);
+          });
+        });
+      });
+    }
+  });
+
   describe("the headword and its audio", () => {
     const minimumGap = 8;
     let rank = 70;

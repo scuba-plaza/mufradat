@@ -98,7 +98,7 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
               {note.forms.map((f) => (
                 <div key={f.id} className="flex flex-col items-center">
                   <span className="text-xs text-quiet">{f.label}</span>
-                  <span className="ar text-ar-sm" lang="ar" dir="rtl">{f.arabic}</span>
+                  <span className="ar mt-1 text-ar-stacked" lang="ar" dir="rtl">{f.arabic}</span>
                   <Clip readOnly note={note} slot={f.id} name={f.label} text={f.arabic} onNote={setNote} />
                 </div>
               ))}

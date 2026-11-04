@@ -19,9 +19,14 @@ export default function ActionBar(props: {
     const el = box.current;
     if (!el) return;
     const root = document.documentElement.style;
-    const watch = new ResizeObserver(() => root.setProperty("--bar-h", `${el.offsetHeight}px`));
+    let frame = 0;
+    const watch = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => root.setProperty("--bar-h", `${el.offsetHeight}px`));
+    });
     watch.observe(el);
     return () => {
+      cancelAnimationFrame(frame);
       watch.disconnect();
       root.removeProperty("--bar-h");
     };

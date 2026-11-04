@@ -46,6 +46,7 @@ module.exports = {
         xl: ["var(--text-xl)", "1.4"],
         "2xl": ["var(--text-2xl)", "1.3333"],
         "ar-sm": ["var(--ar-sm)", "1.4"],
+        "ar-stacked": ["var(--ar-sm)", "1.9"],
         "ar-md": ["var(--ar-md)", "1.7"],
         "ar-lg": ["var(--ar-lg)", "1.8"],
         "ar-xl": ["var(--ar-xl)", "1.5"],
