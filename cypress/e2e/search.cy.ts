@@ -19,6 +19,17 @@ describe("search", () => {
     cy.title().should("eq", "Search: كتاب · Mufradat");
   });
 
+  it("sets the Arabic typed into the search box in the Arabic font", () => {
+    cy.visit("/search");
+    cy.get('input[aria-label="Search"]').then(($input) => {
+      const win = $input[0].ownerDocument.defaultView!;
+      const families = (list: string) => list.split(",").map((family) => family.replace(/["']/g, "").trim());
+      const [arabic] = families(win.getComputedStyle(win.document.documentElement).getPropertyValue("--font-arabic"));
+      expect(arabic).to.not.equal("");
+      expect(families(win.getComputedStyle($input[0]).fontFamily)).to.include(arabic);
+    });
+  });
+
   it("says how many results each group has and says so when there are none", () => {
     cy.visit("/search?q=zzz");
     cy.contains("h2", "Your cards (0)");

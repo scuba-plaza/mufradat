@@ -23,7 +23,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
           defaultValue={q}
           aria-label="Search"
           autoFocus
-          className="field py-2 text-xl"
+          className="field py-2 text-ar-sm"
           placeholder="Search your cards and Wiktionary, in Arabic or English"
         />
       </form>

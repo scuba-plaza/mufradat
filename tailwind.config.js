@@ -14,7 +14,7 @@ module.exports = {
       fontFamily: {
         sans: [
           "ui-sans-serif", "-apple-system", "BlinkMacSystemFont", '"Segoe UI"', "Helvetica", "Arial", "sans-serif",
-          '"Apple Color Emoji"', '"Segoe UI Emoji"',
+          '"Apple Color Emoji"', '"Segoe UI Emoji"', "var(--font-arabic)",
         ],
       },
       letterSpacing: { title: "-0.01em" },
