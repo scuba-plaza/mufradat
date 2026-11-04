@@ -77,14 +77,14 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
   );
 
   return (
-    <div className="pb-36">
+    <div className="pb-[var(--bar-h)]">
       <h1 className="sr-only">{note.lemma}</h1>
-      <div className="flex items-center justify-between gap-4 px-1 py-2 text-sm text-quiet">
+      <div className="flex items-center justify-between gap-4 px-1 py-1 text-sm text-quiet">
         <span>{note.rank > 0 ? `Word ${note.rank} of ${total}` : ""}</span>
         <span role="status">{SAVE_TEXT[saved]}</span>
       </div>
 
-      <div className="mt-8 text-center">
+      <div className="mt-6 text-center">
         <InlineText label="Arabic headword" value={note.lemma} arabic className="text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
         {clip("word", "the word", note.lemma)}
         <InlineText label="English meaning" placeholder="Add the English meaning" value={note.english} className="mt-2 text-center text-2xl font-medium tracking-title" onSave={(english) => save({ english })} />
@@ -107,10 +107,10 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
         ) : (
           <button className="action mt-4" aria-haspopup="dialog" onClick={() => setFormsOpen(true)}>Add forms</button>
         )}
-        <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-6 text-center text-quiet" onSave={(hint) => save({ hint })} />
+        <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-5 text-center text-quiet" onSave={(hint) => save({ hint })} />
       </div>
 
-      <div className="mt-12 text-center">
+      <div className="mt-10 text-center">
         <ExampleText value={note.example} onSave={(example) => save({ example })} />
         {note.example.trim() !== "" && (
           <>
@@ -118,7 +118,7 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
             {clip("example", "the example", plainExample(note.example))}
           </>
         )}
-        <button className="action mt-6" disabled={exampleBusy} onClick={generateExample}>
+        <button className="action mt-5" disabled={exampleBusy} onClick={generateExample}>
           {exampleBusy ? "Asking Mistral…" : note.example ? "New example" : "Generate example"}
         </button>
         {(exampleProblem || note.exampleError) && <p className="mt-1 text-sm text-danger">{exampleProblem || note.exampleError}</p>}

@@ -27,7 +27,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
           placeholder="Search your cards and Wiktionary, in Arabic or English"
         />
       </form>
-      <div className="space-y-8">
+      <div className="space-y-8 pb-8">
         <section>
           <h2 className="mb-1 px-2 text-sm text-quiet">Your cards ({cards.length})</h2>
           {cards.length === 0 ? (

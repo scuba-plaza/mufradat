@@ -30,7 +30,7 @@ export default function FormsDialog(props: {
       aria-labelledby="forms-title"
       onClose={props.onClose}
       onClick={(e) => e.target === dialog.current && props.onClose()}
-      className="max-h-[90vh] w-[calc(100%-2.5rem)] max-w-2xl overflow-y-auto rounded-modal border border-rule bg-surface p-0 text-ink shadow-modal backdrop:bg-black/70"
+      className="max-h-[90vh] w-[calc(100%-2.5rem)] max-w-column overflow-y-auto rounded-modal border border-rule bg-surface p-0 text-ink shadow-modal backdrop:bg-black/70"
     >
       <div className="p-6">
         <h2 id="forms-title" className="flex items-baseline gap-3 text-xl font-semibold tracking-title">

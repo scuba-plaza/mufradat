@@ -1,3 +1,5 @@
+"use client";
+import { useEffect, useRef } from "react";
 import { skipWord } from "@/app/actions";
 import { missingParts } from "@/lib/missing";
 import type { Note } from "@/lib/types";
@@ -11,17 +13,31 @@ export default function ActionBar(props: {
   onApprove: () => void;
 }) {
   const { note } = props;
+  const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const root = document.documentElement.style;
+    const watch = new ResizeObserver(() => root.setProperty("--bar-h", `${el.offsetHeight}px`));
+    watch.observe(el);
+    return () => {
+      watch.disconnect();
+      root.removeProperty("--bar-h");
+    };
+  }, []);
+
   const approved = note.status === "approved";
   const missing = missingParts(note);
   return (
-    <div className="fixed inset-x-0 bottom-0 border-t border-rule bg-paper">
-      <div className="mx-auto max-w-[44rem] px-5">
+    <div ref={box} className="fixed inset-x-0 bottom-0 border-t border-rule bg-paper">
+      <div className="mx-auto max-w-column px-5">
         {props.problems.length > 0 && (
           <ul role="alert" className="pt-2 text-sm text-danger">
             {props.problems.map((p) => <li key={p}>{p}</li>)}
           </ul>
         )}
-        <div role="toolbar" aria-label="Card actions" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+        <div role="toolbar" aria-label="Card actions" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2">
           <p className="flex min-w-0 flex-1 items-center gap-2 text-sm text-quiet">
             <StatusMark status={note.status} />
             {!approved && <span>{missing.length > 0 ? `Still needs ${missing.join(", ")}` : "Ready to approve"}</span>}

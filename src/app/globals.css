@@ -26,9 +26,23 @@
   --radius-control: 4px;
   --radius-surface: 6px;
   --radius-modal: 8px;
+  --space: 1;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --ar-sm: 1.5rem;
+  --ar-md: 2.25rem;
+  --ar-lg: clamp(1.75rem, 7vw, 2.5rem);
+  --ar-xl: clamp(3rem, 14vw, 4.5rem);
+  --column: 44rem;
+  --topbar-h: 48px;
   --control-h: 36px;
   --control-h-sm: 32px;
   --row-h: 36px;
+  --bar-h: 5rem;
   --t-fast: 120ms;
   --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
   --shadow-modal: 0 12px 40px rgba(15, 15, 15, 0.12), 0 4px 12px rgba(15, 15, 15, 0.07);
@@ -59,6 +73,30 @@
   }
 }
 
+@media (min-width: 1024px) {
+  :root {
+    --radius-control: 5px;
+    --radius-surface: 7px;
+    --radius-modal: 9px;
+    --space: 1.2;
+    --text-xs: 0.875rem;
+    --text-sm: 1rem;
+    --text-base: 1.125rem;
+    --text-lg: 1.375rem;
+    --text-xl: 1.5rem;
+    --text-2xl: 1.8125rem;
+    --ar-sm: 1.8125rem;
+    --ar-md: 2.6875rem;
+    --ar-lg: clamp(1.75rem, 7vw, 3rem);
+    --ar-xl: clamp(3rem, 14vw, 5.375rem);
+    --column: 58rem;
+    --topbar-h: 56px;
+    --control-h: 44px;
+    --control-h-sm: 40px;
+    --row-h: 44px;
+  }
+}
+
 @media (pointer: coarse) {
   :root {
     --control-h: 44px;
@@ -73,7 +111,7 @@
   }
   body {
     @apply bg-paper font-sans text-ink antialiased;
-    font-size: 15px;
+    font-size: var(--text-base);
     line-height: 1.5;
   }
   :focus-visible {
@@ -105,8 +143,8 @@
     @apply bg-paper;
   }
   .topbar-inner {
-    @apply mx-auto flex max-w-[44rem] items-center justify-between px-5;
-    min-height: 48px;
+    @apply mx-auto flex max-w-column items-center justify-between px-5;
+    min-height: var(--topbar-h);
   }
   .wordmark {
     @apply -ml-2 px-2 py-1 font-semibold;
@@ -115,9 +153,8 @@
   }
 
   .action {
-    @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap bg-transparent text-sm font-medium text-ink;
+    @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap bg-transparent px-3 text-sm font-medium text-ink;
     min-height: var(--control-h-sm);
-    padding: 0 0.75rem;
     border: 1px solid rgb(var(--rule));
     border-radius: var(--radius-control);
     transition: background-color var(--t-fast) var(--ease);
@@ -130,9 +167,8 @@
   }
 
   .action-quiet {
-    @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium text-quiet;
+    @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap px-3 text-sm font-medium text-quiet;
     min-height: var(--control-h-sm);
-    padding: 0 0.75rem;
     border-radius: var(--radius-control);
     transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
   }
@@ -142,9 +178,8 @@
   }
 
   .action-main {
-    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium text-on-primary;
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap px-4 text-sm font-medium text-on-primary;
     min-height: var(--control-h);
-    padding: 0 1rem;
     background: rgb(var(--primary));
     border: 1px solid transparent;
     border-radius: var(--radius-control);
@@ -158,9 +193,9 @@
   }
 
   .options {
+    @apply p-1;
     position-area: bottom;
     margin: 0.25rem 0 0;
-    padding: 0.25rem;
     color: rgb(var(--ink));
     background: rgb(var(--paper));
     border: 1px solid rgb(var(--rule-strong));
@@ -172,9 +207,8 @@
     flex-direction: column;
   }
   .options-item {
-    @apply flex w-full items-center whitespace-nowrap bg-transparent text-left text-sm font-medium text-ink;
+    @apply flex w-full items-center whitespace-nowrap bg-transparent px-3 text-left text-sm font-medium text-ink;
     min-height: var(--control-h-sm);
-    padding: 0 0.75rem;
     border-radius: var(--radius-control);
     transition: background-color var(--t-fast) var(--ease);
   }
@@ -186,9 +220,9 @@
   }
 
   .field {
-    @apply w-full bg-surface text-sm text-ink;
+    @apply w-full bg-surface px-3 text-ink;
+    font-size: 1rem;
     min-height: var(--control-h);
-    padding: 0 0.75rem;
     border: 1px solid rgb(var(--rule-strong));
     border-radius: var(--radius-control);
     transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
@@ -203,8 +237,7 @@
   }
 
   .edit {
-    @apply w-full bg-transparent;
-    padding-inline: 0.5rem;
+    @apply w-full bg-transparent px-2;
     border: 1px solid transparent;
     border-radius: var(--radius-control);
     outline: none;
@@ -238,7 +271,7 @@
   }
   .table-head {
     @apply grid items-center gap-x-3 px-3 text-xs font-medium text-quiet;
-    min-height: 32px;
+    min-height: calc(2rem * var(--space));
     border-bottom: 1px solid rgb(var(--rule));
     letter-spacing: 0.04em;
   }
@@ -264,7 +297,7 @@
   }
   @media (min-width: 640px) {
     .status {
-      padding: 0.125rem 0.5rem;
+      @apply px-2 py-0.5;
       border-radius: var(--radius-control);
     }
     .status[data-status="approved"] {
