@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { POS_LABELS, type Note } from "@/lib/types";
+import type { Note } from "@/lib/types";
 import { plainExample } from "@/lib/validate";
 import ActionBar from "./ActionBar";
 import { api, post } from "./api";
@@ -88,7 +88,6 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
         <InlineText label="Arabic headword" value={note.lemma} arabic className="text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
         {clip("word", "the word", note.lemma)}
         <InlineText label="English meaning" placeholder="Add the English meaning" value={note.english} className="mt-2 text-center text-2xl font-medium tracking-title" onSave={(english) => save({ english })} />
-        <p className="mt-3 text-sm text-quiet">{POS_LABELS[note.pos]}</p>
         {note.forms.length > 0 ? (
           <section aria-label="Forms" className="panel mx-auto mt-5 max-w-lg px-4 py-3">
             <div className="flex items-center justify-between">

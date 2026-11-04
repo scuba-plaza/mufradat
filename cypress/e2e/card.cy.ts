@@ -23,8 +23,10 @@ describe("a word", () => {
     openWord(3);
     cy.get(by("Arabic headword")).should("have.value", "عَلَى");
     cy.get(by("English meaning")).should("have.value", "on, over");
-    cy.contains("preposition");
     cy.contains("Word 3 of 5000");
+    cy.contains("p", "preposition").should("not.exist");
+    cy.contains("summary", "Details").click();
+    cy.contains("label", "Part of speech").find("select option:selected").should("have.text", "preposition");
   });
 
   it("says Saving… and then Saved when a field is edited", () => {
