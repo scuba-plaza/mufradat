@@ -157,6 +157,34 @@
     @apply cursor-not-allowed opacity-40;
   }
 
+  .options {
+    position-area: bottom;
+    margin: 0.25rem 0 0;
+    padding: 0.25rem;
+    color: rgb(var(--ink));
+    background: rgb(var(--paper));
+    border: 1px solid rgb(var(--rule-strong));
+    border-radius: var(--radius-surface);
+    box-shadow: var(--shadow-modal);
+  }
+  .options:popover-open {
+    display: flex;
+    flex-direction: column;
+  }
+  .options-item {
+    @apply flex w-full items-center whitespace-nowrap bg-transparent text-left text-sm font-medium text-ink;
+    min-height: var(--control-h-sm);
+    padding: 0 0.75rem;
+    border-radius: var(--radius-control);
+    transition: background-color var(--t-fast) var(--ease);
+  }
+  .options-item:hover {
+    background: rgb(var(--hover));
+  }
+  .options-item:disabled {
+    @apply cursor-not-allowed opacity-40;
+  }
+
   .field {
     @apply w-full bg-surface text-sm text-ink;
     min-height: var(--control-h);

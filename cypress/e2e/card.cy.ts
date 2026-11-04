@@ -120,6 +120,117 @@ describe("a word", () => {
     cy.contains("could not be played");
   });
 
+  describe("the audio of the word", () => {
+    const word = by("Audio for the word");
+    const options = by("Audio options for the word");
+    const menu = `${word} [popover]`;
+    const another = { ...unplayable, contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 9, 9, 9, 9]) };
+
+    /** The browser closes a popover on a key press it trusts, which a key that Cypress sends does not count as. */
+    function pressEscape() {
+      for (const type of ["keyDown", "keyUp"]) {
+        cy.then(() => Cypress.automation("remote:debugger:protocol", {
+          command: "Input.dispatchKeyEvent",
+          params: { type, key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 },
+        }));
+      }
+    }
+
+    function openWordWithAudio(rank: number) {
+      openWord(rank);
+      cy.get(`${word} input[type="file"]`).selectFile(unplayable, { force: true });
+      cy.get(options);
+    }
+
+    it("offers Generate and Upload while there is no audio", () => {
+      openWord(40);
+      cy.get(word).contains("button", "Generate");
+      cy.get(word).contains("button", "Upload");
+      cy.get(options).should("not.exist");
+    });
+
+    it("shows the play button and one options button once there is audio, with no Generate in sight", () => {
+      openWordWithAudio(41);
+      cy.get(`${word} button:visible`).should("have.length", 2);
+      cy.get(`${word} button:visible`).first().should("have.attr", "aria-label", "Play the word");
+      cy.get(`${word} button:visible`).last().should("have.attr", "aria-label", "Audio options for the word");
+      cy.get(menu).should("not.be.visible");
+    });
+
+    it("lists exactly Generate again, Upload MP3… and Remove audio", () => {
+      openWordWithAudio(42);
+      cy.get(options).click();
+      cy.get(menu).should("be.visible");
+      cy.get(`${menu} button`).should("have.length", 3).then(($items) => {
+        expect($items.toArray().map((item) => item.textContent)).to.deep.equal(["Generate again", "Upload MP3…", "Remove audio"]);
+      });
+    });
+
+    it("closes on Escape and puts the focus back on the options button", () => {
+      openWordWithAudio(43);
+      cy.get(options).click();
+      cy.get(`${menu} button`).first().focus();
+      pressEscape();
+      cy.get(menu).should("not.be.visible");
+      cy.focused().should("have.attr", "aria-label", "Audio options for the word");
+    });
+
+    it("keeps the clip, closes, and says why when generating again fails", () => {
+      openWordWithAudio(44);
+      cy.get(options).click();
+      cy.contains(`${menu} button`, "Generate again").click();
+      cy.contains("There are no Google credentials");
+      cy.get(menu).should("not.be.visible");
+      cy.get(by("Play the word"));
+    });
+
+    it("replaces the clip when another MP3 is uploaded", () => {
+      cy.intercept("PUT", "/api/audio/*/word").as("put");
+      openWordWithAudio(45);
+      cy.wait("@put").its("response.body.note.audio.word.key").then((first) => {
+        cy.get(`${word} input[type="file"]`).selectFile(another, { force: true });
+        cy.wait("@put").its("response.body.note.audio.word").should((clip) => {
+          expect(clip.source).to.equal("user");
+          expect(clip.key).to.not.equal(first);
+        });
+      });
+    });
+
+    it("removes the clip, and the bar says the word needs audio again", () => {
+      openWordWithAudio(46);
+      cy.get(bar).should("not.contain", "audio for the word");
+      cy.get(options).click();
+      cy.contains(`${menu} button`, "Remove audio").click();
+      cy.get(bar).should("contain", "Still needs").and("contain", "audio for the word");
+      cy.get(options).should("not.exist");
+      cy.get(by("Play the word")).should("not.exist");
+      cy.get(word).contains("button", "Generate");
+      cy.reload();
+      cy.get(word).contains("button", "Upload");
+    });
+
+    it("shows Generate again beside the warning when the Arabic has changed", () => {
+      openWordWithAudio(47);
+      cy.hydrated(by("Hint"));
+      cy.get(by("Arabic headword")).clear().type("قَلَمٌ").blur();
+      cy.get(status).should("contain", "Saved");
+      cy.get(word).should("contain", "Audio is out of date");
+      cy.get(word).contains("button", "Generate again").should("be.visible");
+      cy.get(options).should("be.visible");
+    });
+
+    it("disables the controls and says it is working while it works", () => {
+      cy.intercept("POST", "/api/tts", (req) => req.reply({ delay: 800, statusCode: 400, body: { error: "Busy." } }));
+      openWordWithAudio(48);
+      cy.get(options).click();
+      cy.contains(`${menu} button`, "Generate again").click();
+      cy.get(word).should("contain", "Working…");
+      cy.get(options).should("be.disabled");
+      cy.get(word).should("not.contain", "Working…");
+      cy.get(options).should("be.enabled");
+    });
+  });
+
   it("keeps the lexical fields in Details, closed until you open them", () => {
     openWord(21);
     cy.get("details").should("not.have.attr", "open");
