@@ -1,0 +1,143 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import { POS_LABELS, type Note } from "@/lib/types";
+import { plainExample } from "@/lib/validate";
+import ActionBar from "./ActionBar";
+import { api, post } from "./api";
+import Clip from "./Clip";
+import Details from "./Details";
+import ExampleText from "./ExampleText";
+import InlineText from "./InlineText";
+import { keyIsShortcut } from "./typing";
+
+const SAVE_TEXT = { idle: "", saving: "Saving…", saved: "Saved", failed: "Not saved" };
+
+/** One word as its card: the text is edited where it is shown, and the actions stay in the bar below. */
+export default function CardScreen({ initial, total }: { initial: Note; total: number }) {
+  const [note, setNote] = useState(initial);
+  const [saved, setSaved] = useState<keyof typeof SAVE_TEXT>("idle");
+  const [problems, setProblems] = useState<string[]>([]);
+  const [exampleBusy, setExampleBusy] = useState(false);
+  const [exampleProblem, setExampleProblem] = useState("");
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const skipForm = useRef<HTMLFormElement>(null);
+  const queue = useRef<Promise<void>>(Promise.resolve());
+
+  /** Changes happen one at a time, in the order they were made, so that approving never overtakes a save. */
+  const later = (work: () => Promise<void>) => {
+    queue.current = queue.current.then(work);
+  };
+
+  function save(patch: Record<string, unknown>) {
+    setSaved("saving");
+    later(async () => {
+      try {
+        setNote((await api<{ note: Note }>(`/api/notes/${note.id}`, {
+          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch),
+        })).note);
+        setProblems([]);
+        setSaved("saved");
+      } catch (e) {
+        setProblems([(e as Error).message]);
+        setSaved("failed");
+      }
+    });
+  }
+
+  function generateExample() {
+    if (exampleBusy) return;
+    setExampleBusy(true);
+    setExampleProblem("");
+    later(async () => {
+      try {
+        setNote((await post<{ note: Note }>("/api/mistral", { id: note.id })).note);
+      } catch (e) {
+        setExampleProblem((e as Error).message);
+      } finally {
+        setExampleBusy(false);
+      }
+    });
+  }
+
+  function approve() {
+    setLeaving(true);
+    later(async () => {
+      try {
+        await post(`/api/notes/${note.id}/approve`, {});
+        window.location.assign("/next");
+      } catch (e) {
+        setLeaving(false);
+        setProblems((e as Error & { errors?: string[] }).errors ?? [(e as Error).message]);
+      }
+    });
+  }
+
+  const play = (name: string) => document.querySelector<HTMLButtonElement>(`button[aria-label="Play ${name}"]`)?.click();
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        // Leaving the field first lets it save what was typed before the approval is sent.
+        (document.activeElement as HTMLElement | null)?.blur();
+        return approve();
+      }
+      if (!keyIsShortcut(e)) return;
+      if (e.key === "g") generateExample();
+      else if (e.key === "w") play("the word");
+      else if (e.key === "e") play("the example");
+      else if (e.key === "d") setDetailsOpen((open) => !open);
+      else if (e.key === "s") skipForm.current?.requestSubmit();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const clip = (slot: string, name: string, text: string) => (
+    <Clip note={note} slot={slot} name={name} text={text} onNote={setNote} />
+  );
+
+  return (
+    <div className="pb-36">
+      <div className="flex items-center justify-between gap-4 px-1 py-2 text-sm text-quiet">
+        <span>{note.rank > 0 ? `Word ${note.rank} of ${total}` : ""}</span>
+        <span role="status">{SAVE_TEXT[saved]}</span>
+      </div>
+
+      <div className="mt-8 text-center">
+        <InlineText label="Arabic headword" value={note.lemma} arabic className="text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
+        {clip("word", "the word", note.lemma)}
+        <InlineText label="English meaning" placeholder="Add the English meaning" value={note.english} className="mt-2 text-center font-serif text-2xl" onSave={(english) => save({ english })} />
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-quiet">
+          <span>{POS_LABELS[note.pos]}</span>
+          {note.forms.map((f) => (
+            <span key={f.id} className="inline-flex items-center gap-2">
+              {f.label}
+              <span className="ar text-ar-sm text-ink" lang="ar" dir="rtl">{f.arabic}</span>
+              {clip(f.id, f.label, f.arabic)}
+            </span>
+          ))}
+        </div>
+        <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-6 text-center font-serif text-quiet" onSave={(hint) => save({ hint })} />
+      </div>
+
+      <div className="mt-12 text-center">
+        <ExampleText value={note.example} onSave={(example) => save({ example })} />
+        {note.example.trim() !== "" && (
+          <>
+            <InlineText label="Example in English" placeholder="Add the English translation" value={note.exampleEn} className="mt-2 text-center font-serif text-lg" onSave={(exampleEn) => save({ exampleEn })} />
+            {clip("example", "the example", plainExample(note.example))}
+          </>
+        )}
+        <button className="action mt-6" disabled={exampleBusy} onClick={generateExample}>
+          {exampleBusy ? "Asking Mistral…" : note.example ? "New example" : "Generate example"}
+        </button>
+        {(exampleProblem || note.exampleError) && <p className="mt-1 text-sm text-brick">{exampleProblem || note.exampleError}</p>}
+      </div>
+
+      <Details note={note} open={detailsOpen} onToggle={setDetailsOpen} save={save} />
+      <ActionBar note={note} problems={problems} leaving={leaving} onApprove={approve} skipForm={skipForm} />
+    </div>
+  );
+}

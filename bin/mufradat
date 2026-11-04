@@ -1,0 +1,5 @@
+#!/bin/sh
+# Starts the local web server and prints its address.
+root=$(dirname "$(dirname "$(readlink -f "$0")")")
+cd "$root" || exit 1
+exec node node_modules/next/dist/bin/next start -H 127.0.0.1

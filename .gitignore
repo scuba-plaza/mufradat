@@ -1,0 +1,8 @@
+node_modules
+.next
+result
+*.tsbuildinfo
+next-env.d.ts
+cypress/videos
+cypress/downloads
+cypress/screenshots

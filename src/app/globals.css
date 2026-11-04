@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Colours as RGB triplets, so Tailwind can add opacity. Cool paper, ink, one blue for actions, one yellow for the word being learned. */
+:root {
+  color-scheme: light dark;
+  --paper: 243 244 246;
+  --ink: 22 26 34;
+  --quiet: 89 96 109;
+  --rule: 213 217 224;
+  --lapis: 36 59 154;
+  --on-lapis: 255 255 255;
+  --saffron: 242 182 50;
+  --saffron-ink: 138 82 0;
+  --brick: 179 38 30;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: 16 19 25;
+    --ink: 233 236 242;
+    --quiet: 155 163 178;
+    --rule: 37 43 54;
+    --lapis: 142 162 255;
+    --on-lapis: 11 14 20;
+    --saffron-ink: 242 182 50;
+    --brick: 255 154 146;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-paper font-sans text-[15px] leading-6 text-ink antialiased;
+  }
+  :focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-lapis;
+  }
+  ::selection {
+    @apply bg-lapis/25;
+  }
+  /* The word being learned, marked like a highlighter: a band across the middle of the line, with no padding, so Arabic letters still join across its edges. */
+  mark {
+    @apply text-inherit;
+    background: linear-gradient(transparent 22%, rgb(var(--saffron) / 0.4) 22% 82%, transparent 82%);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      scroll-behavior: auto !important;
+      transition: none !important;
+    }
+  }
+}
+
+@layer components {
+  /* Arabic text; its size comes from text-ar-sm, -md, -lg or -xl, which also set the line height. */
+  .ar {
+    font-family: var(--font-arabic), serif;
+    direction: rtl;
+  }
+  /* A quiet text button or link. */
+  .action {
+    @apply inline-flex items-center gap-1 rounded px-1 py-0.5 text-sm text-quiet underline-offset-4 hover:text-ink hover:underline disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  /* The one filled button on a screen. */
+  .action-main {
+    @apply inline-flex items-center justify-center rounded-md bg-lapis px-4 py-2 text-sm font-medium text-on-lapis hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  /* A small single-line field in a form. */
+  .field {
+    @apply border-b border-rule bg-transparent px-1 py-0.5 text-sm placeholder:text-quiet;
+  }
+  /* Text edited where it is shown: it looks like text until hovered, and a blue line under it marks the focus. */
+  .edit {
+    @apply w-full rounded-none border-b-2 border-transparent bg-transparent px-1 outline-none placeholder:text-quiet hover:border-rule focus:border-lapis;
+  }
+  /* A row of a list that is one link; the page lays out its columns. */
+  .entry {
+    @apply grid items-center gap-x-3 px-2 py-0.5 hover:bg-ink/5;
+  }
+  .status {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-quiet;
+  }
+  .keycap {
+    @apply inline-block min-w-6 rounded border border-b-2 border-rule px-1.5 py-0.5 text-center text-xs font-medium;
+  }
+}
