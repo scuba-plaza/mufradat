@@ -8,7 +8,6 @@ const columnRem = 58;
 
 const px = (value: string) => parseFloat(value);
 
-/** A card with four forms, a marked example with its translation, and a clip for every text, as it looks when it is finished. */
 function openFullCard(rank: number) {
   cy.visit(`/open?rank=${rank}`);
   cy.location("pathname").then((path) => {

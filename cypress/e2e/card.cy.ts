@@ -128,7 +128,6 @@ describe("a word", () => {
     const menu = `${word} [popover]`;
     const another = { ...unplayable, contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 9, 9, 9, 9]) };
 
-    /** The browser closes a popover on a key press it trusts, which a key that Cypress sends does not count as. */
     function pressEscape() {
       for (const type of ["keyDown", "keyUp"]) {
         cy.then(() => Cypress.automation("remote:debugger:protocol", {

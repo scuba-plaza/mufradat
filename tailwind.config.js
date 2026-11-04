@@ -35,7 +35,6 @@ module.exports = {
       },
       minHeight: { control: "var(--control-h)", "control-sm": "var(--control-h-sm)" },
       minWidth: { "control-sm": "var(--control-h-sm)" },
-      // The sizes are variables, set once in globals.css, so the larger screens get the larger sizes without a prefix on every class.
       // Arabic with its vowel marks needs more line height than Latin text of the same size, so every
       // Arabic size carries its own: rows and fields, a hero word, a sentence, and the headword of a card.
       fontSize: {
