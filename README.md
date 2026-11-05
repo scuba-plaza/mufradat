@@ -9,7 +9,7 @@ Nothing is generated or paid for unless you press the button for it.
     PORT=3100 mufradat  # another port
 
 From a checkout (Node 24 and the pnpm in `packageManager`): `pnpm install && pnpm build && ./bin/mufradat`.
-With Nix: `nix-build -E 'with import <nixpkgs> {}; callPackage ./nix/default.nix {}'`.
+With Nix: `nix build`; the flake's `overlays.default` adds `mufradat` to nixpkgs.
 
 ## The flow
 
