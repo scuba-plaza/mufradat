@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FocusEvent } from "react";
 import { plainExample, splitExample } from "@/lib/validate";
 
 /** The example sentence: shown with its target word marked, and edited in the same place as `[target]` markup. */
@@ -16,7 +16,8 @@ export default function ExampleText(props: { value: string; onSave: (v: string) 
     el.setSelectionRange(el.value.length, el.value.length);
   }, [editing]);
 
-  function leave() {
+  function leave(e: FocusEvent<HTMLDivElement>) {
+    if (e.currentTarget.contains(e.relatedTarget)) return;
     setEditing(false);
     if (draft !== props.value) props.onSave(draft);
   }
@@ -53,7 +54,7 @@ export default function ExampleText(props: { value: string; onSave: (v: string) 
     );
   }
   return (
-    <div>
+    <div onBlur={leave}>
       <textarea
         ref={box}
         aria-label="Example"
@@ -62,7 +63,6 @@ export default function ExampleText(props: { value: string; onSave: (v: string) 
         lang="ar"
         dir="rtl"
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={leave}
         onKeyDown={(e) => {
           if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
           e.preventDefault();

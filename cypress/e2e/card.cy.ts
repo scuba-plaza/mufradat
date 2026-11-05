@@ -65,6 +65,28 @@ describe("a word", () => {
     cy.get(`${by("Example")} mark`).should("have.text", "فِي");
   });
 
+  it("lets Tab move on from the example, by way of Mark target", () => {
+    openWord(24);
+    cy.get(by("Hint")).focus();
+    cy.press(Cypress.Keyboard.Keys.TAB);
+    cy.focused().should("match", `textarea${by("Example")}`);
+    cy.press(Cypress.Keyboard.Keys.TAB);
+    cy.focused().should("contain", "Mark target");
+    cy.press(Cypress.Keyboard.Keys.TAB);
+    cy.focused().should("contain", "Generate example");
+  });
+
+  it("keeps what was typed in the example when Tab moves on", () => {
+    openWord(25);
+    cy.get(by("Example")).click();
+    cy.get(`textarea${by("Example")}`).type("الْكِتَابُ [فِي] الْحَقِيبَةِ");
+    cy.press(Cypress.Keyboard.Keys.TAB);
+    cy.press(Cypress.Keyboard.Keys.TAB);
+    cy.get(status).should("contain", "Saved");
+    cy.reload();
+    cy.get(`${by("Example")} mark`).should("have.text", "فِي");
+  });
+
   it("marks the selected text of the example as its target", () => {
     openWord(16);
     cy.get(by("Example")).click();
@@ -75,6 +97,22 @@ describe("a word", () => {
     });
     cy.contains("button", "Mark target").click();
     cy.get(`textarea${by("Example")}`).should("have.value", "الْكِتَابُ [فِي] الْحَقِيبَةِ").blur();
+    cy.get(`${by("Example")} mark`).should("have.text", "فِي");
+  });
+
+  it("marks the selected text of the example from the keyboard, and keeps the example open until Tab moves on", () => {
+    openWord(26);
+    cy.get(by("Example")).click();
+    cy.get(`textarea${by("Example")}`).type("الْكِتَابُ فِي الْحَقِيبَةِ").then(($box) => {
+      const text = $box.val() as string;
+      const start = text.indexOf("فِي");
+      ($box[0] as HTMLTextAreaElement).setSelectionRange(start, start + "فِي".length);
+    });
+    cy.press(Cypress.Keyboard.Keys.TAB);
+    cy.focused().should("contain", "Mark target");
+    cy.press(Cypress.Keyboard.Keys.SPACE);
+    cy.get(`textarea${by("Example")}`).should("have.value", "الْكِتَابُ [فِي] الْحَقِيبَةِ");
+    cy.press(Cypress.Keyboard.Keys.TAB);
     cy.get(`${by("Example")} mark`).should("have.text", "فِي");
   });
 
