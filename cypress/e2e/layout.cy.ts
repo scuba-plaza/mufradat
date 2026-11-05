@@ -17,20 +17,11 @@ const sizeOf = (element: HTMLElement) => {
 
 describe("the layout of a card", () => {
   describe("keyboard focus", () => {
-    function pressTab() {
-      for (const type of ["keyDown", "keyUp"]) {
-        cy.then(() => Cypress.automation("remote:debugger:protocol", {
-          command: "Input.dispatchKeyEvent",
-          params: { type, key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 },
-        }));
-      }
-    }
-
     it("keeps the control that Tab reaches clear of the action bar in a short window", () => {
       cy.viewport(1280, 400);
       openWord(100);
       cy.get(by("English meaning")).focus();
-      pressTab();
+      cy.press(Cypress.Keyboard.Keys.TAB);
       cy.focused().should("contain", "Edit forms").should(($field) => {
         let fixed = $field[0].ownerDocument.querySelector(bar) as HTMLElement;
         while (getComputedStyle(fixed).position !== "fixed") fixed = fixed.parentElement!;
