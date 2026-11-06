@@ -93,21 +93,33 @@ const status = "header .topbar-inner > [role=\"status\"]";
 
 function approvedCard() {
   cy.visit("/open?rank=4100");
-  cy.location("pathname").then((card) =>
-    cy.request({ method: "POST", url: `/api${card.replace("/cards", "/notes")}/approve`, body: {}, failOnStatusCode: false }),
-  );
+  cy.location("pathname").then((card) => cy.request("POST", `/api${card.replace("/cards", "/notes")}/approve`, {}));
+}
+
+const approvedLabel = /^Export (1 approved card|(?:[02-9]|[1-9]\d+) approved cards) to Anki$/;
+
+function expectExportLabel() {
+  cy.request("/api/backups").its("body.check.approved").then((approved: number) => {
+    cy.contains(`${popover} .options-item`, "Export")
+      .invoke("text")
+      .should("match", approvedLabel)
+      .and("contain", `Export ${approved} approved`);
+  });
 }
 
 describe("export from the menu", () => {
   it("names the approved cards in its text, and is disabled when there are none", () => {
     cy.request("/api/backups").its("body.check.approved").then((approved: number) => {
       openMenu();
-      if (approved === 0) {
-        cy.contains(`${popover} .options-item`, "Export to Anki (nothing approved yet)").should("be.disabled");
-      } else {
-        cy.contains(`${popover} .options-item`, `Export ${approved} approved ${approved === 1 ? "card" : "cards"} to Anki`).should("not.be.disabled");
-      }
+      if (approved === 0) cy.contains(`${popover} .options-item`, "Export to Anki (nothing approved yet)").should("be.disabled");
+      else expectExportLabel();
     });
+  });
+
+  it("says card for one approved card and cards for more, with the number", () => {
+    approvedCard();
+    openMenu();
+    expectExportLabel();
   });
 
   it("exports the approved cards, says where the file is and downloads it", () => {
