@@ -47,6 +47,17 @@ describe("backups", () => {
     });
   });
 
+  it("goes to the home page after a restore that removes the card it was started from", () => {
+    openDialog();
+    backUp();
+    cy.visit("/open?rank=413");
+    cy.location("pathname").should("match", /^\/cards\//);
+    cy.menuItem("Backups");
+    cy.contains(rows, "Backed up by you").contains("button", "Restore…").click();
+    cy.contains(`${dialog} button`, "Restore").click();
+    cy.location("pathname").should("eq", "/");
+  });
+
   it("deletes a backup only after asking, and Cancel keeps it", () => {
     openDialog();
     backUp();

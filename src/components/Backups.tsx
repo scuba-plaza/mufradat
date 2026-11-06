@@ -81,7 +81,7 @@ export default function Backups({ open, onClose }: { open: boolean; onClose: () 
     run(async () => {
       setConfirming(null);
       await api(`/api/backups/${s.id}/restore`, { method: "POST" });
-      window.location.reload();
+      window.location.assign("/");
     });
 
   const remove = (s: SnapshotInfo) =>
