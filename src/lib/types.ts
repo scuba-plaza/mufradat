@@ -126,3 +126,9 @@ export interface SnapshotInfo {
   unavailable: number;
   dbBytes: number;
 }
+
+export interface SnapshotUsage {
+  automaticBytes: number;
+  totalBytes: number;
+  budgetBytes: number;
+}

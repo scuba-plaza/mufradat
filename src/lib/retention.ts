@@ -21,6 +21,10 @@ const AUTOMATIC: readonly SnapshotReason[] = ["daily", "before-reset", "before-r
 
 const groupOf = (e: RetentionEntry) => (e.reason === "daily" ? "daily" : "before");
 
+export function automaticSize(entries: RetentionEntry[]): number {
+  return sizeOf(entries.filter((e) => AUTOMATIC.includes(e.reason)));
+}
+
 function sizeOf(entries: RetentionEntry[]): number {
   const clips = new Map<string, number>();
   for (const e of entries) for (const [key, bytes] of Object.entries(e.clips)) clips.set(key, bytes);

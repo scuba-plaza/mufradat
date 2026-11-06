@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { audioKey, audioPath } from "./audio";
-import { createSnapshot, listSnapshots, restoreSnapshot, snapshotAudioPath } from "./snapshots";
+import { createSnapshot, deleteSnapshot, listSnapshots, restoreSnapshot, snapshotAudioPath, snapshotUsage } from "./snapshots";
 import { openStore } from "./store";
 
 const mp3 = Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]);
@@ -231,5 +231,73 @@ describe("restoring over damaged audio", () => {
     fs.writeFileSync(audioPath(root, audioKey(mp3)), Buffer.from("damaged"));
     restoreSnapshot(store, snapshot.id);
     expect(fs.readFileSync(audioPath(root, audioKey(mp3)))).toEqual(mp3);
+  });
+});
+
+describe("deleting a snapshot", () => {
+  it("frees only its database copy and the clips that only it held", () => {
+    const { root, store } = workspace();
+    const card = store.createNote(kitab);
+    const form = card.forms[0].id;
+    const twelve = Buffer.concat([mp3, Buffer.alloc(4)]);
+    store.setAudio(card.id, form, mp3, "tts");
+    const first = createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
+    store.setAudio(card.id, "word", twelve, "tts");
+    const later = createSnapshot(store, "manual", at("2026-11-06T11:00:00Z"));
+    const before = snapshotUsage(root).totalBytes;
+    deleteSnapshot(root, later.id);
+    expect(before - snapshotUsage(root).totalBytes).toBe(later.dbBytes + 12);
+    expect(listSnapshots(root).map((s) => s.id)).toEqual([first.id]);
+    fs.rmSync(audioPath(root, audioKey(mp3)));
+    restoreSnapshot(store, first.id);
+    expect(fs.readFileSync(audioPath(root, audioKey(mp3)))).toEqual(mp3);
+  });
+
+  it("refuses an id that is not a snapshot", () => {
+    const { root } = workspace();
+    expect(() => deleteSnapshot(root, "../x")).toThrow("There is no such backup.");
+    expect(() => deleteSnapshot(root, "20260101T000000Z-manual")).toThrow("There is no such backup.");
+  });
+});
+
+describe("applying retention as snapshots are taken", () => {
+  const limits = (keep: number, budgetBytes = Infinity) => ({ dailyKeep: keep, beforeKeep: keep, budgetBytes });
+
+  it("keeps only the newest daily snapshots the count allows", () => {
+    const { root, store } = workspace();
+    store.createNote(kitab);
+    for (const time of ["10:00", "11:00", "12:00"]) {
+      createSnapshot(store, "daily", { now: new Date(`2026-11-06T${time}:00Z`), limits: limits(2) });
+    }
+    expect(listSnapshots(root).map((s) => s.id)).toEqual(["20261106T120000Z-daily", "20261106T110000Z-daily"]);
+  });
+
+  it("removes the oldest automatic snapshot that the byte budget cannot hold", () => {
+    const { root, store } = workspace();
+    store.createNote(kitab);
+    const first = createSnapshot(store, "daily", { now: new Date("2026-11-06T10:00:00Z"), limits: limits(14) });
+    const second = createSnapshot(store, "daily", {
+      now: new Date("2026-11-06T11:00:00Z"),
+      limits: limits(14, first.dbBytes + 5),
+    });
+    expect(listSnapshots(root).map((s) => s.id)).toEqual([second.id]);
+  });
+
+  it("never removes a manual snapshot, whatever the budget", () => {
+    const { root, store } = workspace();
+    const card = store.createNote(kitab);
+    store.setAudio(card.id, "word", mp3, "tts");
+    const older = createSnapshot(store, "manual", at("2026-11-06T08:00:00Z"));
+    const newer = createSnapshot(store, "manual", at("2026-11-06T09:00:00Z"));
+    const daily = createSnapshot(store, "daily", { now: new Date("2026-11-06T10:00:00Z"), limits: limits(14, 0) });
+    expect(listSnapshots(root).map((s) => s.id)).toEqual([daily.id, newer.id, older.id]);
+  });
+
+  it("reports what the snapshots use, counting manual ones only in the total", () => {
+    const { root, store } = workspace();
+    const card = store.createNote(kitab);
+    store.setAudio(card.id, "word", mp3, "tts");
+    const manual = createSnapshot(store, "manual", at("2026-11-06T09:00:00Z"));
+    expect(snapshotUsage(root)).toEqual({ automaticBytes: 0, totalBytes: manual.dbBytes + 8, budgetBytes: 1073741824 });
   });
 });

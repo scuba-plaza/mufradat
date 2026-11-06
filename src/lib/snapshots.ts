@@ -1,12 +1,14 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
-import { audioKey, audioPath } from "./audio";
+import { audioFiles, audioKey, audioPath } from "./audio";
+import { automaticSize, DEFAULT_LIMITS, selectRemovals, type Limits, type RetentionEntry } from "./retention";
 import { SCHEMA_VERSION, type Store } from "./store";
-import { SNAPSHOT_REASONS, type SnapshotInfo, type SnapshotReason } from "./types";
+import { SNAPSHOT_REASONS, type SnapshotInfo, type SnapshotReason, type SnapshotUsage } from "./types";
 
 export interface SnapshotOptions {
   now?: Date;
+  limits?: Limits;
 }
 
 interface Manifest {
@@ -70,9 +72,7 @@ function freeId(root: string, now: Date, reason: SnapshotReason): string {
   return id;
 }
 
-export function createSnapshot(store: Store, reason: SnapshotReason, options: SnapshotOptions = {}): SnapshotInfo {
-  const now = options.now ?? new Date();
-  const id = freeId(store.root, now, reason);
+function writeSnapshot(store: Store, reason: SnapshotReason, now: Date, id: string): SnapshotInfo {
   const dir = path.join(snapshotsDir(store.root), id);
   const partial = path.join(snapshotsDir(store.root), `.partial-${id}`);
   fs.mkdirSync(partial, { recursive: true });
@@ -95,6 +95,13 @@ export function createSnapshot(store: Store, reason: SnapshotReason, options: Sn
     fs.rmSync(partial, { recursive: true, force: true });
     throw error;
   }
+}
+
+export function createSnapshot(store: Store, reason: SnapshotReason, options: SnapshotOptions = {}): SnapshotInfo {
+  const now = options.now ?? new Date();
+  const info = writeSnapshot(store, reason, now, freeId(store.root, now, reason));
+  applyRetention(store.root, options.limits);
+  return info;
 }
 
 function databaseIsSound(file: string): boolean {
@@ -133,7 +140,7 @@ function fileBytes(file: string): number | null {
   }
 }
 
-export function listSnapshots(root: string): SnapshotInfo[] {
+function readAll(root: string): { info: SnapshotInfo; manifest: Manifest }[] {
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(snapshotsDir(root), { withFileTypes: true });
@@ -145,9 +152,48 @@ export function listSnapshots(root: string): SnapshotInfo[] {
     .flatMap((entry) => {
       const manifest = readManifest(root, entry.name);
       const dbBytes = fileBytes(path.join(snapshotsDir(root), entry.name, "vocabulary.db"));
-      return manifest && dbBytes !== null ? [infoOf(entry.name, manifest, dbBytes)] : [];
+      return manifest && dbBytes !== null ? [{ info: infoOf(entry.name, manifest, dbBytes), manifest }] : [];
     })
-    .sort((a, b) => (a.id < b.id ? 1 : -1));
+    .sort((a, b) => (a.info.id < b.info.id ? 1 : -1));
+}
+
+export const listSnapshots = (root: string): SnapshotInfo[] => readAll(root).map((entry) => entry.info);
+
+function dropUnheldClips(root: string): void {
+  const held = new Set(readAll(root).flatMap((entry) => entry.manifest.audioKeys));
+  for (const file of audioFiles(snapshotsDir(root))) if (!held.has(file.key)) fs.rmSync(file.path, { force: true });
+}
+
+export function deleteSnapshot(root: string, id: string): void {
+  if (!isSnapshotId(id) || !readManifest(root, id)) throw new Error("There is no such backup.");
+  fs.rmSync(path.join(snapshotsDir(root), id), { recursive: true, force: true });
+  dropUnheldClips(root);
+}
+
+function entriesOf(root: string): RetentionEntry[] {
+  return readAll(root).map(({ info, manifest }) => ({
+    id: info.id,
+    reason: info.reason,
+    dbBytes: info.dbBytes,
+    clips: Object.fromEntries(manifest.audioKeys.map((key) => [key, fileBytes(snapshotAudioPath(root, key)) ?? 0])),
+  }));
+}
+
+export function applyRetention(root: string, limits: Limits = DEFAULT_LIMITS): string[] {
+  const removed = selectRemovals(entriesOf(root), limits);
+  for (const id of removed) fs.rmSync(path.join(snapshotsDir(root), id), { recursive: true, force: true });
+  dropUnheldClips(root);
+  return removed;
+}
+
+export function snapshotUsage(root: string, limits: Limits = DEFAULT_LIMITS): SnapshotUsage {
+  const entries = entriesOf(root);
+  const pool = audioFiles(snapshotsDir(root)).reduce((sum, file) => sum + file.bytes, 0);
+  return {
+    totalBytes: entries.reduce((sum, entry) => sum + entry.dbBytes, 0) + pool,
+    automaticBytes: automaticSize(entries),
+    budgetBytes: limits.budgetBytes,
+  };
 }
 
 export function restoreSnapshot(store: Store, id: string, options: SnapshotOptions = {}): void {
