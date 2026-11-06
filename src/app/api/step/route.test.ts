@@ -48,4 +48,17 @@ describe("stepping from a card to the next word of its list", () => {
     const id = openCard(context().store, { rank: 10 })!;
     expect((await step(id, "sideways")).status).toBe(400);
   });
+
+  it("refuses a request that names no direction", async () => {
+    const id = openCard(context().store, { rank: 10 })!;
+    const res = await GET(new Request(`http://127.0.0.1/api/step?id=${id}`));
+    expect(res.status).toBe(400);
+  });
+
+  it("answers with no address for a query it cannot read and for a card that does not exist", async () => {
+    const id = openCard(context().store, { rank: 10 })!;
+    expect(await step(id, "next", "pos:animal")).toEqual({ status: 200, body: { href: null } });
+    expect(await step("no-such-card", "next")).toEqual({ status: 200, body: { href: null } });
+    expect(await step("no-such-card", "next", "pos:noun")).toEqual({ status: 200, body: { href: null } });
+  });
 });

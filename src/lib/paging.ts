@@ -22,9 +22,12 @@ export function paginate(total: number, requested: number, size: number): Paging
   };
 }
 
+export const firstParam = (value: string | string[] | undefined): string => (Array.isArray(value) ? value[0] : value) ?? "";
+
 /** `?page=N`; a page that is missing or unreadable is the first. */
-export function requestedPage(query: { page?: string }): number {
-  const page = query.page === undefined || query.page.trim() === "" ? Number.NaN : Number(query.page);
+export function requestedPage(query: { page?: string | string[] }): number {
+  const text = firstParam(query.page);
+  const page = text.trim() === "" ? Number.NaN : Number(text);
   return Number.isFinite(page) ? page : 1;
 }
 

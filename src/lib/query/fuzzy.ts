@@ -1,8 +1,6 @@
-const MARKS = /[ً-ٰـ]/g;
+import { skeleton } from "../validate";
 
-export function fold(text: string): string {
-  return text.toLowerCase().replace(MARKS, "").replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه");
-}
+export const fold = (text: string): string => skeleton(text.toLowerCase()).replace(/ة/g, "ه");
 
 const wordsOf = (text: string) => text.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 
@@ -22,6 +20,7 @@ function distance(a: string, b: string): number {
 
 export function closeness(term: string, text: string, phrase = false): number {
   const wanted = fold(term);
+  if (wanted === "") return Infinity;
   const folded = fold(text);
   const words = wordsOf(folded);
   if (folded === wanted) return 0;

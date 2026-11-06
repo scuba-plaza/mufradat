@@ -9,7 +9,7 @@ export const POS_LABELS: Record<POS, string> = {
   intj: "interjection", phrase: "phrase", det: "determiner",
 };
 
-export type CardStatus = "draft" | "incomplete" | "approved";
+export type CardStatus = "draft" | "approved";
 export type WordStatus = "todo" | "progress" | "ready" | "approved";
 export type AudioSource = "tts" | "user";
 
@@ -81,7 +81,6 @@ export interface NoteEdit {
 export const MISSING_KINDS = ["example", "translation", "target", "audio"] as const;
 export type MissingKind = (typeof MISSING_KINDS)[number];
 
-/** One word of the list: a card, a frequency word that has none yet, or a Wiktionary entry that matched a search. */
 export interface WordRow {
   id: string | null;
   rank: number | null;

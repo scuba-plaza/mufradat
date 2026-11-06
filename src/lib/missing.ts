@@ -1,7 +1,6 @@
 import type { MissingKind, Note, WordStatus } from "./types";
 import { splitExample } from "./validate";
 
-/** Where a card stands: approved, ready when it lacks nothing and only approving is left, otherwise still in progress. */
 export function wordStatus(n: Note): Exclude<WordStatus, "todo"> {
   if (n.status === "approved") return "approved";
   return gaps(n).length === 0 ? "ready" : "progress";

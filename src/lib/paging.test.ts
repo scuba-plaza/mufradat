@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { listPath, paginate, requestedPage } from "./paging";
+import { firstParam, listPath, paginate, requestedPage } from "./paging";
 
 describe("paginating the frequency list", () => {
   it("gives the first of 50 pages for 5000 words in pages of 100", () => {
@@ -58,5 +58,16 @@ describe("the address of a page of the list", () => {
     const url = new URL(listPath('"to write" sort:-rank', 2), "http://localhost");
     expect(url.searchParams.get("q")).toBe('"to write" sort:-rank');
     expect(url.searchParams.get("page")).toBe("2");
+  });
+});
+
+describe("a parameter that is given more than once", () => {
+  it("is read as its first value", () => {
+    expect(firstParam("a")).toBe("a");
+    expect(firstParam(["a", "b"])).toBe("a");
+    expect(firstParam([])).toBe("");
+    expect(firstParam(undefined)).toBe("");
+    expect(requestedPage({ page: ["3", "4"] })).toBe(3);
+    expect(requestedPage({ page: [] })).toBe(1);
   });
 });

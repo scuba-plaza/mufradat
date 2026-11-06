@@ -22,7 +22,7 @@ interface Data {
   lexicon: Map<string, Entry[]>;
   bySkeleton: Map<string, string[]>;
   ranked: Word[];
-  entries: WiktionaryWord[];
+  entries: Word[];
 }
 
 let cached: Data | null = null;
@@ -54,7 +54,7 @@ function load(): Data {
     const { gender, root, verbForm } = entry ? summary(r.id, entry, r) : { gender: "", root: "", verbForm: "" };
     return { rank: r.rank, lemma: r.id, english: r.gloss, pos, gender, root, verbForm };
   });
-  const entries: WiktionaryWord[] = [];
+  const entries: Word[] = [];
   for (const [id, list] of lexicon) {
     const seen = new Set<POS>();
     for (const e of list) {
@@ -80,20 +80,10 @@ export interface Word {
   verbForm: string;
 }
 
-export interface WiktionaryWord {
-  lemma: string;
-  english: string;
-  pos: POS;
-  gender: string;
-  root: string;
-  verbForm: string;
-  rank: number;
-}
-
 /** The frequency list as Wiktionary gives it. */
 export const rankedWords = (): Word[] => load().ranked;
 
-export const wiktionaryWords = (): WiktionaryWord[] => load().entries;
+export const wiktionaryWords = (): Word[] => load().entries;
 
 function forms(e: Entry): { label: string; arabic: string }[] {
   const out: { label: string; arabic: string }[] = [];
@@ -109,7 +99,7 @@ function forms(e: Entry): { label: string; arabic: string }[] {
   return out;
 }
 
-function summary(id: string, e: Entry, rankRow: RankRow | undefined, gloss?: string): WiktionaryWord {
+function summary(id: string, e: Entry, rankRow: RankRow | undefined, gloss?: string): Word {
   const pos = POS_FROM_WIKTIONARY[e.pos];
   const ranked = rankRow && POS_FROM_WIKTIONARY[rankRow.pos.split(",")[0]] === pos;
   return {

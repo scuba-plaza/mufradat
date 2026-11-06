@@ -5,14 +5,10 @@ const pager = 'nav[aria-label="Pages"]';
 const panel = '[aria-label="Next word"]';
 const bar = 'form[role="search"] input';
 const tabs = 'nav[aria-label="Status"]';
-const sorting = 'nav[aria-label="Sort by"]';
+const sorting = '[aria-label="Sort by"]';
 const typed = (query: string) => `/?q=${encodeURIComponent(query)}`;
 const mp3 = [0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4];
 
-/** The row of the word with this rank, wherever it stands in the list. */
-const rowOf = (rank: number) => cy.get(rows).filter((_, row) => row.querySelector(".num")?.textContent === String(rank));
-
-/** Opens the card of a word and gives it everything a card needs, so that nothing is missing. */
 function finishCard(rank: number) {
   cy.visit(`/open?rank=${rank}`);
   cy.location("pathname").then((path) => {
@@ -86,29 +82,35 @@ describe("the words page", () => {
     cy.visit("/open?rank=130");
     cy.visit("/open?rank=131");
     cy.location("pathname").then((card) => cy.request("POST", `/api${card.replace("/cards", "/notes")}/approve`, {}));
-    cy.visit("/");
-    rowOf(130).should("contain", "in progress");
-    cy.visit("/?page=999");
-    rowOf(131).should("contain", "approved");
-    rowOf(4990).should("not.contain", "in progress").and("not.contain", "approved").and("not.contain", "ready");
+    cy.visit(typed("rank:130"));
+    cy.wordRow(130).should("contain", "in progress");
+    cy.visit(typed("rank:131"));
+    cy.wordRow(131).should("contain", "approved");
+    cy.visit(typed("rank:4980"));
+    cy.wordRow(4980).should("not.contain", "in progress").and("not.contain", "approved").and("not.contain", "ready");
   });
 
   it("says ready for a card that lacks nothing", () => {
     finishCard(141);
-    cy.visit("/");
-    rowOf(141).should("contain", "ready");
+    cy.visit(typed("rank:141"));
+    cy.wordRow(141).should("contain", "ready");
     cy.contains(panel, /\d+ ready/);
   });
 
   it("opens the card of a word that has one from its row", () => {
-    cy.visit("/");
-    cy.get(rows).first().click();
-    cy.location("pathname").should("match", /^\/cards\/[0-9a-f-]{36}$/);
+    cy.visit("/open?rank=170");
+    cy.location("pathname").then((card) => {
+      cy.visit(typed("rank:170"));
+      cy.wordRow(170).find("a").should("have.attr", "href").and("match", /^\/cards\/[0-9a-f-]{36}/);
+      cy.wordRow(170).click();
+      cy.location("pathname").should("eq", card);
+    });
   });
 
   it("opens the card of a word without one from its row, creating it", () => {
-    cy.visit("/?page=999");
-    rowOf(4990).click();
+    cy.visit(typed("rank:4990"));
+    cy.wordRow(4990).find("a").should("have.attr", "href", "/open?rank=4990&q=rank%3A4990");
+    cy.wordRow(4990).click();
     cy.location("pathname").should("match", /^\/cards\/[0-9a-f-]{36}$/);
     cy.contains("Word 4990 of 5000");
   });

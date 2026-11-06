@@ -251,8 +251,16 @@ describe("the words a query asks for", () => {
   it("reports the problem with the query and shows no rows", () => {
     expect(view(openStore(":memory:"), "pos:animal", now)).toEqual({
       rows: [],
+      sort: null,
       error: 'pos: expects noun, verb, adj, adv, prep, conj, particle, pron, num, intj, phrase or det, not "animal".',
     });
+  });
+
+  it("hands on the sort it read from the query", () => {
+    const s = openStore(":memory:");
+    expect(view(s, "sort:-rank", now).sort).toEqual({ key: "rank", descending: true });
+    expect(view(s, "pos:noun", now).sort).toBeNull();
+    expect(view(s, "pos:animal", now).sort).toBeNull();
   });
 
   it("finds a word in Wiktionary that is not in the list when the query has text, once", () => {
@@ -395,5 +403,25 @@ describe("the word an arrow leads to", () => {
     const s = openStore(":memory:");
     const id = openCard(s, { rank: 3 })!;
     expect(neighbour(s, id, "pos:animal", "next", now)).toBeNull();
+  });
+
+  it("resumes at the place of a word that has just been opened from a list of the words not started", () => {
+    const s = openStore(":memory:");
+    const id = openCard(s, { rank: 5 })!;
+    expect(neighbour(s, id, "status:todo", "next", now)).toMatchObject({ rank: 6 });
+    expect(neighbour(s, id, "status:todo", "previous", now)).toMatchObject({ rank: 4 });
+  });
+
+  it("keeps a Wiktionary entry in its place in the list once it was opened, so that its neighbours stay its neighbours", () => {
+    const s = openStore(":memory:");
+    const query = "على rank:none";
+    const lemmas = () => view(s, query, now).rows.map((r) => r.lemma);
+    const before = lemmas();
+    expect(before.length).toBeGreaterThan(3);
+    const third = view(s, query, now).rows[2];
+    const id = openCard(s, { lemma: third.lemma, pos: third.pos })!;
+    expect(lemmas()).toEqual(before);
+    expect(neighbour(s, id, query, "previous", now)).toMatchObject({ lemma: before[1] });
+    expect(neighbour(s, id, query, "next", now)).toMatchObject({ lemma: before[3] });
   });
 });

@@ -1,6 +1,6 @@
 import { cardForRank, lookup, rankedWords, wiktionaryWords } from "./lexicon";
 import { missingKinds, wordStatus } from "./missing";
-import { parseQuery } from "./query/parse";
+import { parseQuery, type Query } from "./query/parse";
 import { runQuery } from "./query/run";
 import type { Store } from "./store";
 import { MISSING_KINDS, POS_VALUES, type Note, type POS, type WordRow } from "./types";
@@ -31,25 +31,30 @@ const notStarted = (row: Pick<WordRow, "rank" | "lemma" | "english" | "pos" | "g
   edited: null,
 });
 
-function listRows(notes: Note[]): WordRow[] {
+const entryKey = (lemma: string, pos: POS) => `${lemma}|${pos}`;
+
+function listRows(notes: Note[], withEntries: boolean): WordRow[] {
   const byRank = new Map(notes.filter((n) => n.rank > 0).map((n) => [n.rank, n]));
   const listed = rankedWords().map((w) => {
     const card = byRank.get(w.rank);
     return card ? fromCard(card) : notStarted(w);
   });
-  const added = notes.filter((n) => n.rank === 0).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(fromCard);
-  return [...listed, ...added];
+  const added = notes.filter((n) => n.rank === 0).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  if (!withEntries) return [...listed, ...added.map(fromCard)];
+  const cards = new Map(added.map((n) => [entryKey(n.lemma, n.pos), n]));
+  const entries = wiktionaryWords().filter((e) => e.rank === 0);
+  const listedEntries = new Set(entries.map((e) => entryKey(e.lemma, e.pos)));
+  return [
+    ...listed,
+    ...entries.map((e) => {
+      const card = cards.get(entryKey(e.lemma, e.pos));
+      return card ? fromCard(card) : notStarted({ ...e, rank: null });
+    }),
+    ...added.filter((n) => !listedEntries.has(entryKey(n.lemma, n.pos))).map(fromCard),
+  ];
 }
 
-function entryRows(notes: Note[]): WordRow[] {
-  const made = new Set(notes.map((n) => `${n.lemma}|${n.pos}`));
-  return wiktionaryWords()
-    .filter((e) => e.rank === 0 && !made.has(`${e.lemma}|${e.pos}`))
-    .map((e) => notStarted({ ...e, rank: null }));
-}
-
-/** All 5000 frequency words in rank order, each showing its card when it has one, then the cards made outside the list. */
-export const wordRows = (store: Store): WordRow[] => listRows(store.allNotes());
+export const wordRows = (store: Store): WordRow[] => listRows(store.allNotes(), false);
 
 const working = (r: WordRow) => r.status === "progress" || r.status === "ready";
 const group = (r: WordRow) => (working(r) ? 0 : r.status === "todo" ? 1 : 2);
@@ -66,14 +71,12 @@ function latestFirst(a: WordRow, b: WordRow): number {
   return x === y ? 0 : x < y ? 1 : -1;
 }
 
-/** Cards being worked on first, latest edit on top; then words not started by rank; then approved ones by rank. */
 export function defaultOrder(rows: WordRow[]): WordRow[] {
   return [...rows].sort(
     (a, b) => group(a) - group(b) || (group(a) === 0 ? latestFirst(a, b) || byRank(a, b) : byRank(a, b) || latestFirst(a, b)),
   );
 }
 
-/** What Continue opens: the first row of the default order that is not approved. */
 export function continueFrom(rows: WordRow[]): WordRow | null {
   return defaultOrder(rows).find((r) => r.status !== "approved") ?? null;
 }
@@ -83,16 +86,20 @@ export const continueTarget = (store: Store): WordRow | null => continueFrom(wor
 export interface View {
   rows: WordRow[];
   error: string | null;
+  sort: Query["sort"];
+}
+
+function evaluate(store: Store, text: string, now: Date): { error: string } | { query: Query; start: WordRow[]; rows: WordRow[] } {
+  const parsed = parseQuery(text);
+  if ("error" in parsed) return { error: parsed.error };
+  const all = listRows(store.allNotes(), parsed.query.texts.length > 0);
+  const start = text.trim() === "" ? defaultOrder(all) : all;
+  return { query: parsed.query, start, rows: runQuery(start, parsed.query, now) };
 }
 
 export function view(store: Store, text: string, now: Date = new Date()): View {
-  const parsed = parseQuery(text);
-  if ("error" in parsed) return { rows: [], error: parsed.error };
-  const notes = store.allNotes();
-  const rows = listRows(notes);
-  if (parsed.query.texts.length > 0) rows.push(...entryRows(notes));
-  const start = text.trim() === "" ? defaultOrder(rows) : rows;
-  return { rows: runQuery(start, parsed.query, now), error: null };
+  const found = evaluate(store, text, now);
+  return "error" in found ? { rows: [], error: found.error, sort: null } : { rows: found.rows, error: null, sort: found.query.sort };
 }
 
 /** The id of the card for a ranked word or a Wiktionary entry, creating the bare card if there is none. */
@@ -117,10 +124,19 @@ export function nextCardPath(store: Store): string {
 const WALK_ALL = "rank:>0 sort:rank";
 
 export function neighbour(store: Store, id: string, q: string, direction: "previous" | "next", now: Date = new Date()): WordRow | null {
-  const { rows } = view(store, q.trim() === "" ? WALK_ALL : q, now);
+  const walkingAll = q.trim() === "";
+  const found = evaluate(store, walkingAll ? WALK_ALL : q, now);
+  if ("error" in found) return null;
+  const { rows } = found;
   const at = rows.findIndex((r) => r.id === id);
-  if (at < 0 && q.trim() === "") return null;
-  return (direction === "next" ? rows[at + 1] : at > 0 ? rows[at - 1] : undefined) ?? null;
+  if (at >= 0) return (direction === "next" ? rows[at + 1] : rows[at - 1]) ?? null;
+  if (walkingAll) return null;
+  const whole = runQuery(found.start, { ...found.query, tests: [] }, now);
+  const from = whole.findIndex((r) => r.id === id);
+  if (from < 0) return null;
+  const place = new Map(whole.map((r, i) => [r, i]));
+  const after = (r: WordRow) => place.get(r)! > from;
+  return (direction === "next" ? rows.find(after) : [...rows].reverse().find((r) => !after(r))) ?? null;
 }
 
 export function cardPath(id: string, q = ""): string {

@@ -21,6 +21,11 @@ describe("folding text so that spellings compare equal", () => {
   it("lowercases Latin text", () => {
     expect(fold("Book")).toBe("book");
   });
+
+  it("keeps Arabic-Indic digits and leaves nothing of vowel marks alone", () => {
+    expect(fold("٢٩")).toBe("٢٩");
+    expect(fold("َـ")).toBe("");
+  });
 });
 
 describe("how close a typed word is to a text", () => {
@@ -59,6 +64,13 @@ describe("how close a typed word is to a text", () => {
 
   it("finds nothing for a word that is not there", () => {
     expect(closeness("xyz", "book")).toBe(Infinity);
+  });
+
+  it("finds nothing for a term that is only vowel marks, and for digits that are not in the text", () => {
+    expect(closeness("َ", "كتاب")).toBe(Infinity);
+    expect(closeness("ـ", "كتاب")).toBe(Infinity);
+    expect(closeness("٣", "كتاب")).toBe(Infinity);
+    expect(closeness("٣", "الباب ٣")).toBe(1);
   });
 
   it("takes a phrase only as it stands in the text, without typos", () => {

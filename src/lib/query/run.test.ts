@@ -54,6 +54,11 @@ describe("finding words by text", () => {
     expect(find("oo")).toEqual(["book", "school", "library, bookshop"]);
   });
 
+  it("matches nothing for a term that is only vowel marks", () => {
+    expect(find("َ")).toEqual([]);
+    expect(find("٣")).toEqual([]);
+  });
+
   it("matches a phrase only as typed", () => {
     expect(find('"to write"')).toEqual(["to write"]);
     expect(find('"to wrote"')).toEqual([]);

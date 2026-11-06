@@ -33,11 +33,12 @@ describe("the keys of a card", () => {
   });
 
   it("stays on the first word on Ctrl+←, and on the last on Ctrl+→", () => {
+    cy.intercept("/api/step*").as("step");
     for (const [rank, keys] of [[1, "{ctrl}{leftarrow}"], [5000, "{ctrl}{rightarrow}"]] as const) {
       openWord(rank);
       cy.location("pathname").then((card) => {
         cy.get("body").type(keys);
-        cy.wait(300);
+        cy.wait("@step").its("response.body").should("deep.equal", { href: null });
         cy.contains(`Word ${rank} of 5000`);
         cy.location("pathname").should("eq", card);
       });
@@ -63,22 +64,26 @@ describe("the keys of a card", () => {
   });
 
   it("does not act on them while a field has focus", () => {
+    cy.intercept("/api/step*").as("step");
     openWord(96);
     cy.location("pathname").then((card) => {
       cy.get(by("Hint")).type("a hint{ctrl}{rightarrow}");
       cy.wait(300);
+      cy.get("@step.all").should("have.length", 0);
       cy.location("pathname").should("eq", card);
       cy.get(by("Hint")).should("have.value", "a hint");
     });
   });
 
   it("does not act on them while a dialog is open", () => {
+    cy.intercept("/api/step*").as("step");
     openWord(97);
     cy.location("pathname").then((card) => {
       cy.contains("button", "forms").click();
       cy.get("dialog[open]");
       cy.get("body").type("{ctrl}{rightarrow}");
       cy.wait(300);
+      cy.get("@step.all").should("have.length", 0);
       cy.location("pathname").should("eq", card);
     });
   });
@@ -102,12 +107,9 @@ describe("the list of keys", () => {
 });
 
 describe("the keys of a card opened from a list", () => {
-  const rowOf = (rank: number) =>
-    cy.get('[aria-label="Word list"] > li').filter((_, row) => row.querySelector(".num")?.textContent === String(rank));
-
   function openFrom(query: string, rank: number) {
     cy.visit(`/?q=${encodeURIComponent(query)}`);
-    rowOf(rank).click();
+    cy.wordRow(rank).click();
     cy.hydrated(by("Hint"));
   }
 
@@ -130,11 +132,26 @@ describe("the keys of a card opened from a list", () => {
     }
   });
 
+  it("goes on to the next word from a word that was just started in the list of the words not started", () => {
+    openFrom("status:todo rank:195-199", 197);
+    cy.contains("Word 197 of 5000");
+    cy.get("body").type("{ctrl}{rightarrow}");
+    cy.contains("Word 198 of 5000");
+  });
+
+  it("goes back to the previous word from a word that was just started in the list of the words not started", () => {
+    openFrom("status:todo rank:175-179", 177);
+    cy.contains("Word 177 of 5000");
+    cy.get("body").type("{ctrl}{leftarrow}");
+    cy.contains("Word 176 of 5000");
+  });
+
   it("stays on the last word of the list it was opened from", () => {
+    cy.intercept("/api/step*").as("step");
     openFrom("rank:191-192", 192);
     cy.location("pathname").then((card) => {
       cy.get("body").type("{ctrl}{rightarrow}");
-      cy.wait(300);
+      cy.wait("@step").its("response.body").should("deep.equal", { href: null });
       cy.contains("Word 192 of 5000");
       cy.location("pathname").should("eq", card);
     });

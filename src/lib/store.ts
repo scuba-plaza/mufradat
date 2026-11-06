@@ -4,7 +4,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { audioKey, audioPath, mp3Problem } from "./audio";
-import { missingParts } from "./missing";
 import { approvalProblems, plainExample } from "./validate";
 import type { AudioSource, Clip, Form, Note, NoteEdit, NewNote, POS, Slot } from "./types";
 
@@ -100,7 +99,11 @@ export function openStore(dir: string) {
   function allNotes(): Note[] {
     const group = <T extends { note_id: string }>(rows: T[]) => {
       const byNote = new Map<string, T[]>();
-      for (const r of rows) byNote.set(r.note_id, [...(byNote.get(r.note_id) ?? []), r]);
+      for (const r of rows) {
+        const list = byNote.get(r.note_id);
+        if (list) list.push(r);
+        else byNote.set(r.note_id, [r]);
+      }
       return byNote;
     };
     const forms = group(db.prepare("SELECT note_id, id, label, arabic FROM forms ORDER BY ord").all() as (Form & { note_id: string })[]);
@@ -131,10 +134,9 @@ export function openStore(dir: string) {
     return getNote(id)!;
   }
 
-  /** Records a change: bumps the timestamp and takes the card back from "approved". A card is incomplete until nothing is missing. */
+  /** Records a change: bumps the timestamp and takes the card back from "approved". */
   function touch(id: string): Note {
-    const status = missingParts(getNote(id)!).length > 0 ? "incomplete" : "draft";
-    db.prepare("UPDATE notes SET status = ?, updated_at = ? WHERE id = ?").run(status, now(), id);
+    db.prepare("UPDATE notes SET status = 'draft', updated_at = ? WHERE id = ?").run(now(), id);
     return getNote(id)!;
   }
 

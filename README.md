@@ -22,25 +22,25 @@ With Nix: `nix build`; the flake's `overlays.default` adds `mufradat` to nixpkgs
 
 ## The search bar
 
-The bar on the home page searches, filters and sorts the one list. Words you type are looked for in the Arabic and in the English, ignoring vowel marks and hamza, ya and ha variants, and a word of four letters or more still matches with a typo; the closest match comes first. Your cards, the frequency words and the Wiktionary entries that have no card yet are searched together, and the entries without a card show as not started. Terms are separated by spaces and all of them have to hold; a comma inside a field means or.
+The bar on the home page searches, filters and sorts the one list. Words you type are looked for in the Arabic and in the English, ignoring vowel marks and the differences between أ إ آ and ا, between ى and ي, and between ة and ه; a word of four letters or more still matches with a typo, and the closest match comes first. When the query has text, the Wiktionary entries that have no card yet are searched with your cards and the frequency words, and show as not started. Terms are separated by spaces and all of them have to hold, at most 12 of them; a comma inside a field means or, at most 12 values.
 
 | Term | Means |
 |---|---|
 | `kitab`, `"to write"` | text to find; quotes keep a phrase as typed |
 | `status:progress,ready` | `todo` (no card), `progress` (the card lacks something), `ready` (nothing lacks, not approved), `approved` |
 | `pos:noun,adj` | part of speech |
-| `rank:100`, `rank:1-500`, `rank:>2000`, `rank:<=100`, `rank:none` | frequency rank; `none` is a word you added yourself |
+| `rank:100`, `rank:1-500`, `rank:>2000`, `rank:<=100`, `rank:none` | frequency rank; `none` is a word outside the frequency list: a card you added yourself and, in a text search, a Wiktionary entry |
 | `root:كتب`, `gender:f`, `verbform:II` | root (vowels ignored), gender (`m`, `f`, `m+f`), verb form |
 | `missing:audio,example` | what the card still lacks: `example`, `translation`, `target`, `audio`; a word with no card lacks all of it |
 | `has:error` | a failed example or audio generation is still shown |
 | `example:mistral`, `example:mine` | who wrote the example |
-| `edited:7d`, `edited:12h`, `edited:2026-11-01..`, `edited:..2026-11-01`, `edited:none` | last edit within that time, since or until a day, or never |
-| `-pos:verb` | a minus in front of a field term takes the words out |
+| `edited:7d`, `edited:12h`, `edited:2w`, `edited:2026-11-01`, `edited:2026-11-01..`, `edited:..2026-11-01`, `edited:none` | last edit within that time (`h`, `d`, `w`), on a day, since or until a day, or never |
+| `-pos:verb` | a minus in front of a field term takes the words out; to find text that starts with a minus, quote it |
 | `sort:-edited` | order by `rank`, `edited`, `arabic` or `english`; a minus is descending, words without a value come last |
 
 Without a `sort:` the words come in the order of the frequency list, the ones you added last, and with text the closest match first; only the list with nothing typed puts the cards you are working on at the top. The In progress and Ready tabs add `sort:-edited`.
 
-A term the bar cannot read is named under it and no words are listed. Clicking Arabic, English or # above the list sorts by it, again for the other way, a third time for the default order; only the `sort:` term changes.
+A term the bar cannot read, or a quote that is not closed, is named under the bar and no words are listed. A card you made from a Wiktionary entry and then gave another headword no longer counts as made from it, so the entry shows again as not started. Clicking Arabic, English or # above the list sorts by it, again for the other way, a third time for the default order; only the `sort:` term changes.
 
 ## Layout
 
@@ -48,7 +48,7 @@ One centered column, 44rem wide on small screens and 58rem from 1024px up, where
 
 ## Keyboard
 
-On a word, while no field has focus and no dialog is open: Ctrl+← and Ctrl+→ open the previous and the next word of the list the card was opened from, leaving the current one as it is (a card opened from Continue or from the list with nothing typed walks the frequency list by rank), Ctrl+↑ plays the word and Ctrl+↓ plays the example. The list is read again on every press, so in a list sorted by last edit the order changes as you edit. The keys are matched by their position, so they work in any keyboard layout. The ? button in the top bar lists them.
+On a word, while no field has focus and no dialog is open: Ctrl+← and Ctrl+→ open the previous and the next word of the list the card was opened from, leaving the current one as it is (a card opened from Continue or from the list with nothing typed walks the frequency list by rank, and a card made outside it has no arrows then). A card that has just left the list it was opened from, such as a word you started in the words not started, goes to where it stands in that list, Ctrl+↑ plays the word and Ctrl+↓ plays the example. The list is read again on every press, so in a list sorted by last edit the order changes as you edit. The keys are matched by their position, so they work in any keyboard layout. The ? button in the top bar lists them.
 
 ## Pages
 

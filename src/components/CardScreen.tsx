@@ -90,6 +90,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
       const key = keyPressed(e);
       if (!key) return;
       e.preventDefault();
+      if (e.repeat) return;
       if (key === "previous" || key === "next") go(key);
       else if (key === "playWord") play("the word");
       else if (key === "playExample") play("the example");

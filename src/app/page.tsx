@@ -3,12 +3,12 @@ import Pager from "@/components/Pager";
 import StatusMark from "@/components/StatusMark";
 import WordBar from "@/components/WordBar";
 import { rankingSize } from "@/lib/lexicon";
-import { listPath, paginate, requestedPage } from "@/lib/paging";
+import { firstParam, listPath, paginate, requestedPage } from "@/lib/paging";
 import type { SortKey } from "@/lib/query/fields";
-import { nextSort, parseQuery, withSort } from "@/lib/query/parse";
+import { nextSort, withSort } from "@/lib/query/parse";
 import { context } from "@/lib/server";
 import type { WordStatus } from "@/lib/types";
-import { continueFrom, defaultOrder, rowHref, view, wordRows } from "@/lib/words";
+import { continueFrom, rowHref, view, wordRows } from "@/lib/words";
 
 const PAGE_SIZE = 100;
 
@@ -21,24 +21,22 @@ const TABS = [
 ] as const;
 
 const COLUMNS: { key: SortKey; label: string; name: string; className: string }[] = [
-  { key: "rank", label: "#", name: "Rank", className: "justify-self-end" },
+  { key: "rank", label: "#", name: "Rank (#)", className: "justify-self-end" },
   { key: "arabic", label: "Arabic", name: "Arabic", className: "justify-self-end" },
   { key: "english", label: "English", name: "English", className: "" },
 ];
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
+export default async function Home({ searchParams }: { searchParams: Promise<{ q?: string | string[]; page?: string | string[] }> }) {
   const params = await searchParams;
-  const q = (params.q ?? "").trim();
+  const q = firstParam(params.q).trim();
   const { store } = context();
-  const everything = defaultOrder(wordRows(store));
+  const everything = wordRows(store);
   const next = continueFrom(everything);
-  const { rows, error } = view(store, q);
+  const { rows, error, sort } = view(store, q);
   const count = (status: WordStatus) => everything.filter((w) => w.status === status).length;
   const listed = rankingSize();
   const approvedListed = everything.filter((w) => w.status === "approved" && w.rank !== null).length;
   const paging = paginate(rows.length, requestedPage(params), PAGE_SIZE);
-  const parsed = parseQuery(q);
-  const sort = "query" in parsed ? parsed.query.sort : null;
   return (
     <>
       <h1 className="sr-only">Words</h1>
@@ -57,7 +55,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
           <div className="h-full rounded-full bg-progress" style={{ width: `${(approvedListed / listed) * 100}%` }} />
         </div>
       </section>
-      <WordBar q={q} />
+      <WordBar q={q} error={error} />
       <nav aria-label="Status" className="mt-2 flex flex-wrap gap-1">
         {TABS.map((tab) => (
           <a
@@ -70,17 +68,16 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
           </a>
         ))}
       </nav>
-      {error && <p role="alert" className="px-1 py-3 text-sm text-danger">{error}</p>}
       {rows.length > 0 && <Pager paging={paging} q={q} total={rows.length} />}
       {rows.length === 0 && !error && <p className="px-2 py-4">Nothing matches.</p>}
       {rows.length > 0 && (
         <div className="table-box">
-          <nav aria-label="Sort by" className="table-head grid-cols-[2.5rem_5rem_1fr_auto] sm:grid-cols-[2.5rem_6rem_1fr_7rem]">
+          <div role="group" aria-label="Sort by" className="table-head grid-cols-[2.5rem_5rem_1fr_auto] sm:grid-cols-[2.5rem_6rem_1fr_7rem]">
             {COLUMNS.map((column) => (
               <a
                 key={column.key}
                 href={listPath(withSort(q, nextSort(sort, column.key)))}
-                aria-label={column.name}
+                aria-label={sort?.key === column.key ? `${column.name}, sorted ${sort.descending ? "descending" : "ascending"}` : column.name}
                 aria-current={sort?.key === column.key ? "true" : undefined}
                 className={`${column.className} hover:text-ink`}
               >
@@ -89,7 +86,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
               </a>
             ))}
             <span className="justify-self-end">Status</span>
-          </nav>
+          </div>
           {/* Plain anchors: opening a word creates its card, which a prefetching <Link> would do for every row on screen. */}
           <ol aria-label="Word list">
             {rows.slice(paging.start, paging.end).map((w) => (

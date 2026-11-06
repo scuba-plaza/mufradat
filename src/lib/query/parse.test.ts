@@ -23,8 +23,8 @@ describe("reading what was typed in the bar", () => {
     expect(texts('"to write" book')).toEqual([{ term: "to write", phrase: true }, { term: "book", phrase: false }]);
   });
 
-  it("runs an open quote to the end of the text", () => {
-    expect(texts('"to write')).toEqual([{ term: "to write", phrase: true }]);
+  it("takes a term with a quote in the middle as a phrase when it holds a space", () => {
+    expect(texts('foo"bar baz"qux')).toEqual([{ term: "foobar bazqux", phrase: true }]);
   });
 
   it("does not take a field term for text", () => {
@@ -66,8 +66,36 @@ describe("what the bar says about a term it cannot use", () => {
   });
 
   it("allows a minus only in front of a field term", () => {
-    expect(failure("-book")).toBe("A minus goes in front of a field term, such as -pos:verb.");
+    expect(failure("-book")).toBe('A minus goes in front of a field term, such as -pos:verb. To find text that starts with one, put it in quotes: "-book".');
+    expect(failure('-"book"')).toContain("A minus goes in front of a field term");
+    expect(failure('"-book"')).toBeNull();
     expect(failure("-pos:verb")).toBeNull();
+  });
+
+  it("says when a quote is not closed", () => {
+    expect(failure('"to write')).toBe("A quote is not closed.");
+    expect(failure('pos:noun "book')).toBe("A quote is not closed.");
+    expect(failure('"to write"')).toBeNull();
+  });
+
+  it("reads field names and sort keys in any case, and values with a space in quotes", () => {
+    expect(failure("POS:noun")).toBeNull();
+    expect(failure("Sort:-RANK")).toBeNull();
+    expect(failure('status:"in progress"')).toBe('status: expects todo, progress, ready or approved, not "in progress".');
+    expect(failure('root:"ك ت ب"')).toBeNull();
+  });
+
+  it("refuses a date range that ends before it starts", () => {
+    expect(failure("edited:2026-11-05..2026-11-01")).toContain("edited: expects");
+    expect(failure("edited:2026-11-01..2026-11-05")).toBeNull();
+    expect(failure("edited:2026-11-01..2026-11-01")).toBeNull();
+  });
+
+  it("allows at most 12 terms and 12 values in a field", () => {
+    expect(failure(Array(12).fill("book").join(" "))).toBeNull();
+    expect(failure(Array(13).fill("book").join(" "))).toBe("At most 12 terms.");
+    expect(failure(`pos:${Array(12).fill("noun").join(",")}`)).toBeNull();
+    expect(failure(`pos:${Array(13).fill("noun").join(",")}`)).toBe("pos: at most 12 values.");
   });
 
   it("allows one sort, by a known key", () => {

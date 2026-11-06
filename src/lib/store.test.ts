@@ -76,14 +76,13 @@ describe("editing a card", () => {
     expect(e.updatedAt >= n.updatedAt).toBe(true);
   });
 
-  it("calls a card incomplete while the example or audio is missing and draft once it has all of it", () => {
+  it("keeps a card that is not approved a draft, whatever it still lacks", () => {
     const s = openStore(":memory:");
     const n = s.createNote({ ...kitab, forms: [] });
-    expect(s.updateNote(n.id, { hint: "paper" }).status).toBe("incomplete");
+    expect(s.updateNote(n.id, { hint: "paper" }).status).toBe("draft");
     s.updateNote(n.id, { example: "هٰذَا [كِتَابٌ]", exampleEn: "this is a book" });
     s.setAudio(n.id, "word", mp3, "tts");
-    const done = s.setAudio(n.id, "example", mp3, "user");
-    expect(done.status).toBe("draft");
+    expect(s.setAudio(n.id, "example", mp3, "user").status).toBe("draft");
   });
 });
 
@@ -193,7 +192,7 @@ describe("audio", () => {
       const removed = s.removeAudio(id, "word");
       expect(removed.audio.word).toBeUndefined();
       expect(removed.audio.example.key).not.toBeNull();
-      expect(removed.status).toBe("incomplete");
+      expect(removed.status).toBe("draft");
       expect(missingParts(removed)).toEqual(["audio for the word"]);
     });
 

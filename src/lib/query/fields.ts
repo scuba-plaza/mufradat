@@ -91,6 +91,7 @@ const edited: Field = {
     const from = first === "" ? null : day(first);
     const to = last === "" ? null : day(last);
     if (extra.length > 0 || (first === "" && last === "") || (first !== "" && !from) || (last !== "" && !to)) return editedHint(part);
+    if (from && to && from.getTime() > to.getTime()) return editedHint(part);
     const until = to && new Date(to.getFullYear(), to.getMonth(), to.getDate() + 1);
     return (row) => {
       if (row.edited === null) return false;

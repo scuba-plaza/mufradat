@@ -84,7 +84,7 @@ describe("the layout of a card", () => {
 
     for (const [width, height] of [[1920, 1100], [390, 844]]) {
       for (const { what, rank, written, editing, above, below } of pairs) {
-        it(`leaves ${minimumGap}px between ${what} at ${width}px`, () => {
+        it(`leaves at least ${minimumGap}px between ${what} at ${width}px`, () => {
           cy.viewport(width, height);
           openWord(rank);
           if (written) {
