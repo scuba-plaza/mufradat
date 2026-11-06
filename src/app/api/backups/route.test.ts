@@ -1,0 +1,75 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { audioKey, audioPath } from "@/lib/audio";
+import { context } from "@/lib/server";
+import type { SnapshotInfo } from "@/lib/types";
+import { openCard } from "@/lib/words";
+import { DELETE } from "./[id]/route";
+import { GET, POST } from "./route";
+
+const mp3 = Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]);
+
+const removeBackup = (id: string) =>
+  DELETE(new Request(`http://127.0.0.1/api/backups/${id}`, { method: "DELETE" }), { params: Promise.resolve({ id }) });
+
+const manuals = async () =>
+  ((await (await GET()).json()).snapshots as SnapshotInfo[]).filter((s) => s.reason === "manual");
+
+describe("the backups API", () => {
+  let home: string;
+
+  beforeEach(() => {
+    home = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-backups-route-"));
+    vi.stubEnv("XDG_CONFIG_HOME", path.join(home, "config"));
+    vi.stubEnv("MUFRADAT_WORKSPACE", path.join(home, "workspace"));
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    fs.rmSync(home, { recursive: true, force: true });
+  });
+
+  it("lists nothing in an empty workspace and says it is healthy", async () => {
+    const res = await GET();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      snapshots: [],
+      usage: { automaticBytes: 0, totalBytes: 0, budgetBytes: 1073741824 },
+      check: { cards: 0, approved: 0, integrity: "ok", missingAudio: [] },
+    });
+  });
+
+  it("takes a manual backup on request and lists it with its counts", async () => {
+    openCard(context().store, { rank: 10 });
+    const res = await POST();
+    expect(res.status).toBe(200);
+    const { snapshot } = await res.json();
+    expect(snapshot).toMatchObject({ reason: "manual", cards: 1, approved: 0 });
+    expect((await manuals()).map((s) => s.id)).toEqual([snapshot.id]);
+  });
+
+  it("deletes a backup, and answers 404 for ids that are not backups", async () => {
+    openCard(context().store, { rank: 10 });
+    const { snapshot } = await (await POST()).json();
+    for (const id of ["20260101T000000Z-manual", ".."]) {
+      const res = await removeBackup(id);
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "There is no such backup." });
+    }
+    expect(await manuals()).toHaveLength(1);
+    expect((await removeBackup(snapshot.id)).status).toBe(204);
+    expect(await manuals()).toEqual([]);
+  });
+
+  it("shows a clip whose file is gone in the check", async () => {
+    const { store } = context();
+    const id = openCard(store, { rank: 10 })!;
+    store.setAudio(id, "word", mp3, "tts");
+    fs.rmSync(audioPath(store.root, audioKey(mp3)));
+    const { check } = await (await GET()).json();
+    expect(check.missingAudio).toEqual([
+      { noteId: id, lemma: store.getNote(id)!.lemma, slot: "word", slotName: "word", key: audioKey(mp3) },
+    ]);
+  });
+});
