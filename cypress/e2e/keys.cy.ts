@@ -2,7 +2,6 @@ export {};
 
 const by = (label: string) => `[aria-label="${label}"]`;
 const unplayable = { contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]), fileName: "clip.mp3", mimeType: "audio/mpeg" };
-const help = 'button[aria-label="Keyboard shortcuts"]';
 
 function openWord(rank: number) {
   cy.visit(`/open?rank=${rank}`);
@@ -90,11 +89,10 @@ describe("the keys of a card", () => {
 });
 
 describe("the list of keys", () => {
-  it("opens from the ? button in the header, lists each key, and closes with Close", () => {
+  it("opens from the menu, lists each key, and closes with Close", () => {
     cy.visit("/");
-    cy.hydrated(help);
     cy.get("dialog[open]").should("not.exist");
-    cy.get(help).click();
+    cy.menuItem("Keyboard shortcuts");
     cy.get("dialog[open]").within(() => {
       cy.contains("Previous word").parent().should("contain", "Ctrl").and("contain", "←");
       cy.contains("Next word").parent().should("contain", "Ctrl").and("contain", "→");

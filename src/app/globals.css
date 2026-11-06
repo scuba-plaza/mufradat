@@ -208,6 +208,9 @@
     display: flex;
     flex-direction: column;
   }
+  .options-end {
+    position-area: bottom span-left;
+  }
   .options-item {
     @apply flex w-full items-center whitespace-nowrap bg-transparent px-3 text-left text-sm font-medium text-ink;
     min-height: var(--control-h-sm);

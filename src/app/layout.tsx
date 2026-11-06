@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import Shortcuts from "@/components/Shortcuts";
+import Menu from "@/components/Menu";
 import "./globals.css";
 
 export const metadata: Metadata = { title: { default: "Mufradat", template: "%s · Mufradat" } };
@@ -16,9 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="topbar">
           <div className="topbar-inner">
             <a href="/" className="wordmark">Mufradat</a>
-            <nav className="flex items-center gap-2">
-              <Shortcuts />
-            </nav>
+            <Menu />
           </div>
         </header>
         <main className="mx-auto max-w-column px-5">{children}</main>

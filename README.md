@@ -62,7 +62,7 @@ One centered column, 44rem wide on small screens and 58rem from 1024px up, where
 
 ## Keyboard
 
-On a word, while no field has focus and no dialog is open: Ctrl+← and Ctrl+→ open the previous and the next word of the list the card was opened from, leaving the current one as it is (a card opened from Continue or from the list with nothing typed walks the frequency list by rank, and a card made outside it has no arrows then). A card that has just left the list it was opened from, such as a word you started in the words not started, goes to where it stands in that list, Ctrl+↑ plays the word and Ctrl+↓ plays the example. The list is read again on every press, so in a list sorted by last edit the order changes as you edit. The keys are matched by their position, so they work in any keyboard layout. The ? button in the top bar lists them.
+On a word, while no field has focus and no dialog is open: Ctrl+← and Ctrl+→ open the previous and the next word of the list the card was opened from, leaving the current one as it is (a card opened from Continue or from the list with nothing typed walks the frequency list by rank, and a card made outside it has no arrows then). A card that has just left the list it was opened from, such as a word you started in the words not started, goes to where it stands in that list, Ctrl+↑ plays the word and Ctrl+↓ plays the example. The list is read again on every press, so in a list sorted by last edit the order changes as you edit. The keys are matched by their position, so they work in any keyboard layout. Keyboard shortcuts in the menu (the ⋯ button at the right of the top bar) lists them.
 
 ## Pages
 
