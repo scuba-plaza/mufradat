@@ -146,6 +146,44 @@ describe("a word", () => {
     cy.contains("button", "Generate example").should("be.enabled");
   });
 
+  it("takes the failed example message away once you write an example yourself", () => {
+    openWord(27);
+    cy.contains("button", "Generate example").click();
+    cy.contains("There is no Mistral API key");
+    cy.get(by("Example")).click();
+    cy.get(`textarea${by("Example")}`).type("الْكِتَابُ [فِي] الْحَقِيبَةِ").blur();
+    cy.get(status).should("contain", "Saved");
+    cy.contains("There is no Mistral API key").should("not.exist");
+  });
+
+  it("takes a failed example request away once you write an example yourself", () => {
+    cy.intercept("POST", "/api/mistral", { statusCode: 500, body: { error: "Mistral could not be reached." } });
+    openWord(28);
+    cy.contains("button", "Generate example").click();
+    cy.contains("Mistral could not be reached.");
+    cy.get(by("Example")).click();
+    cy.get(`textarea${by("Example")}`).type("الْكِتَابُ [فِي] الْحَقِيبَةِ").blur();
+    cy.get(status).should("contain", "Saved");
+    cy.contains("Mistral could not be reached.").should("not.exist");
+  });
+
+  it("takes away what stopped the approval once a new example fixes it", () => {
+    openWord(29);
+    cy.location("pathname").then((path) => {
+      cy.get(by("Example")).click();
+      cy.get(`textarea${by("Example")}`).type("الْكِتَابُ [فِي] الْحَقِيبَةِ").blur();
+      cy.get(status).should("contain", "Saved");
+      cy.contains("button", "Approve and next").click();
+      cy.get(alert).should("contain", "The example has no English translation.");
+      cy.request("PUT", `/api/notes/${path.split("/").pop()}`, { exampleEn: "The book is in the bag." }).then((response) => {
+        cy.intercept("POST", "/api/mistral", { body: { note: response.body.note } });
+      });
+      cy.contains("button", "New example").click();
+      cy.get(by("Example in English")).should("have.value", "The book is in the bag.");
+      cy.get(alert).should("not.exist");
+    });
+  });
+
   it("keeps a failed clip under its text and lets you try again", () => {
     openWord(18);
     cy.get(by("Audio for the word")).contains("button", "Generate").click();

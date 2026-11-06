@@ -222,6 +222,15 @@ describe("audio", () => {
     expect(ok.exampleError).toBeNull();
     expect(ok.exampleSource).toBe("mistral");
   });
+
+  it("drops a failed example generation once you write an example yourself", () => {
+    const s = openStore(":memory:");
+    const n = s.createNote(kitab);
+    s.setExampleError(n.id, "Mistral's example was not saved. The example has 2 words; it must have 3 to 9.");
+    const written = s.updateNote(n.id, { example: "هٰذَا [كِتَابٌ] جَدِيدٌ" });
+    expect(written.exampleError).toBeNull();
+    expect(written.exampleSource).toBe("user");
+  });
 });
 
 describe("working through the frequency list", () => {

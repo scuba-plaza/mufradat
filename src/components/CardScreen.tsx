@@ -37,6 +37,7 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
           method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch),
         })).note);
         setProblems([]);
+        if ("example" in patch) setExampleProblem("");
         setSaved("saved");
       } catch (e) {
         setProblems([(e as Error).message]);
@@ -52,6 +53,7 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
     later(async () => {
       try {
         setNote((await post<{ note: Note }>("/api/mistral", { id: note.id })).note);
+        setProblems([]);
       } catch (e) {
         setExampleProblem((e as Error).message);
       } finally {

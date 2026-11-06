@@ -149,6 +149,9 @@ export function openStore(dir: string) {
         (edit.example !== undefined && edit.example !== before.example) ||
         (edit.exampleEn !== undefined && edit.exampleEn !== before.exampleEn);
       if (edit.example !== undefined) set("example", edit.example);
+      if (edit.example !== undefined && edit.example !== before.example) {
+        db.prepare("UPDATE notes SET example_error = NULL WHERE id = ?").run(id);
+      }
       if (edit.exampleEn !== undefined) set("example_en", edit.exampleEn);
       if (exampleChanged) set("example_source", "user");
       if (edit.forms) {
