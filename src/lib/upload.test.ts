@@ -34,4 +34,12 @@ describe("saving an uploaded body", () => {
   it("refuses a body that grows past the limit while it streams, saying how large a file may be", async () => {
     await expect(saveBody(streamOf([[1, 2, 3], [4, 5, 6]]), file(), 5)).rejects.toThrow("That file is larger than 3 GiB.");
   });
+
+  it("leaves no file for a later cleanup to miss when the body fails at once", async () => {
+    const target = file();
+    await expect(saveBody(streamOf([[1, 2, 3, 4, 5, 6]]), target, 5)).rejects.toThrow();
+    fs.rmSync(target, { force: true });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(fs.existsSync(target)).toBe(false);
+  });
 });

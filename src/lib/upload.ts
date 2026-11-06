@@ -1,4 +1,3 @@
-import { once } from "node:events";
 import fs from "node:fs";
 
 export const MAX_IMPORT_BYTES = 3 * 1024 ** 3;
@@ -10,7 +9,7 @@ export class TooLargeError extends Error {
 }
 
 export async function saveBody(body: ReadableStream<Uint8Array>, file: string, limit: number): Promise<void> {
-  const out = fs.createWriteStream(file);
+  const handle = await fs.promises.open(file, "w");
   const reader = body.getReader();
   let size = 0;
   try {
@@ -19,12 +18,12 @@ export async function saveBody(body: ReadableStream<Uint8Array>, file: string, l
       if (done) break;
       size += value.length;
       if (size > limit) throw new TooLargeError();
-      if (!out.write(value)) await once(out, "drain");
+      await handle.writeFile(value);
     }
-    await new Promise<void>((resolve, reject) => out.end((error?: Error | null) => (error ? reject(error) : resolve())));
   } catch (error) {
-    out.destroy();
     await reader.cancel().catch(() => undefined);
     throw error;
+  } finally {
+    await handle.close();
   }
 }

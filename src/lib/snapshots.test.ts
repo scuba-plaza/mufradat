@@ -435,13 +435,24 @@ describe("refusing an import", () => {
   const keyA = audioKey(mp3);
   const keyB = audioKey(other);
 
-  const newerDatabase = (db: Buffer) => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-newer-db-"));
+  const modified = (db: Buffer, change: (raw: Database.Database) => void) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-modified-db-"));
     roots.push(dir);
     const file = path.join(dir, "v.db");
     fs.writeFileSync(file, db);
     const raw = new Database(file);
-    raw.pragma("user_version = 99");
+    change(raw);
+    raw.close();
+    return fs.readFileSync(file);
+  };
+
+  const bareDatabase = () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-bare-db-"));
+    roots.push(dir);
+    const file = path.join(dir, "bare.db");
+    const raw = new Database(file);
+    raw.exec("CREATE TABLE notes (id TEXT PRIMARY KEY, status TEXT); INSERT INTO notes VALUES ('a', 'approved')");
+    raw.pragma("user_version = 1");
     raw.close();
     return fs.readFileSync(file);
   };
@@ -452,8 +463,38 @@ describe("refusing an import", () => {
     ["a backup with no database", async (p) => zipFrom([["manifest.json", json(p.manifest)], [entry(keyA), mp3]]), refused],
     ["a manifest that is not one", async (p) => zipFrom([["manifest.json", "{"], ["vocabulary.db", p.db]]), refused],
     ["a manifest from a newer version", async (p) => zipFrom([["manifest.json", json({ ...p.manifest, schema: 99 })], ["vocabulary.db", p.db], [entry(keyA), mp3]]), newer],
-    ["a database from a newer version", async (p) => zipFrom([["manifest.json", json(p.manifest)], ["vocabulary.db", newerDatabase(p.db)], [entry(keyA), mp3]]), newer],
+    ["a database from a newer version", async (p) => zipFrom([["manifest.json", json(p.manifest)], ["vocabulary.db", modified(p.db, (raw) => raw.pragma("user_version = 99"))], [entry(keyA), mp3]]), newer],
     ["a damaged database", async (p) => zipFrom([["manifest.json", json(p.manifest)], ["vocabulary.db", "not a database"], [entry(keyA), mp3]]), "The backup's database is damaged."],
+    [
+      "a database with a trigger",
+      async (p) =>
+        zipFrom([
+          ["manifest.json", json(p.manifest)],
+          ["vocabulary.db", modified(p.db, (raw) => raw.exec("CREATE TRIGGER t AFTER UPDATE ON notes BEGIN SELECT 1; END"))],
+          [entry(keyA), mp3],
+        ]),
+      "The backup's database is damaged.",
+    ],
+    [
+      "a database in which notes is a view",
+      async (p) =>
+        zipFrom([
+          ["manifest.json", json(p.manifest)],
+          ["vocabulary.db", modified(p.db, (raw) => raw.exec("ALTER TABLE notes RENAME TO notes_real; CREATE VIEW notes AS SELECT * FROM notes_real"))],
+          [entry(keyA), mp3],
+        ]),
+      "The backup's database is damaged.",
+    ],
+    [
+      "a database that is not shaped like this app's",
+      async (p) => zipFrom([["manifest.json", json(p.manifest)], ["vocabulary.db", bareDatabase()], [entry(keyA), mp3]]),
+      "The backup's database is damaged.",
+    ],
+    [
+      "a manifest that lists a clip twice",
+      async (p) => zipFrom([["manifest.json", json({ ...p.manifest, audioKeys: [keyA, keyA] })], ["vocabulary.db", p.db], [entry(keyA), mp3]]),
+      refused,
+    ],
     ["a clip that is not what its name says", async (p) => zipFrom([["manifest.json", json(p.manifest)], ["vocabulary.db", p.db], [entry(keyA), other]]), refused],
     [
       "a second clip that is not what its name says, after a good one",

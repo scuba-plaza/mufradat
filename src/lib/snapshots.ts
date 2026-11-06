@@ -3,9 +3,9 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { audioFiles, audioKey, audioPath } from "./audio";
-import { NOT_A_BACKUP, openBackupZip, type BackupEntry, type BackupZip } from "./backup-zip";
+import { openBackupZip, refuse, type BackupEntry, type BackupZip } from "./backup-zip";
 import { automaticSize, DEFAULT_LIMITS, selectRemovals, type Limits, type RetentionEntry } from "./retention";
-import { SCHEMA_VERSION, type Store } from "./store";
+import { openStore, SCHEMA_VERSION, type Store } from "./store";
 import { SNAPSHOT_REASONS, type SnapshotInfo, type SnapshotReason, type SnapshotUsage } from "./types";
 
 export interface SnapshotOptions {
@@ -138,6 +138,8 @@ function inspectDatabase(file: string): { cards: number; approved: number; versi
     const db = new Database(file, { readonly: true, fileMustExist: true });
     try {
       if (db.pragma("integrity_check", { simple: true }) !== "ok") return null;
+      const extras = db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type IN ('trigger', 'view')").get() as { n: number };
+      if (extras.n > 0) return null;
       const counts = db
         .prepare("SELECT COUNT(*) AS cards, COALESCE(SUM(status = 'approved'), 0) AS approved FROM notes")
         .get() as { cards: number; approved: number };
@@ -263,9 +265,20 @@ export function incomingFile(root: string): string {
   return path.join(snapshotsDir(root), `.incoming-${randomUUID()}.zip`);
 }
 
-const refuseBackup = (): never => {
-  throw new Error(NOT_A_BACKUP);
-};
+function openable(dir: string): boolean {
+  try {
+    const store = openStore(dir);
+    try {
+      store.allNotes();
+      store.check();
+      return true;
+    } finally {
+      store.close();
+    }
+  } catch {
+    return false;
+  }
+}
 
 function incomingManifest(bytes: Buffer): { schema: number; audioKeys: string[]; unavailable: number } | null {
   let raw: unknown;
@@ -277,19 +290,17 @@ function incomingManifest(bytes: Buffer): { schema: number; audioKeys: string[];
   if (typeof raw !== "object" || raw === null) return null;
   const { schema, audioKeys, unavailable } = raw as Record<string, unknown>;
   const keys = Array.isArray(audioKeys) ? audioKeys : null;
-  const wellFormed = keys !== null && keys.every((key) => typeof key === "string" && /^[0-9a-f]{16}$/.test(key)) && new Set(keys).size === keys.length;
+  const wellFormed = keys !== null && keys.every((key) => typeof key === "string") && new Set(keys).size === keys.length;
   if (typeof schema !== "number" || !Number.isInteger(schema) || schema < 1 || !wellFormed) return null;
   return { schema, audioKeys: keys as string[], unavailable: typeof unavailable === "number" ? unavailable : 0 };
 }
 
 function importFrom(root: string, backup: BackupZip, options: SnapshotOptions): SnapshotInfo {
-  const names = new Set(backup.names);
-  if (!names.has("manifest.json") || !names.has("vocabulary.db")) return refuseBackup();
-  const incoming = incomingManifest(backup.read("manifest.json")) ?? refuseBackup();
+  const incoming = incomingManifest(backup.read("manifest.json")) ?? refuse();
   if (incoming.schema > SCHEMA_VERSION) throw new Error(NEWER);
   const wanted = new Set(incoming.audioKeys.map(entryName));
   const held = backup.names.filter((name) => name.startsWith("audio/"));
-  if (held.length !== wanted.size || !held.every((name) => wanted.has(name))) return refuseBackup();
+  if (held.length !== wanted.size || !held.every((name) => wanted.has(name))) return refuse();
 
   const now = options.now ?? new Date();
   const id = freeId(root, now, "imported");
@@ -301,9 +312,10 @@ function importFrom(root: string, backup: BackupZip, options: SnapshotOptions): 
     const inspected = inspectDatabase(database);
     if (!inspected) throw new Error(DAMAGED);
     if (inspected.version > SCHEMA_VERSION) throw new Error(NEWER);
+    if (!openable(partial)) throw new Error(DAMAGED);
     for (const key of incoming.audioKeys) {
       const bytes = backup.read(entryName(key));
-      if (audioKey(bytes) !== key) return refuseBackup();
+      if (audioKey(bytes) !== key) return refuse();
       storeClip(bytes, snapshotAudioPath(root, key));
     }
     const manifest: Manifest = {
