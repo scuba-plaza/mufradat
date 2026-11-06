@@ -32,7 +32,7 @@ describe("the look of the pages", () => {
 
   it("does not scroll sideways on a phone", () => {
     cy.viewport(375, 700);
-    for (const path of ["/", `/search?q=${kitab}`, "/open?rank=3"]) {
+    for (const path of ["/", `/?q=${kitab}`, "/open?rank=3"]) {
       cy.visit(path);
       cy.document().should((doc) => expect(doc.documentElement.scrollWidth, path).to.be.at.most(375));
     }

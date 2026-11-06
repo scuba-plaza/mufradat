@@ -250,14 +250,3 @@ describe("audio", () => {
     expect(written.exampleSource).toBe("user");
   });
 });
-
-describe("searching cards", () => {
-  it("finds cards by Arabic without vowels, or by English", () => {
-    const s = openStore(":memory:");
-    s.createNote(kitab);
-    s.createNote({ ...kitab, lemma: "قَلَم", english: "pen" });
-    expect(s.search("كتاب").map((n) => n.english)).toEqual(["book"]);
-    expect(s.search("PEN").map((n) => n.lemma)).toEqual(["قَلَم"]);
-    expect(s.search("")).toEqual([]);
-  });
-});

@@ -17,7 +17,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="topbar-inner">
             <a href="/" className="wordmark">Mufradat</a>
             <nav className="flex items-center gap-2">
-              <a href="/search" className="action-quiet">Search</a>
               <Shortcuts />
             </nav>
           </div>

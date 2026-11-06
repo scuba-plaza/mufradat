@@ -61,9 +61,9 @@ describe("the scale of the interface", () => {
       cy.document().its("documentElement.scrollHeight").should("be.at.most", 1100);
     });
 
-    it("shows the next word, Continue, the progress and ten rows of the list without scrolling", () => {
+    it("shows the next word, Continue, the progress, the search bar and ten rows of the list without scrolling", () => {
       cy.visit("/");
-      for (const selector of ['[aria-label="Next word"]', '[aria-label="Next word"] a', '[role="progressbar"]', `${list} > li:nth-child(10)`]) {
+      for (const selector of ['[aria-label="Next word"]', '[aria-label="Next word"] a', '[role="progressbar"]', 'form[role="search"]', `${list} > li:nth-child(10)`]) {
         cy.get(selector).should(($el) => expect($el[0].getBoundingClientRect().bottom, selector).to.be.at.most(1100));
       }
     });
@@ -73,7 +73,7 @@ describe("the scale of the interface", () => {
     beforeEach(() => cy.viewport(390, 844));
 
     it("sets text and every field at 16px or more", () => {
-      for (const path of ["/", `/search?q=${kitab}`, "/open?rank=6"]) {
+      for (const path of ["/", `/?q=${kitab}`, "/open?rank=6"]) {
         cy.visit(path);
         cy.get("body").should(($body) => expect(px($body.css("font-size")), path).to.be.at.least(16));
         cy.get("body").then(($body) => {

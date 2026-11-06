@@ -13,12 +13,32 @@ With Nix: `nix build`; the flake's `overlays.default` adds `mufradat` to nixpkgs
 
 ## The flow
 
-1. Press Continue on the home page to pick up where you left off: the card you edited last that is not approved, or, when none is left, the most frequent word you have not started. You can also pick a word from the list (rank, Arabic, English, status), or search your cards and Wiktionary. Opening a word creates its bare card from Wiktionary.
+1. Press Continue on the home page to pick up where you left off: the card you edited last that is not approved, or, when none is left, the most frequent word you have not started. You can also pick a word from the list or find it with the search bar. Opening a word creates its bare card from Wiktionary.
 2. Edit the card where it is shown. Text saves when you leave it or press Enter. Regenerating never overwrites what you typed. The lexical fields (part of speech, gender, root, verb form) are under Details, closed until you open them. The forms are edited in a dialog: Edit forms.
 3. Optionally generate an example (Mistral), and generate or upload audio per clip (Google TTS, MP3 upload). A clip that has audio shows a play button and an options button with Generate again, Upload MP3… and Remove audio; removing a clip takes the card's approval back and leaves the audio file in place. A failure is shown under its text and changes nothing else. The bar at the bottom says what the card still needs.
    Mistral names the word of the card in its sentence and the app marks it, also when it is attached to another word (بِالْقَلَمِ) or has another ending. When the word cannot be told for certain the sentence is kept unmarked and the card says so: select the word and choose Mark target.
 4. Approve and next. Editing an approved card takes the approval back.
 5. Export to Anki: every approved card, written to `exports/` in the workspace. The same cards always give the same bytes.
+
+## The search bar
+
+The bar on the home page searches, filters and sorts the one list. Words you type are looked for in the Arabic and in the English, ignoring vowel marks and hamza, ya and ha variants, and a word of four letters or more still matches with a typo; the closest match comes first. Your cards, the frequency words and the Wiktionary entries that have no card yet are searched together, and the entries without a card show as not started. Terms are separated by spaces and all of them have to hold; a comma inside a field means or.
+
+| Term | Means |
+|---|---|
+| `kitab`, `"to write"` | text to find; quotes keep a phrase as typed |
+| `status:progress,ready` | `todo` (no card), `progress` (the card lacks something), `ready` (nothing lacks, not approved), `approved` |
+| `pos:noun,adj` | part of speech |
+| `rank:100`, `rank:1-500`, `rank:>2000`, `rank:<=100`, `rank:none` | frequency rank; `none` is a word you added yourself |
+| `root:كتب`, `gender:f`, `verbform:II` | root (vowels ignored), gender (`m`, `f`, `m+f`), verb form |
+| `missing:audio,example` | what the card still lacks: `example`, `translation`, `target`, `audio`; a word with no card lacks all of it |
+| `has:error` | a failed example or audio generation is still shown |
+| `example:mistral`, `example:mine` | who wrote the example |
+| `edited:7d`, `edited:12h`, `edited:2026-11-01..`, `edited:..2026-11-01`, `edited:none` | last edit within that time, since or until a day, or never |
+| `-pos:verb` | a minus in front of a field term takes the words out |
+| `sort:-edited` | order by `rank`, `edited`, `arabic` or `english`; a minus is descending, words without a value come last |
+
+A term the bar cannot read is named under it and no words are listed. Clicking Arabic, English or # above the list sorts by it, again for the other way, a third time for the default order; only the `sort:` term changes.
 
 ## Layout
 
@@ -30,10 +50,9 @@ On a word, while no field has focus and no dialog is open: Ctrl+← and Ctrl+→
 
 ## Pages
 
-- `/` every word, 100 a page: the cards you are working on first (latest edit on top, "in progress" or "ready"), then the words you have not started by frequency, then the approved ones; `/?page=N` is a page. A card made outside the frequency list shows a dash for its rank
+- `/` every word, 100 a page, found with the search bar. With nothing typed: the cards you are working on first (latest edit on top, "in progress" or "ready"), then the words you have not started by frequency, then the approved ones. The tabs above the list show how many words are in each state and filter by it. A card made outside the frequency list shows a dash for its rank. `/?q=…&page=N` is a query and a page
 - `/next` goes to the card Continue opens, creating it the first time
 - `/cards/<id>` one card
-- `/search?q=` your cards and Wiktionary entries
 - `/open?rank=N` and `/open?lemma=…&pos=…` go to a word's card, creating it the first time
 
 ## Files

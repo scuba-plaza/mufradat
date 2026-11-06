@@ -1,22 +1,44 @@
 import ExportButton from "@/components/ExportButton";
 import Pager from "@/components/Pager";
 import StatusMark from "@/components/StatusMark";
+import WordBar from "@/components/WordBar";
 import { rankingSize } from "@/lib/lexicon";
-import { paginate, requestedPage } from "@/lib/paging";
+import { listPath, paginate, requestedPage } from "@/lib/paging";
+import type { SortKey } from "@/lib/query/fields";
+import { nextSort, parseQuery, withSort } from "@/lib/query/parse";
 import { context } from "@/lib/server";
 import type { WordStatus } from "@/lib/types";
-import { continueFrom, defaultOrder, wordRows } from "@/lib/words";
+import { continueFrom, defaultOrder, rowHref, view, wordRows } from "@/lib/words";
 
 const PAGE_SIZE = 100;
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
-  const query = await searchParams;
-  const rows = defaultOrder(wordRows(context().store));
-  const next = continueFrom(rows);
-  const count = (status: WordStatus) => rows.filter((w) => w.status === status).length;
+const TABS = [
+  { label: "All", query: "", status: null },
+  { label: "Not started", query: "status:todo", status: "todo" },
+  { label: "In progress", query: "status:progress", status: "progress" },
+  { label: "Ready", query: "status:ready", status: "ready" },
+  { label: "Approved", query: "status:approved", status: "approved" },
+] as const;
+
+const COLUMNS: { key: SortKey; label: string; name: string; className: string }[] = [
+  { key: "rank", label: "#", name: "Rank", className: "justify-self-end" },
+  { key: "arabic", label: "Arabic", name: "Arabic", className: "justify-self-end" },
+  { key: "english", label: "English", name: "English", className: "" },
+];
+
+export default async function Home({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
+  const params = await searchParams;
+  const q = (params.q ?? "").trim();
+  const { store } = context();
+  const everything = defaultOrder(wordRows(store));
+  const next = continueFrom(everything);
+  const { rows, error } = view(store, q);
+  const count = (status: WordStatus) => everything.filter((w) => w.status === status).length;
   const listed = rankingSize();
-  const approvedListed = rows.filter((w) => w.status === "approved" && w.rank !== null).length;
-  const paging = paginate(rows.length, requestedPage(query), PAGE_SIZE);
+  const approvedListed = everything.filter((w) => w.status === "approved" && w.rank !== null).length;
+  const paging = paginate(rows.length, requestedPage(params), PAGE_SIZE);
+  const parsed = parseQuery(q);
+  const sort = "query" in parsed ? parsed.query.sort : null;
   return (
     <>
       <h1 className="sr-only">Words</h1>
@@ -35,29 +57,55 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ p
           <div className="h-full rounded-full bg-progress" style={{ width: `${(approvedListed / listed) * 100}%` }} />
         </div>
       </section>
-      <Pager paging={paging} />
-      {/* Plain anchors: opening a word creates its card, which a prefetching <Link> would do for every row on screen. */}
-      <div className="table-box">
-        <div aria-hidden="true" className="table-head grid-cols-[2.5rem_5rem_1fr_auto] sm:grid-cols-[2.5rem_6rem_1fr_7rem]">
-          <span className="text-right">#</span>
-          <span className="justify-self-end">Arabic</span>
-          <span>English</span>
-          <span className="justify-self-end">Status</span>
-        </div>
-        <ol aria-label="Word list">
-          {rows.slice(paging.start, paging.end).map((w) => (
-            <li key={w.id ?? w.rank}>
-              <a href={w.id ? `/cards/${w.id}` : `/open?rank=${w.rank}`} className="entry grid-cols-[2.5rem_5rem_1fr_auto] sm:grid-cols-[2.5rem_6rem_1fr_7rem]">
-                <span className="num text-right text-xs text-quiet">{w.rank ?? "—"}</span>
-                <span className="ar justify-self-end text-ar-sm" lang="ar" dir="rtl">{w.lemma}</span>
-                <span className="truncate">{w.english}</span>
-                <span className="justify-self-end">{w.status !== "todo" && <StatusMark status={w.status} />}</span>
+      <WordBar q={q} />
+      <nav aria-label="Status" className="mt-2 flex flex-wrap gap-1">
+        {TABS.map((tab) => (
+          <a
+            key={tab.label}
+            href={listPath(tab.query)}
+            aria-current={q === tab.query ? "page" : undefined}
+            className="action-quiet aria-[current=page]:bg-hover aria-[current=page]:text-ink"
+          >
+            {tab.label} <span className="num">{tab.status ? count(tab.status) : everything.length}</span>
+          </a>
+        ))}
+      </nav>
+      {error && <p role="alert" className="px-1 py-3 text-sm text-danger">{error}</p>}
+      {rows.length > 0 && <Pager paging={paging} q={q} total={rows.length} />}
+      {rows.length === 0 && !error && <p className="px-2 py-4">Nothing matches.</p>}
+      {rows.length > 0 && (
+        <div className="table-box">
+          <nav aria-label="Sort by" className="table-head grid-cols-[2.5rem_5rem_1fr_auto] sm:grid-cols-[2.5rem_6rem_1fr_7rem]">
+            {COLUMNS.map((column) => (
+              <a
+                key={column.key}
+                href={listPath(withSort(q, nextSort(sort, column.key)))}
+                aria-label={column.name}
+                aria-current={sort?.key === column.key ? "true" : undefined}
+                className={`${column.className} hover:text-ink`}
+              >
+                {column.label}
+                {sort?.key === column.key && <span aria-hidden="true"> {sort.descending ? "↓" : "↑"}</span>}
               </a>
-            </li>
-          ))}
-        </ol>
-      </div>
-      <Pager paging={paging} label="More pages" />
+            ))}
+            <span className="justify-self-end">Status</span>
+          </nav>
+          {/* Plain anchors: opening a word creates its card, which a prefetching <Link> would do for every row on screen. */}
+          <ol aria-label="Word list">
+            {rows.slice(paging.start, paging.end).map((w) => (
+              <li key={rowHref(w)}>
+                <a href={rowHref(w)} className="entry grid-cols-[2.5rem_5rem_1fr_auto] sm:grid-cols-[2.5rem_6rem_1fr_7rem]">
+                  <span className="num text-right text-xs text-quiet">{w.rank ?? "—"}</span>
+                  <span className="ar justify-self-end text-ar-sm" lang="ar" dir="rtl">{w.lemma}</span>
+                  <span className="truncate">{w.english}</span>
+                  <span className="justify-self-end">{w.status !== "todo" && <StatusMark status={w.status} />}</span>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+      {rows.length > 0 && <Pager paging={paging} q={q} label="More pages" />}
       <ExportButton approved={count("approved")} />
     </>
   );

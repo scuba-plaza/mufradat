@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { audioKey, audioPath, mp3Problem } from "./audio";
 import { missingParts } from "./missing";
-import { approvalProblems, plainExample, skeleton } from "./validate";
+import { approvalProblems, plainExample } from "./validate";
 import type { AudioSource, Clip, Form, Note, NoteEdit, NewNote, POS, Slot } from "./types";
 
 const SCHEMA = `
@@ -251,18 +251,6 @@ export function openStore(dir: string) {
     return { ok: true, note: getNote(id)! };
   }
 
-  function search(query: string): Note[] {
-    const q = query.trim();
-    if (q === "") return [];
-    const arabic = skeleton(q);
-    const lower = q.toLowerCase();
-    const rows = db.prepare("SELECT id, lemma, english FROM notes ORDER BY CASE WHEN rank = 0 THEN 1 ELSE 0 END, rank, created_at").all() as
-      { id: string; lemma: string; english: string }[];
-    return rows
-      .filter((r) => skeleton(r.lemma).includes(arabic) || r.english.toLowerCase().includes(lower))
-      .map((r) => getNote(r.id)!);
-  }
-
   function findNote(lemma: string, pos: POS): string | null {
     const row = db.prepare("SELECT id FROM notes WHERE lemma = ? AND pos = ?").get(lemma, pos) as { id: string } | undefined;
     return row?.id ?? null;
@@ -274,7 +262,7 @@ export function openStore(dir: string) {
   }
 
   return {
-    root, findNote, approvedNotes, allNotes, close: () => db.close(), search, getNote, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
+    root, findNote, approvedNotes, allNotes, close: () => db.close(), getNote, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
     applyGeneratedExample, approve,
   };
 }

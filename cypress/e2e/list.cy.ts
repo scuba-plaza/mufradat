@@ -3,6 +3,10 @@ export {};
 const rows = '[aria-label="Word list"] > li';
 const pager = 'nav[aria-label="Pages"]';
 const panel = '[aria-label="Next word"]';
+const bar = 'form[role="search"] input';
+const tabs = 'nav[aria-label="Status"]';
+const sorting = 'nav[aria-label="Sort by"]';
+const typed = (query: string) => `/?q=${encodeURIComponent(query)}`;
 const mp3 = [0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4];
 
 /** The row of the word with this rank, wherever it stands in the list. */
@@ -146,6 +150,121 @@ describe("a card made outside the list", () => {
       cy.get(rows).first().should("contain", "آنَ").and("contain", "—");
       cy.visit("/next");
       cy.location("pathname").should("eq", card);
+    });
+  });
+});
+
+describe("the search bar", () => {
+  it("searches when you press Enter, keeps what you typed in the box, and counts the words it found", () => {
+    cy.visit("/");
+    cy.get(bar).type("كتاب{enter}");
+    cy.location("search").should("eq", `?q=${encodeURIComponent("كتاب")}`);
+    cy.get(bar).should("have.value", "كتاب");
+    cy.contains(/^\d+ words?$/);
+  });
+
+  it("sets the Arabic typed into the bar in the Arabic font", () => {
+    cy.visit("/");
+    cy.get(bar).then(($input) => {
+      const win = $input[0].ownerDocument.defaultView!;
+      const families = (list: string) => list.split(",").map((family) => family.replace(/["']/g, "").trim());
+      const [arabic] = families(win.getComputedStyle(win.document.documentElement).getPropertyValue("--font-arabic"));
+      expect(arabic).to.not.equal("");
+      expect(families(win.getComputedStyle($input[0]).fontFamily)).to.include(arabic);
+    });
+  });
+
+  it("finds a word typed without its vowels and a word typed with a typo", () => {
+    cy.visit(typed("كتاب"));
+    cy.get(rows).first().should("contain", "كِتَاب").and("contain", "book");
+    cy.visit(typed("writting"));
+    cy.get(rows).first().should("contain", "writing");
+  });
+
+  it("filters and sorts with field terms", () => {
+    cy.visit(typed("rank:1-5 sort:-rank"));
+    cy.get(rows).should("have.length", 5);
+    cy.get(rows).then(($rows) => {
+      expect([...$rows].map((row) => row.querySelector(".num")!.textContent)).to.deep.equal(["5", "4", "3", "2", "1"]);
+    });
+  });
+
+  it("says what is wrong with a term it cannot read and lists no words", () => {
+    cy.visit(typed("pos:animal"));
+    cy.get('[role="alert"]').should("contain", "pos: expects noun, verb");
+    cy.get(rows).should("have.length", 0);
+  });
+
+  it("says so when no word matches", () => {
+    cy.visit(typed("zzzzzz"));
+    cy.contains("Nothing matches");
+    cy.get(rows).should("have.length", 0);
+  });
+
+  it("shows the words in each state as tabs, and the tab for a state lists its words", () => {
+    cy.visit("/open?rank=160");
+    cy.visit("/");
+    cy.get(tabs).contains("a", "In progress").invoke("text").then((label) => {
+      const count = Number(label.match(/\d+/)![0]);
+      expect(count).to.be.at.least(1);
+      cy.get(tabs).contains("a", "In progress").click();
+      cy.location("search").should("eq", "?q=status%3Aprogress");
+      cy.get(tabs).contains("a", "In progress").should("have.attr", "aria-current", "page");
+      cy.contains(new RegExp(`^${count} words?$`));
+      cy.get(rows).first().should("contain", "in progress");
+    });
+    cy.get(tabs).contains("a", /^All/).click();
+    cy.location("search").should("eq", "");
+    cy.get(tabs).contains("a", /^All/).should("have.attr", "aria-current", "page");
+  });
+
+  it("lists the words not started under their tab", () => {
+    cy.visit("/");
+    cy.get(tabs).contains("a", "Not started").click();
+    cy.location("search").should("eq", "?q=status%3Atodo");
+    cy.get(rows).first().should("not.contain", "in progress").and("not.contain", "approved");
+  });
+
+  it("sorts by a column when you click its heading, the other way on the next click, and back to the default on the third", () => {
+    const english = () =>
+      cy.get(rows).then(($rows) => [...$rows].map((row) => row.querySelector("a")!.children[2].textContent!.toLowerCase()));
+    cy.visit("/");
+    cy.get(sorting).contains("a", "English").click();
+    cy.location("search").should("eq", "?q=sort%3Aenglish");
+    english().then((names) => expect(names).to.deep.equal([...names].sort()));
+    cy.get(sorting).contains("a", "English").should("have.attr", "aria-current", "true").click();
+    cy.location("search").should("eq", "?q=sort%3A-english");
+    english().then((names) => expect(names).to.deep.equal([...names].sort().reverse()));
+    cy.get(sorting).contains("a", "English").click();
+    cy.location("search").should("eq", "");
+  });
+
+  it("changes only the sort of what you typed when you click a heading", () => {
+    cy.visit(typed('pos:noun "book" sort:rank'));
+    cy.get(sorting).contains("a", "Arabic").click();
+    cy.location("search").should((search) => expect(new URLSearchParams(search).get("q")).to.equal('pos:noun "book" sort:arabic'));
+  });
+
+  it("keeps the query when you move between pages", () => {
+    cy.visit(typed("pos:noun"));
+    cy.get(pager).first().contains("a", "Next").click();
+    cy.location("search").should("eq", "?q=pos%3Anoun&page=2");
+    cy.get(rows).should("have.length", 100);
+    cy.get(pager).first().contains("a", "First").click();
+    cy.location("search").should("eq", "?q=pos%3Anoun");
+  });
+
+  it("lists Wiktionary entries that have no card among the words, each opening its own card", () => {
+    const search = typed("على rank:none");
+    cy.visit(search);
+    cy.get(rows).should("have.length.at.least", 3);
+    [0, 1, 2].forEach((i) => {
+      cy.visit(search);
+      cy.get(rows).eq(i).find('[lang="ar"]').invoke("text").then((lemma) => {
+        expect(lemma.replace(/[\u064B-\u0652]/g, "").replace("ى", "ي"), "the letters of the entry").to.equal("علي");
+        cy.get(rows).eq(i).click();
+        cy.get('[aria-label="Arabic headword"]').should("have.value", lemma);
+      });
     });
   });
 });
