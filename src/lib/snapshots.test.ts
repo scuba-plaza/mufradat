@@ -3,7 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { audioKey, audioPath } from "./audio";
-import { createSnapshot, deleteSnapshot, listSnapshots, restoreSnapshot, snapshotAudioPath, snapshotUsage } from "./snapshots";
+import { createSnapshot, dailyDue, deleteSnapshot, listSnapshots, restoreSnapshot, snapshotAudioPath, snapshotUsage } from "./snapshots";
+import type { SnapshotReason } from "./types";
 import { openStore } from "./store";
 
 const mp3 = Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]);
@@ -324,5 +325,28 @@ describe("retention never gets in the way of a restore", () => {
     expect(listSnapshots(root).map((s) => s.id)).toEqual([snapshot.id]);
     expect(logged).toHaveBeenCalledTimes(1);
     logged.mockRestore();
+  });
+});
+
+describe("deciding whether a daily snapshot is due", () => {
+  const made = (reason: SnapshotReason, when: Date) => ({ reason, createdAt: when.toISOString() });
+  const morning = new Date(2026, 10, 6, 8, 0);
+
+  it("is not due while there are no cards", () => {
+    expect(dailyDue([], new Date(2026, 10, 6, 9, 0), 0)).toBe(false);
+  });
+
+  it("is due when there is no daily snapshot yet", () => {
+    expect(dailyDue([], new Date(2026, 10, 6, 9, 0), 1)).toBe(true);
+  });
+
+  it("is not due when a daily snapshot was made earlier the same day, and is due again after midnight", () => {
+    expect(dailyDue([made("daily", morning)], new Date(2026, 10, 6, 23, 59), 1)).toBe(false);
+    expect(dailyDue([made("daily", morning)], new Date(2026, 10, 7, 0, 5), 1)).toBe(true);
+  });
+
+  it("is not satisfied by a snapshot of another kind", () => {
+    const others = [made("manual", morning), made("before-reset", morning)];
+    expect(dailyDue(others, new Date(2026, 10, 6, 9, 0), 1)).toBe(true);
   });
 });

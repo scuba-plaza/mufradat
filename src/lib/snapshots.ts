@@ -97,6 +97,16 @@ function writeSnapshot(store: Store, reason: SnapshotReason, now: Date, id: stri
   }
 }
 
+export function localDay(date: Date): string {
+  const two = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}`;
+}
+
+export function dailyDue(snapshots: Pick<SnapshotInfo, "reason" | "createdAt">[], now: Date, cards: number): boolean {
+  const today = localDay(now);
+  return cards > 0 && !snapshots.some((s) => s.reason === "daily" && localDay(new Date(s.createdAt)) === today);
+}
+
 function pruneQuietly(root: string, limits?: Limits): void {
   try {
     applyRetention(root, limits);

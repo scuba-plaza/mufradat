@@ -1,8 +1,28 @@
 import { NextResponse } from "next/server";
 import { loadConfig, type Config } from "./config";
+import { createSnapshot, dailyDue, listSnapshots, localDay } from "./snapshots";
 import { openStore, type Store } from "./store";
 
-const g = globalThis as unknown as { __mufradat?: { workspace: string; store: Store } };
+interface Entry {
+  workspace: string;
+  store: Store;
+  dailyDay?: string;
+}
+
+const g = globalThis as unknown as { __mufradat?: Entry };
+
+function ensureDaily(entry: Entry, now: Date): void {
+  const day = localDay(now);
+  if (entry.dailyDay === day) return;
+  const { cards } = entry.store.counts();
+  if (cards === 0) return;
+  entry.dailyDay = day;
+  try {
+    if (dailyDue(listSnapshots(entry.store.root), now, cards)) createSnapshot(entry.store, "daily", { now });
+  } catch (error) {
+    console.error(error);
+  }
+}
 
 /** The config as it is now, and the store for its workspace. */
 export function context(): { cfg: Config; store: Store } {
@@ -11,6 +31,7 @@ export function context(): { cfg: Config; store: Store } {
     g.__mufradat?.store.close();
     g.__mufradat = { workspace: cfg.workspace, store: openStore(cfg.workspace) };
   }
+  ensureDaily(g.__mufradat, new Date());
   return { cfg, store: g.__mufradat.store };
 }
 

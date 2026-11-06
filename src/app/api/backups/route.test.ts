@@ -26,6 +26,7 @@ describe("the backups API", () => {
     vi.stubEnv("MUFRADAT_WORKSPACE", path.join(home, "workspace"));
   });
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllEnvs();
     fs.rmSync(home, { recursive: true, force: true });
   });
@@ -71,5 +72,30 @@ describe("the backups API", () => {
     expect(check.missingAudio).toEqual([
       { noteId: id, lemma: store.getNote(id)!.lemma, slot: "word", slotName: "word", key: audioKey(mp3) },
     ]);
+  });
+
+  it("takes one daily snapshot on the first request of a day that finds cards", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 6, 9, 0));
+    const dailies = async () =>
+      ((await (await GET()).json()).snapshots as SnapshotInfo[]).filter((s) => s.reason === "daily").length;
+    expect(await dailies()).toBe(0);
+    openCard(context().store, { rank: 10 });
+    expect(await dailies()).toBe(1);
+    expect(await dailies()).toBe(1);
+    vi.setSystemTime(new Date(2026, 10, 7, 0, 5));
+    expect(await dailies()).toBe(2);
+  });
+
+  it("does not fail a request when the daily snapshot cannot be written", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 6, 9, 0));
+    const { store } = context();
+    openCard(store, { rank: 10 });
+    fs.writeFileSync(path.join(store.root, "snapshots"), "in the way");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => context()).not.toThrow();
+    expect(logged).toHaveBeenCalledTimes(1);
+    logged.mockRestore();
   });
 });
