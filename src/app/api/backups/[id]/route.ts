@@ -16,15 +16,16 @@ export const GET = (_req: Request, { params }: Ctx) =>
     } catch (e) {
       return fail((e as Error).message);
     }
-    const response = new Response(backupZipStream(entries), {
+    const delivered = () => {
+      try {
+        recordDownload(store.root);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    return new Response(backupZipStream(entries, delivered), {
       headers: { "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="mufradat-backup-${id}.zip"` },
     });
-    try {
-      recordDownload(store.root);
-    } catch (error) {
-      console.error(error);
-    }
-    return response;
   });
 
 export const DELETE = (_req: Request, { params }: Ctx) =>

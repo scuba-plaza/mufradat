@@ -91,13 +91,15 @@ async function* chunks(entries: BackupEntry[]): AsyncGenerator<Uint8Array> {
   yield end;
 }
 
-export function backupZipStream(entries: BackupEntry[]): ReadableStream<Uint8Array> {
+export function backupZipStream(entries: BackupEntry[], onEnd?: () => void): ReadableStream<Uint8Array> {
   const source = chunks(entries);
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       const next = await source.next();
-      if (next.done) controller.close();
-      else controller.enqueue(next.value);
+      if (next.done) {
+        onEnd?.();
+        controller.close();
+      } else controller.enqueue(next.value);
     },
     async cancel() {
       await source.return(undefined);

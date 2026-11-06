@@ -35,7 +35,7 @@ function storeClip(bytes: Uint8Array, to: string): void {
 }
 
 function copyClip(from: string, to: string, key: string): boolean {
-  if (fs.existsSync(to)) return true;
+  if (clipIsSound(to, key)) return true;
   if (!fs.existsSync(from)) return false;
   const bytes = fs.readFileSync(from);
   if (audioKey(bytes) !== key) return false;
@@ -252,7 +252,7 @@ export function lastDownload(root: string): string | null {
 
 export function backupEntries(root: string, id: string): BackupEntry[] {
   const manifest = knownManifest(root, id);
-  if (!manifest.audioKeys.every((key) => fs.existsSync(snapshotAudioPath(root, key)))) throw new Error(CLIPS_GONE);
+  if (!manifest.audioKeys.every((key) => clipIsSound(snapshotAudioPath(root, key), key))) throw new Error(CLIPS_GONE);
   const dir = path.join(snapshotsDir(root), id);
   return [
     { name: "manifest.json", file: path.join(dir, "manifest.json") },
@@ -352,9 +352,7 @@ export function restoreSnapshot(store: Store, id: string, options: SnapshotOptio
   const now = options.now ?? new Date();
   writeSnapshot(store, "before-restore", now, freeId(store.root, now, "before-restore"));
   for (const key of manifest.audioKeys) {
-    const live = audioPath(store.root, key);
-    if (!clipIsSound(live, key)) fs.rmSync(live, { force: true });
-    copyClip(snapshotAudioPath(store.root, key), live, key);
+    copyClip(snapshotAudioPath(store.root, key), audioPath(store.root, key), key);
   }
   const staged = path.join(store.root, "vocabulary.db.restoring");
   fs.copyFileSync(path.join(snapshotsDir(store.root), id, "vocabulary.db"), staged);

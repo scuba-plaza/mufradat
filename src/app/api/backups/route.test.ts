@@ -135,7 +135,7 @@ describe("the backups API", () => {
     expect(await lastDownloadedAt()).toBeNull();
     expect((await downloadBackup("20260101T000000Z-manual")).status).toBe(404);
     expect(await lastDownloadedAt()).toBeNull();
-    await downloadBackup(snapshot.id);
+    await (await downloadBackup(snapshot.id)).arrayBuffer();
     expect(await lastDownloadedAt()).toBe("2026-11-06T10:00:00.000Z");
   });
 
@@ -164,5 +164,27 @@ describe("the backups API", () => {
     expect(openBackupZip(file).names).toContain("manifest.json");
     expect(logged).toHaveBeenCalledTimes(1);
     logged.mockRestore();
+  });
+
+  it("answers 400 instead of a download the other end would refuse when a clip in the backup is damaged", async () => {
+    const { store } = context();
+    const id = openCard(store, { rank: 10 })!;
+    store.setAudio(id, "word", mp3, "tts");
+    const { snapshot } = await (await POST()).json();
+    fs.writeFileSync(snapshotAudioPath(store.root, audioKey(mp3)), Buffer.from("x"));
+    const res = await downloadBackup(snapshot.id);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "The backup is missing or has damaged audio clips." });
+  });
+
+  it("does not say a backup was downloaded when the download is cancelled part way", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-06T10:00:00Z"));
+    openCard(context().store, { rank: 10 });
+    const { snapshot } = await (await POST()).json();
+    const reader = (await downloadBackup(snapshot.id)).body!.getReader();
+    await reader.read();
+    await reader.cancel();
+    expect(await lastDownloadedAt()).toBeNull();
   });
 });

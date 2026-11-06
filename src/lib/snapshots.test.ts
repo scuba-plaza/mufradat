@@ -524,3 +524,18 @@ describe("refusing an import", () => {
     expect(imported).toMatchObject({ cards: 1, approved: 0 });
   });
 });
+
+describe("a damaged clip in the snapshot folder", () => {
+  it("is replaced from the live clip by the next snapshot, so that later snapshots still restore", () => {
+    const { root, store } = workspace();
+    const card = store.createNote(kitab);
+    store.setAudio(card.id, "word", mp3, "tts");
+    createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
+    fs.writeFileSync(snapshotAudioPath(root, audioKey(mp3)), Buffer.alloc(0));
+    const later = createSnapshot(store, "manual", at("2026-11-06T11:00:00Z"));
+    store.deleteNote(card.id);
+    fs.rmSync(path.join(root, "audio"), { recursive: true });
+    restoreSnapshot(store, later.id, at("2026-11-06T12:00:00Z"));
+    expect(fs.readFileSync(audioPath(root, audioKey(mp3)))).toEqual(mp3);
+  });
+});
