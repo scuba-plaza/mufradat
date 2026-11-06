@@ -59,6 +59,7 @@ function centralHeader(nameBytes: Buffer, crc: number, size: number, offset: num
 }
 
 async function* chunks(entries: BackupEntry[]): AsyncGenerator<Uint8Array> {
+  if (entries.length >= 0xffff) throw new Error("The backup has too many files for one zip.");
   const central: Buffer[] = [];
   let offset = 0;
   for (const { name, file } of entries) {
@@ -126,7 +127,6 @@ function parse(fd: number): BackupZip {
     if (fs.readSync(fd, buffer, 0, length, position) !== length) return refuse();
     return buffer;
   };
-  if (total < 22) refuse();
   const end = readAt(22, total - 22);
   if (end.readUInt32LE(0) !== END || end.readUInt16LE(4) !== 0 || end.readUInt16LE(6) !== 0 || end.readUInt16LE(20) !== 0) refuse();
   const count = end.readUInt16LE(10);

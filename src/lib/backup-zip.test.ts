@@ -59,6 +59,13 @@ describe("reading back what the writer wrote", () => {
   });
 });
 
+describe("writing a backup that cannot be listed", () => {
+  it("refuses more files than a zip can list, before sending anything", async () => {
+    const many: BackupEntry[] = Array.from({ length: 65535 }, (_, i) => ({ name: `audio/ab/${i}`, file: "/nonexistent" }));
+    await expect(backupZipStream(many).getReader().read()).rejects.toThrow("The backup has too many files for one zip.");
+  });
+});
+
 describe("refusing what is not a backup", () => {
   const refused = "This is not a Mufradat backup.";
   const stored = (contents: [string, Buffer][]) => zipStored(contents.map(([name, data]) => ({ name, data })));
@@ -91,6 +98,18 @@ describe("refusing what is not a backup", () => {
       const backup = openBackupZip(file);
       for (const name of backup.names) backup.read(name);
     }).toThrow(refused);
+  });
+
+  it("refuses a database whose bytes changed, and leaves no copy behind", () => {
+    const file = path.join(scratch(), "bad-db.zip");
+    const zip = stored(valid());
+    zip[zip.indexOf(database)] ^= 0xff;
+    fs.writeFileSync(file, zip);
+    const backup = openBackupZip(file);
+    const dest = path.join(scratch(), "out.db");
+    expect(() => backup.copyTo("vocabulary.db", dest)).toThrow(refused);
+    expect(fs.existsSync(dest)).toBe(false);
+    backup.close();
   });
 
   it("refuses to read a manifest or clip larger than a clip may be", () => {
