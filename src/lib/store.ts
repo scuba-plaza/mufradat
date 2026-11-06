@@ -321,7 +321,7 @@ export function openStore(dir: string) {
   }
 
   return {
-    root, findNote, approvedNotes, allNotes, counts, check, exportDatabase, audioKeys, close: () => db.close(), getNote, deleteNote, unusedAudio, deleteUnusedAudio, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
+    root, findNote, approvedNotes, allNotes, counts, check, exportDatabase, audioKeys, isOpen: () => db.open, close: () => db.close(), getNote, deleteNote, unusedAudio, deleteUnusedAudio, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
     applyGeneratedExample, approve,
   };
 }
