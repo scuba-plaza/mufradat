@@ -1,13 +1,13 @@
 # Workspace safety and long-term management: plan and design
 
-Status: revised after the owner's answers, waiting for the seams in "Seams to confirm" to be agreed. Nothing here is implemented.
+Status: the owner has confirmed the seams and supplied measurements. One decision is still open: how a downloaded backup gets back into the app (see Questions). Nothing here is implemented.
 
 ## How this plan is to be used
 
 Implementation of every phase is guided by the `tdd` and `laws-of-simplicity` skills (in this environment `anthropic-skills:tdd` and `anthropic-skills:laws-of-simplicity`). Load both before each phase. How their rules apply here:
 
 `tdd`
-- Tests live only at the seams agreed in "Seams to confirm". No test is written at a seam the owner has not confirmed.
+- Tests live only at the seams in "Seams", which the owner has confirmed. A new seam needs the owner's agreement first.
 - Vertical slices: one failing test, the minimum code to pass it, then choose the next test from what that taught. The slice lists below are candidates in a likely order, not a batch to write up front.
 - Tests observe behaviour through the public interface. A restore is checked by reading the card back through the store, not by opening the snapshot database; audio is checked by playing it, not by listing the backup folder.
 - Expected values are literals (a byte count, a count of snapshots), never recomputed the way the code computes them.
@@ -116,9 +116,10 @@ Step 2 always runs, so a restore is itself undone by restoring the `before-resto
 ### 4. One file out, one file in
 
 - Download: `GET /api/backups/<id>` serves a zip of `manifest.json`, `vocabulary.db` and the snapshot's clips, built file by file from the snapshot folder with a streaming writer (data descriptors), not in memory. It never contains the config or the exports. The dialog shows when a snapshot was last downloaded, quietly and only as information: this is the one protection that survives losing the laptop, and automatic snapshots cannot give it.
+- Restoring from a file only matters after a disk loss or on a fresh install. Undoing a mistake on the same machine is the Restore button and involves no file.
 - Import reads from a folder, not from an upload: the owner puts the zip in `<workspace>/imports/`, the dialog lists the zips it finds there, and Import turns one into an `imported` snapshot. The same Restore button then switches to it, so there is one restore path, and the list row shows the manifest counts as the preview. `POST /api/backups/import` takes the file name, which must match `^[\w.-]+\.zip$` and is resolved only inside `imports/`.
 - The zip reader reads from a file with positional reads, so memory stays flat. It accepts only what the writer produces: stored entries, no zip64, no encryption, no duplicates. Entry names must match an allowlist (`manifest.json`, `vocabulary.db`, `audio/xx/<16 hex>.mp3`) and are rebuilt from the matched groups, never used as paths. Each entry's CRC is checked, a clip's hash must equal the key in its name, and the database must pass `integrity_check` before the snapshot appears.
-- Why not an upload button: the Next version in use (15.5.29) clones request bodies for middleware with a default cap of 10 MiB (see Evidence), and the backup is hundreds of megabytes. Raising the cap or moving the route out from under the cross-site guard would change how the whole app is protected, to save the owner from copying one file into one folder, once, after a disaster.
+- Why not an upload button: the Next version in use (15.5.29) clones request bodies for middleware with a default cap of 10 MiB (see Evidence). At the measured 32 KB of audio per word a backup passes that at around 300 words, so an upload button would work today and stop working soon. Raising the cap or moving the route out from under the cross-site guard would change how the whole app is protected, to save the owner from copying one file into one folder, once, after a disaster.
 - Not merged: importing never combines two workspaces. That needs a rule for `UNIQUE (lemma, pos)` and for edits on both sides, and a single-machine owner has no use for it.
 
 ### 5. Workspace check
@@ -140,21 +141,28 @@ Routes, in the existing `handle` / `fail` / `context` style: `GET` and `POST` on
 
 ## How big is a snapshot
 
-Not measured; the real workspace is on the owner's laptop. What I can say:
+Measured on the owner's workspace, which has about 30 words: `audio/` is 976 KB and `vocabulary.db` is 88 KB. Everything below is arithmetic from those two numbers, so it is an estimate. The number of clips was not supplied, so the size of one clip is unknown, and all 30 cards are assumed to be voiced.
 
-- The database copy is small: cards are short text rows, so a few megabytes at 5,000 cards (an estimate).
-- Audio is the bulk and is stored once for all snapshots. The word list has 5,000 entries, so a finished deck is at most 5,000 cards. Speech MP3 is on the order of 4 to 16 KB per second; a word is about a second, an example about four, a form about one. That is roughly 30 to 120 KB per fully voiced card, so 150 to 600 MB of audio for a finished deck (an estimate).
-- Total for the automatic snapshots: about one copy of the audio, plus clips since replaced, plus up to 28 database copies of a few megabytes. That is expected to be well under 1 GiB now and to stay under it through a finished deck. 3 GiB is not expected to be needed.
-- Decision rule: ship with 1 GiB. Raise it, to 3 GiB at most, only if the numbers measured on the real workspace say it is needed: audio plus database above about 0.7 GiB. The limit is a constant in `snapshots.ts`, not a setting.
+- Audio: 976 KB over 30 words is about 32 KB per word. If some of the 30 cards have no audio yet, the real figure per voiced card is higher, so the upper figures below use a margin of two (about 65 KB).
+- Database: an empty schema already takes about 48 KB (twelve pages of 4 KB: the tables and their indexes), which leaves about 1.5 to 3 KB per card. Scaling 88 KB straight up gives the upper end.
 
-To measure, on the laptop (adjust the path if `MUFRADAT_WORKSPACE` is set):
+| Words | Database copy | Audio, stored once | One more daily snapshot adds | Everything the automatic snapshots hold, at most |
+|---|---|---|---|---|
+| 30 (today) | 88 KB | 1 MB | 88 KB, plus new clips | about 3.5 MB |
+| 1,000 | 1.5 to 3 MB | 33 to 65 MB | 1.5 to 3 MB, plus new clips | about 75 to 150 MB |
+| 5,000 | 8 to 15 MB | 160 to 325 MB | 8 to 15 MB, plus new clips | about 390 to 750 MB |
 
-    du -sh ~/.local/share/mufradat/audio ~/.local/share/mufradat/vocabulary.db
-    find ~/.local/share/mufradat/audio -name '*.mp3' | wc -l
+"At most" is the audio once plus 28 database copies, the full count of 14 daily and 14 `before-*`. In practice there are fewer.
 
-## Seams to confirm
+- A snapshot contains the whole workspace, about 35 MB at 1,000 words and 170 to 340 MB at 5,000. Because clips are stored once, a new snapshot only costs a database copy plus the clips made since the last one.
+- Audio is on disk twice once snapshots exist: live and in the snapshot folder.
+- 1 GiB holds a finished 5,000-word deck even at the upper figures, which reach about 70% of it. 3 GiB is not needed, and the budget stays at 1 GiB.
+- At the upper end the database copies are the biggest part after the audio. If space ever got tight, compressing the database copies (text compresses well) is the lever to pull before raising the limit. It is not built.
+- Decision rule: if the usage the dialog shows for the automatic snapshots ever passes 0.8 GiB, raise the constant in `snapshots.ts`, to 3 GiB at most. It is a constant, not a setting.
 
-The `tdd` skill requires these to be agreed before any test is written.
+## Seams
+
+Confirmed by the owner on 2026-11-06, as the `tdd` skill requires before any test is written.
 
 | # | Seam | What it catches | What it misses |
 |---|---|---|---|
@@ -249,21 +257,20 @@ Traced in the code:
 - `zip.ts` can write a stored zip and cannot read one.
 - Next 15.5.29, read from the package source: `experimental.middlewareClientMaxBodySize` defaults to 10485760 bytes; the body-cloning code ends the stream after that many bytes and logs a warning, so only the first 10 MiB would be available. Not traced: whether a route handler is affected when its path is outside the middleware matcher. The design does not depend on the answer.
 - The word list has 5,000 entries (`data/ranking.tsv`), which bounds the deck.
+- Measured on the owner's workspace (about 30 words): `audio/` 976 KB, `vocabulary.db` 88 KB. The size table is derived from these.
 
 Open, to be settled by the first slices:
 
 - Whether the bundled SQLite supports `VACUUM INTO` (Phase 1, slice 1).
-- Real clip and database sizes on the owner's workspace; the numbers above are estimates.
-- How long the first snapshot takes with the audio of a real workspace. It is synchronous; if it is noticeable, the first one moves out of the request.
+- The average size of one clip: the clip count of the owner's workspace was not supplied, so the per-card audio figure assumes all 30 cards are voiced.
+- How long the first snapshot takes. At 5,000 words that is roughly 160 to 325 MB to read, hash and write, probably a few seconds on an SSD, unmeasured. It is synchronous; if it is noticeable, the first one moves out of the request.
 - Whether the daily check in `context()` is measurable on a real database.
 - The day boundary is the local date and snapshot ids use UTC; a test pins this across midnight.
 
 ## Questions
 
-1. Are the six seams above the right ones to test at? The `tdd` skill needs this answered before the first test.
-2. Import from a folder (copy the zip into `imports/`), not from an upload button: acceptable?
-3. Optional: running the two commands above on the laptop and sending the numbers would replace the estimates; the plan starts at 1 GiB either way.
+1. Restoring on a fresh install, for example a new laptop after a disk loss: how should the downloaded backup file get back into the app? The plan says to copy the file into the `imports/` folder inside the data folder and press Import in the dialog. The alternative is an "Import backup…" button with a file picker, which stops working above 10 MiB (around 300 words) unless the app's cross-site protection is reworked. Undoing a mistake on the same machine never involves a file: that is the Restore button.
 
 ## Next step
 
-After the seams are confirmed, the `writing-plans` skill turns each phase into task-sized steps; `tdd` and `laws-of-simplicity` guide those steps as described at the top.
+Once the import question is answered, the `writing-plans` skill turns each phase into task-sized steps; `tdd` and `laws-of-simplicity` guide those steps as described at the top.
