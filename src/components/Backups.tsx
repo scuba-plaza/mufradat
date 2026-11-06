@@ -1,0 +1,169 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import type { SnapshotInfo, SnapshotReason, SnapshotUsage, WorkspaceCheck } from "@/lib/types";
+import { api } from "./api";
+
+interface BackupsData {
+  snapshots: SnapshotInfo[];
+  usage: SnapshotUsage;
+  check: WorkspaceCheck;
+}
+
+const REASONS: Record<SnapshotReason, string> = {
+  manual: "Backed up by you",
+  daily: "Daily",
+  "before-reset": "Before a reset",
+  "before-restore": "Before a restore",
+  imported: "Imported",
+};
+
+const noun = (count: number) => (count === 1 ? "card" : "cards");
+
+const MEGABYTE = 1024 * 1024;
+const GIGABYTE = 1024 * MEGABYTE;
+
+const size = (bytes: number) =>
+  bytes < 1024
+    ? `${bytes} B`
+    : bytes < MEGABYTE
+      ? `${Math.round(bytes / 1024)} KB`
+      : bytes < GIGABYTE
+        ? `${(bytes / MEGABYTE).toFixed(1)} MB`
+        : `${(bytes / GIGABYTE).toFixed(1)} GB`;
+
+export default function Backups() {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<BackupsData | null>(null);
+  const [confirming, setConfirming] = useState<SnapshotInfo | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const el = dialog.current;
+    if (!el) return;
+    if (open && !el.open) el.showModal();
+    if (!open && el.open) el.close();
+  }, [open]);
+
+  async function run(call: () => Promise<void>) {
+    setBusy(true);
+    setError("");
+    try {
+      await call();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const load = async () => setData(await api<BackupsData>("/api/backups"));
+
+  const show = () => {
+    setOpen(true);
+    return run(load);
+  };
+
+  const backUp = () =>
+    run(async () => {
+      await api("/api/backups", { method: "POST" });
+      await load();
+    });
+
+  const restore = (s: SnapshotInfo) =>
+    run(async () => {
+      setConfirming(null);
+      await api(`/api/backups/${s.id}/restore`, { method: "POST" });
+      window.location.reload();
+    });
+
+  const remove = (s: SnapshotInfo) =>
+    run(async () => {
+      await api(`/api/backups/${s.id}`, { method: "DELETE" });
+      await load();
+    });
+
+  const close = () => {
+    setOpen(false);
+    setData(null);
+    setConfirming(null);
+    setError("");
+  };
+
+  return (
+    <div className="text-sm">
+      <button className="action-quiet" aria-haspopup="dialog" disabled={busy} onClick={show}>Backups…</button>
+      <dialog
+        ref={dialog}
+        aria-labelledby="backups-title"
+        onClose={close}
+        onClick={(e) => e.target === dialog.current && close()}
+        className="w-[calc(100%-2.5rem)] max-w-2xl rounded-modal border border-rule bg-surface p-0 text-ink shadow-modal backdrop:bg-black/70"
+      >
+        <div className="p-6">
+          <h2 id="backups-title" className="text-xl font-semibold tracking-title">Backups</h2>
+          <p className="mt-2 text-sm text-quiet">These backups are on this computer. Download one to keep a copy somewhere else.</p>
+          {error && <p role="alert" className="mt-2 break-words text-danger">{error}</p>}
+          {data && (
+            <>
+              <p className="mt-2 text-sm text-quiet">
+                Automatic backups use {size(data.usage.automaticBytes)} of {size(data.usage.budgetBytes)}; all backups use {size(data.usage.totalBytes)}.
+                {data.usage.automaticBytes > data.usage.budgetBytes && " The newest automatic backups alone are over that limit."}
+              </p>
+              {(data.check.integrity !== "ok" || data.check.missingAudio.length > 0) && (
+                <ul role="status" className="mt-3 space-y-1 text-danger">
+                  {data.check.integrity !== "ok" && <li className="break-words">The database reports a problem: {data.check.integrity}</li>}
+                  {data.check.missingAudio.map((m) => (
+                    <li key={`${m.noteId}-${m.slot}`}>
+                      No audio file for the {m.slotName} of <a className="underline" href={`/cards/${m.noteId}`}>{m.lemma}</a>. Open the card to generate or upload it again.
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {confirming ? (
+                <div className="mt-4">
+                  <p role="status">
+                    Restore the backup from {new Date(confirming.createdAt).toLocaleString()}? It has {confirming.cards} {noun(confirming.cards)} ({confirming.approved} approved);
+                    the workspace has {data.check.cards} ({data.check.approved} approved) now. Your current state is saved first.
+                  </p>
+                  <div className="mt-4 flex justify-end gap-3">
+                    <button className="action" onClick={() => setConfirming(null)}>Cancel</button>
+                    <button className="action-main" disabled={busy} onClick={() => restore(confirming)}>Restore</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="mt-4">
+                    <button className="action" disabled={busy} onClick={backUp}>Back up now</button>
+                  </div>
+                  {data.snapshots.length === 0 ? (
+                    <p className="mt-4">No backups yet.</p>
+                  ) : (
+                    <ol aria-label="Backups" className="mt-4">
+                      {data.snapshots.map((s) => (
+                        <li key={s.id} className="border-t border-rule py-3">
+                          <p>{REASONS[s.reason]} · {new Date(s.createdAt).toLocaleString()}</p>
+                          <p className="text-quiet">{s.cards} {noun(s.cards)} · {s.approved} approved</p>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            <button className="action-quiet" disabled={busy} onClick={() => setConfirming(s)}>Restore…</button>
+                            <button className="action-quiet" disabled={busy} onClick={() => remove(s)}>Delete</button>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </>
+              )}
+            </>
+          )}
+          {!confirming && (
+            <div className="mt-6 flex justify-end gap-3">
+              <button className="action" onClick={close}>Close</button>
+            </div>
+          )}
+        </div>
+      </dialog>
+    </div>
+  );
+}

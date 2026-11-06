@@ -43,6 +43,16 @@ Without a `sort:` the words come in the order of the frequency list, the ones yo
 
 A term the bar cannot read, or a quote that is not closed, is named under the bar and no words are listed. A card you made from a Wiktionary entry and then gave another headword no longer counts as made from it, so the entry shows again as not started. Clicking Arabic, English or # above the list sorts by it, again for the other way, a third time for the default order; only the `sort:` term changes.
 
+## Backups
+
+The Backups… button at the bottom of the home page opens the list of backups. A backup is the whole workspace at one moment: the database and every audio clip it needs, so a restore never needs audio generated again.
+
+- Taken automatically, with no setting: once a day, on the first visit of the day that finds cards; and just before Reset word and just before a restore. Back up now takes one when you want it.
+- Kept: the newest 14 daily backups, the newest 14 of those taken before a reset or a restore, and at most 1 GiB for all of these together; a clip that several backups share counts once. Backups made with Back up now are never removed on their own, and do not count toward the limit.
+- Restore brings the workspace back to a backup. It first takes a backup of the current state, so a restore is undone by restoring that one. A backup that is damaged, written by a newer Mufradat, or missing audio is refused and nothing changes.
+- The dialog also names any clip whose audio file is missing from the workspace, with a link to its card, and any problem the database reports about itself.
+- These backups are on this computer. Copying the workspace folder copies them too.
+
 ## Layout
 
 One centered column, 44rem wide on small screens and 58rem from 1024px up, where text, controls and spacing are about 1.2 times as large, the size that 120% zoom gives on a 1920×1200 screen at 100% zoom. The sizes are CSS variables in `src/app/globals.css`, set once and overridden once for the larger screens; browser zoom and the system text size still apply.
@@ -60,7 +70,7 @@ On a word, while no field has focus and no dialog is open: Ctrl+← and Ctrl+→
 
 ## Files
 
-- Workspace (`~/.local/share/mufradat`, or `MUFRADAT_WORKSPACE`): `vocabulary.db`, `audio/` (named by the hash of the audio), `exports/`.
+- Workspace (`~/.local/share/mufradat`, or `MUFRADAT_WORKSPACE`): `vocabulary.db`, `audio/` (named by the hash of the audio), `exports/`, `snapshots/` (the backups, with their own copy of the audio).
 - Config `~/.config/mufradat/config.toml`, readable only by you (`chmod 600`); the app refuses to read it otherwise:
 
       mistral_api_key = "..."

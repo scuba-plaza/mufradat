@@ -58,5 +58,9 @@ for (let i = 0; !(await alive()); i++) {
   await new Promise((r) => setTimeout(r, 500));
 }
 
-const cypress = spawn("pnpm", ["exec", "cypress", mode, "--e2e", "--browser", browser, "--config", `baseUrl=${baseUrl}`, ...extra], { cwd: root, stdio: "inherit" });
+const cypress = spawn("pnpm", ["exec", "cypress", mode, "--e2e", "--browser", browser, "--config", `baseUrl=${baseUrl}`, ...extra], {
+  cwd: root,
+  stdio: "inherit",
+  env: { ...process.env, CYPRESS_WORKSPACE: env.MUFRADAT_WORKSPACE },
+});
 cypress.on("exit", (code) => finish(code ?? 1));

@@ -1,3 +1,4 @@
+import Backups from "@/components/Backups";
 import ExportButton from "@/components/ExportButton";
 import Pager from "@/components/Pager";
 import StatusMark from "@/components/StatusMark";
@@ -107,6 +108,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2 py-6">
         <ExportButton approved={count("approved")} />
         <UnusedAudio />
+        <Backups />
       </div>
     </>
   );
