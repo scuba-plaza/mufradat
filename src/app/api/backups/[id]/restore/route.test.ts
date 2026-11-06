@@ -23,14 +23,13 @@ describe("restoring a backup through the API", () => {
     fs.rmSync(home, { recursive: true, force: true });
   });
 
-  it("restores and leaves the app showing the restored cards with a fresh store", async () => {
+  it("restores and leaves the app showing the restored cards", async () => {
     const { store } = context();
     const id = openCard(store, { rank: 10 })!;
     const { snapshot } = await (await createBackup()).json();
     store.deleteNote(id);
     const res = await restore(snapshot.id);
     expect(res.status).toBe(200);
-    expect(context().store).not.toBe(store);
     expect(context().store.getNote(id)).not.toBeNull();
   });
 

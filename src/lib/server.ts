@@ -8,7 +8,7 @@ const g = globalThis as unknown as { __mufradat?: { workspace: string; store: St
 export function context(): { cfg: Config; store: Store } {
   const cfg = loadConfig();
   if (!g.__mufradat || g.__mufradat.workspace !== cfg.workspace || !g.__mufradat.store.isOpen()) {
-    if (g.__mufradat?.store.isOpen()) g.__mufradat.store.close();
+    g.__mufradat?.store.close();
     g.__mufradat = { workspace: cfg.workspace, store: openStore(cfg.workspace) };
   }
   return { cfg, store: g.__mufradat.store };
