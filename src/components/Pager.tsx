@@ -1,7 +1,7 @@
 import type { Paging } from "@/lib/paging";
 
-/** Links between pages of the list, and a box to jump to the page of a rank. Plain links and a GET form: no client code. */
-export default function Pager({ paging, total, label = "Pages" }: { paging: Paging; total: number; label?: string }) {
+/** Links between pages of the list. Plain links: no client code. */
+export default function Pager({ paging, label = "Pages" }: { paging: Paging; label?: string }) {
   const href = (page: number) => `/?page=${page}`;
   return (
     <nav aria-label={label} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 text-sm text-quiet">
@@ -18,10 +18,6 @@ export default function Pager({ paging, total, label = "Pages" }: { paging: Pagi
           <a className="action-quiet" href={href(paging.pages)}>Last</a>
         </>
       )}
-      <form action="/" className="ml-auto flex items-center gap-2">
-        <input className="field w-28" name="rank" type="number" min={1} max={total} required placeholder="Go to rank" aria-label="Go to rank" />
-        <button className="action">Go</button>
-      </form>
     </nav>
   );
 }

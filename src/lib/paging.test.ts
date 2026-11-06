@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pageForRank, paginate, requestedPage } from "./paging";
+import { paginate, requestedPage } from "./paging";
 
 describe("paginating the frequency list", () => {
   it("gives the first of 50 pages for 5000 words in pages of 100", () => {
@@ -31,40 +31,17 @@ describe("paginating the frequency list", () => {
   });
 });
 
-describe("finding the page of a rank", () => {
-  it("counts ranks 1 to 100 as page 1 and 101 as page 2", () => {
-    expect(pageForRank(1, 100)).toBe(1);
-    expect(pageForRank(100, 100)).toBe(1);
-    expect(pageForRank(101, 100)).toBe(2);
-  });
-
-  it("puts rank 2500 on page 25 and rank 2501 on page 26", () => {
-    expect(pageForRank(2500, 100)).toBe(25);
-    expect(pageForRank(2501, 100)).toBe(26);
-  });
-});
-
 describe("choosing the page to show", () => {
-  it("shows the page asked for, even when a rank is given too", () => {
-    expect(requestedPage({ page: "3", rank: "900" }, 5, 100)).toBe(3);
+  it("shows the page asked for", () => {
+    expect(requestedPage({ page: "3" })).toBe(3);
   });
 
-  it("shows the page of a rank when only a rank is given", () => {
-    expect(requestedPage({ rank: "2500" }, 5, 100)).toBe(25);
-  });
-
-  it("opens on the page of the next word when nothing is asked for", () => {
-    expect(requestedPage({}, 101, 100)).toBe(2);
-    expect(requestedPage({}, 100, 100)).toBe(1);
-  });
-
-  it("opens on the first page when nothing is asked for and no word is left", () => {
-    expect(requestedPage({}, null, 100)).toBe(1);
+  it("opens on the first page when nothing is asked for", () => {
+    expect(requestedPage({})).toBe(1);
   });
 
   it("falls back to the first page when what was asked for is not a number", () => {
-    expect(requestedPage({ page: "abc" }, 500, 100)).toBe(1);
-    expect(requestedPage({ rank: "x" }, 500, 100)).toBe(1);
-    expect(requestedPage({ page: "" }, 500, 100)).toBe(1);
+    expect(requestedPage({ page: "abc" })).toBe(1);
+    expect(requestedPage({ page: "" })).toBe(1);
   });
 });

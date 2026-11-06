@@ -49,10 +49,6 @@ CREATE TABLE IF NOT EXISTS audio (
   error TEXT,
   PRIMARY KEY (note_id, slot)
 );
-CREATE TABLE IF NOT EXISTS progress (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL
-);
 `;
 
 interface NoteRow {
@@ -60,6 +56,10 @@ interface NoteRow {
   verb_form: string; hint: string; example: string; example_en: string; example_error: string | null;
   rank: number; status: Note["status"]; created_at: string; updated_at: string;
   lemma_source: Note["lemmaSource"]; example_source: Note["exampleSource"];
+}
+
+interface ClipRow {
+  slot: string; key: string | null; source: AudioSource | null; text: string; error: string | null;
 }
 
 export function openStore(dir: string) {
@@ -72,17 +72,10 @@ export function openStore(dir: string) {
 
   const now = () => new Date().toISOString();
 
-  function getNote(id: string): Note | null {
-    const row = db.prepare("SELECT * FROM notes WHERE id = ?").get(id) as NoteRow | undefined;
-    if (!row) return null;
-    const forms = db
-      .prepare("SELECT id, label, arabic FROM forms WHERE note_id = ? ORDER BY ord")
-      .all(id) as Form[];
+  function build(row: NoteRow, forms: Form[], clips: ClipRow[]): Note {
     const text: Record<Slot, string> = { word: row.lemma, example: plainExample(row.example) };
     for (const f of forms) text[f.id] = f.arabic;
     const audio: Record<Slot, Clip> = {};
-    const clips = db.prepare("SELECT slot, key, source, text, error FROM audio WHERE note_id = ?").all(id) as
-      { slot: string; key: string | null; source: AudioSource | null; text: string; error: string | null }[];
     for (const c of clips) {
       if (!(c.slot in text)) continue;
       audio[c.slot] = { key: c.key, source: c.source, text: c.text, error: c.error, outdated: c.key !== null && c.text !== text[c.slot] };
@@ -94,6 +87,27 @@ export function openStore(dir: string) {
       status: row.status, lemmaSource: row.lemma_source, exampleSource: row.example_source,
       createdAt: row.created_at, updatedAt: row.updated_at, forms, audio,
     };
+  }
+
+  function getNote(id: string): Note | null {
+    const row = db.prepare("SELECT * FROM notes WHERE id = ?").get(id) as NoteRow | undefined;
+    if (!row) return null;
+    const forms = db.prepare("SELECT id, label, arabic FROM forms WHERE note_id = ? ORDER BY ord").all(id) as Form[];
+    const clips = db.prepare("SELECT slot, key, source, text, error FROM audio WHERE note_id = ?").all(id) as ClipRow[];
+    return build(row, forms, clips);
+  }
+
+  function allNotes(): Note[] {
+    const group = <T extends { note_id: string }>(rows: T[]) => {
+      const byNote = new Map<string, T[]>();
+      for (const r of rows) byNote.set(r.note_id, [...(byNote.get(r.note_id) ?? []), r]);
+      return byNote;
+    };
+    const forms = group(db.prepare("SELECT note_id, id, label, arabic FROM forms ORDER BY ord").all() as (Form & { note_id: string })[]);
+    const clips = group(db.prepare("SELECT note_id, slot, key, source, text, error FROM audio").all() as (ClipRow & { note_id: string })[]);
+    return (db.prepare("SELECT * FROM notes").all() as NoteRow[]).map((row) =>
+      build(row, (forms.get(row.id) ?? []).map(({ id, label, arabic }) => ({ id, label, arabic })), clips.get(row.id) ?? []),
+    );
   }
 
   function createNote(input: NewNote): Note {
@@ -237,26 +251,6 @@ export function openStore(dir: string) {
     return { ok: true, note: getNote(id)! };
   }
 
-  function skippedRanks(): number[] {
-    const row = db.prepare("SELECT value FROM progress WHERE key = 'skipped_ranks'").get() as { value: string } | undefined;
-    return row ? (JSON.parse(row.value) as number[]) : [];
-  }
-
-  function skipRank(rank: number): void {
-    const all = [...new Set([...skippedRanks(), rank])].sort((a, b) => a - b);
-    db.prepare("INSERT INTO progress (key, value) VALUES ('skipped_ranks', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value")
-      .run(JSON.stringify(all));
-  }
-
-  /** The first listed rank whose card is not approved (or that has none) and was not skipped; skipped ones come last. */
-  function nextRank(total: number): number | null {
-    const done = new Set((db.prepare("SELECT rank FROM notes WHERE rank > 0 AND status = 'approved'").all() as { rank: number }[]).map((r) => r.rank));
-    const skipped = new Set(skippedRanks());
-    for (let r = 1; r <= total; r++) if (!done.has(r) && !skipped.has(r)) return r;
-    for (const r of skippedRanks()) if (r <= total && !done.has(r)) return r;
-    return null;
-  }
-
   function search(query: string): Note[] {
     const q = query.trim();
     if (q === "") return [];
@@ -279,15 +273,8 @@ export function openStore(dir: string) {
     return ids.map((r) => getNote(r.id)!);
   }
 
-  /** Lemma, English and status of every ranked card, by rank. */
-  function rankedCards(): Map<number, { lemma: string; english: string; status: Note["status"] }> {
-    const rows = db.prepare("SELECT rank, lemma, english, status FROM notes WHERE rank > 0").all() as
-      { rank: number; lemma: string; english: string; status: Note["status"] }[];
-    return new Map(rows.map(({ rank, ...card }) => [rank, card]));
-  }
-
   return {
-    root, findNote, approvedNotes, rankedCards, close: () => db.close(), skipRank, nextRank, search, getNote, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
+    root, findNote, approvedNotes, allNotes, close: () => db.close(), search, getNote, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
     applyGeneratedExample, approve,
   };
 }

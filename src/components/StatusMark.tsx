@@ -1,9 +1,9 @@
-import type { CardStatus } from "@/lib/types";
+import type { WordStatus } from "@/lib/types";
 
-const LABEL: Record<CardStatus, string> = { draft: "in progress", incomplete: "in progress", approved: "approved" };
+const LABEL: Record<Exclude<WordStatus, "todo">, string> = { progress: "in progress", ready: "ready", approved: "approved" };
 
 /** Where a card stands: a half-filled circle while it is being made, a filled one once approved. Shape and word, never colour alone. */
-export default function StatusMark({ status }: { status: CardStatus }) {
+export default function StatusMark({ status }: { status: Exclude<WordStatus, "todo"> }) {
   const approved = status === "approved";
   return (
     <span className="status" data-status={status} title={LABEL[status]}>

@@ -22,12 +22,8 @@ export function paginate(total: number, requested: number, size: number): Paging
   };
 }
 
-export const pageForRank = (rank: number, size: number): number => Math.ceil(rank / size);
-
-/** `?page=N` wins, then `?rank=N`, then the page of the next word to do; anything unreadable is page 1. */
-export function requestedPage(query: { page?: string; rank?: string }, nextRank: number | null, size: number): number {
-  const number = (text: string) => (text.trim() === "" ? Number.NaN : Number(text));
-  const chosen =
-    query.page !== undefined ? number(query.page) : query.rank !== undefined ? pageForRank(number(query.rank), size) : pageForRank(nextRank ?? 1, size);
-  return Number.isFinite(chosen) ? chosen : 1;
+/** `?page=N`; a page that is missing or unreadable is the first. */
+export function requestedPage(query: { page?: string }): number {
+  const page = query.page === undefined || query.page.trim() === "" ? Number.NaN : Number(query.page);
+  return Number.isFinite(page) ? page : 1;
 }

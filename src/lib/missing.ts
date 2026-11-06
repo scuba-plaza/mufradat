@@ -1,5 +1,11 @@
-import type { Note } from "./types";
+import type { Note, WordStatus } from "./types";
 import { splitExample } from "./validate";
+
+/** Where a card stands: approved, ready when it lacks nothing and only approving is left, otherwise still in progress. */
+export function wordStatus(n: Note): Exclude<WordStatus, "todo"> {
+  if (n.status === "approved") return "approved";
+  return missingParts(n).length === 0 ? "ready" : "progress";
+}
 
 /** What a card still lacks, in words for the person making it; empty once it has all of it. */
 export function missingParts(n: Note): string[] {

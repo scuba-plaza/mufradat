@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { skipWord } from "@/app/actions";
-import { missingParts } from "@/lib/missing";
+import { missingParts, wordStatus } from "@/lib/missing";
 import type { Note } from "@/lib/types";
 import StatusMark from "./StatusMark";
 
@@ -44,22 +43,14 @@ export default function ActionBar(props: {
         )}
         <div role="toolbar" aria-label="Card actions" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2">
           <p className="flex min-w-0 flex-1 items-center gap-2 text-sm text-quiet">
-            <StatusMark status={note.status} />
+            <StatusMark status={wordStatus(note)} />
             {!approved && <span>{missing.length > 0 ? `Still needs ${missing.join(", ")}` : "Ready to approve"}</span>}
           </p>
           <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto">
             {approved ? (
               <a href="/next" className="action-main col-start-2 w-full sm:w-44">Next</a>
             ) : (
-              <>
-                {note.rank > 0 && (
-                  <form action={skipWord} className="contents">
-                    <input type="hidden" name="rank" value={note.rank} />
-                    <button className="action min-h-control w-full sm:w-44">Skip</button>
-                  </form>
-                )}
-                <button className="action-main col-start-2 w-full sm:w-44" disabled={props.leaving} onClick={props.onApprove}>Approve and next</button>
-              </>
+              <button className="action-main col-start-2 w-full sm:w-44" disabled={props.leaving} onClick={props.onApprove}>Approve and next</button>
             )}
           </div>
         </div>

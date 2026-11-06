@@ -351,14 +351,6 @@ describe("a word", () => {
     });
   });
 
-  it("skips the word and opens another", () => {
-    openWord(63);
-    cy.location("pathname").then((card) => {
-      cy.contains("button", "Skip").click();
-      cy.location("pathname").should("not.eq", card).and("match", /^\/cards\/[0-9a-f-]{36}$/);
-    });
-  });
-
   it("shows a friendly page for a card that does not exist", () => {
     cy.visit("/cards/nope", { failOnStatusCode: false });
     cy.contains("There is nothing at this address.");

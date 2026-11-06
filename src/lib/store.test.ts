@@ -1,6 +1,4 @@
 import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { audioPath } from "./audio";
 import { missingParts } from "./missing";
@@ -33,6 +31,26 @@ describe("creating a bare card", () => {
     const s = openStore(":memory:");
     s.createNote(kitab);
     expect(() => s.createNote({ ...kitab, pos: "verb" })).not.toThrow();
+  });
+});
+
+describe("listing every card", () => {
+  it("gives each card whole, with its forms and clips", () => {
+    const s = openStore(":memory:");
+    const book = s.createNote(kitab);
+    const pen = s.createNote({ ...kitab, lemma: "قَلَم", english: "pen", forms: [] });
+    s.setAudio(book.id, book.forms[0].id, mp3, "tts");
+    s.setAudioError(pen.id, "word", "Google rejected the credentials (401).");
+    const all = s.allNotes();
+    expect(all.map((n) => n.lemma).sort()).toEqual(["قَلَم", "كِتَاب"].sort());
+    expect(all.find((n) => n.id === book.id)!.audio[book.forms[0].id].key).not.toBeNull();
+    expect(all.find((n) => n.id === pen.id)!.audio.word.error).toMatch(/401/);
+    expect(all).toContainEqual(s.getNote(book.id));
+    expect(all).toContainEqual(s.getNote(pen.id));
+  });
+
+  it("is empty while there is no card", () => {
+    expect(openStore(":memory:").allNotes()).toEqual([]);
   });
 });
 
@@ -233,49 +251,7 @@ describe("audio", () => {
   });
 });
 
-describe("working through the frequency list", () => {
-  /** A card for the word at `rank`, approved. */
-  const approved = (s: ReturnType<typeof openStore>, lemma: string, rank: number) => {
-    const n = s.createNote({ ...kitab, lemma, rank });
-    expect(s.approve(n.id).ok).toBe(true);
-    return n;
-  };
-
-  it("offers the first rank whose card is not approved, and remembers it across reopening", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ws-"));
-    const s = openStore(dir);
-    expect(s.nextRank(5)).toBe(1);
-    const one = s.createNote({ ...kitab, rank: 1 });
-    expect(s.nextRank(5)).toBe(1);
-    approved(s, "قَلَم", 2);
-    expect(s.nextRank(5)).toBe(1);
-    s.approve(one.id);
-    s.close();
-    expect(openStore(dir).nextRank(5)).toBe(3);
-  });
-
-  it("offers a half-finished card again, and a card that lost its approval", () => {
-    const s = openStore(":memory:");
-    const one = approved(s, "قَلَم", 1);
-    approved(s, "بَاب", 2);
-    expect(s.nextRank(3)).toBe(3);
-    s.updateNote(one.id, { hint: "a pen" });
-    expect(s.nextRank(3)).toBe(1);
-  });
-
-  it("moves past a skipped word, comes back to it at the end, and offers it until it is approved", () => {
-    const s = openStore(":memory:");
-    s.skipRank(1);
-    expect(s.nextRank(3)).toBe(2);
-    approved(s, "قَلَم", 2);
-    s.skipRank(3);
-    expect(s.nextRank(3)).toBe(1);
-    approved(s, "بَاب", 1);
-    expect(s.nextRank(3)).toBe(3);
-    approved(s, "بَيْت", 3);
-    expect(s.nextRank(3)).toBeNull();
-  });
-
+describe("searching cards", () => {
   it("finds cards by Arabic without vowels, or by English", () => {
     const s = openStore(":memory:");
     s.createNote(kitab);

@@ -13,7 +13,7 @@ With Nix: `nix build`; the flake's `overlays.default` adds `mufradat` to nixpkgs
 
 ## The flow
 
-1. Press Continue on the home page to open the next word that is not approved, pick a word from the list (rank, Arabic, English, status), or search your cards and Wiktionary. Opening a word creates its bare card from Wiktionary; skipping a word puts it at the end of the queue.
+1. Press Continue on the home page to pick up where you left off: the card you edited last that is not approved, or, when none is left, the most frequent word you have not started. You can also pick a word from the list (rank, Arabic, English, status), or search your cards and Wiktionary. Opening a word creates its bare card from Wiktionary.
 2. Edit the card where it is shown. Text saves when you leave it or press Enter. Regenerating never overwrites what you typed. The lexical fields (part of speech, gender, root, verb form) are under Details, closed until you open them. The forms are edited in a dialog: Edit forms.
 3. Optionally generate an example (Mistral), and generate or upload audio per clip (Google TTS, MP3 upload). A clip that has audio shows a play button and an options button with Generate again, Upload MP3… and Remove audio; removing a clip takes the card's approval back and leaves the audio file in place. A failure is shown under its text and changes nothing else. The bar at the bottom says what the card still needs.
    Mistral names the word of the card in its sentence and the app marks it, also when it is attached to another word (بِالْقَلَمِ) or has another ending. When the word cannot be told for certain the sentence is kept unmarked and the card says so: select the word and choose Mark target.
@@ -30,8 +30,8 @@ On a word, while no field has focus and no dialog is open: Ctrl+← and Ctrl+→
 
 ## Pages
 
-- `/` the frequency list, 100 words a page, with the next word on top. It opens on that word's page; `/?page=N` is a page and `/?rank=N` is the page of a rank, with its row marked
-- `/next` goes to the card of the next word that is not approved, creating it the first time
+- `/` every word, 100 a page: the cards you are working on first (latest edit on top, "in progress" or "ready"), then the words you have not started by frequency, then the approved ones; `/?page=N` is a page. A card made outside the frequency list shows a dash for its rank
+- `/next` goes to the card Continue opens, creating it the first time
 - `/cards/<id>` one card
 - `/search?q=` your cards and Wiktionary entries
 - `/open?rank=N` and `/open?lemma=…&pos=…` go to a word's card, creating it the first time

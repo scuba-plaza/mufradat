@@ -1,6 +1,6 @@
 export {};
 
-const list = '[aria-label="Frequency list"]';
+const list = '[aria-label="Word list"]';
 const kitab = encodeURIComponent("كتاب");
 
 /** Passes once the font that the element asks for first has been loaded by the page. */

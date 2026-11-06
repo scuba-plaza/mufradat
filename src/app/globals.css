@@ -295,11 +295,11 @@
   .status {
     @apply inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-quiet;
   }
-  .status[data-status="approved"] {
+  .status[data-status="approved"],
+  .status[data-status="ready"] {
     color: rgb(var(--ok-ink));
   }
-  .status[data-status="draft"],
-  .status[data-status="incomplete"] {
+  .status[data-status="progress"] {
     color: rgb(var(--wip-ink));
   }
   @media (min-width: 640px) {
@@ -307,11 +307,11 @@
       @apply px-2 py-0.5;
       border-radius: var(--radius-control);
     }
-    .status[data-status="approved"] {
+    .status[data-status="approved"],
+    .status[data-status="ready"] {
       background: rgb(var(--ok-bg));
     }
-    .status[data-status="draft"],
-    .status[data-status="incomplete"] {
+    .status[data-status="progress"] {
       background: rgb(var(--wip-bg));
     }
     .status svg {

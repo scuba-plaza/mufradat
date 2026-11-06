@@ -1,7 +1,7 @@
 export {};
 
 const bar = '[role="toolbar"]';
-const list = '[aria-label="Frequency list"]';
+const list = '[aria-label="Word list"]';
 const mp3 = [0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4];
 const kitab = encodeURIComponent("كتاب");
 const columnRem = 58;
@@ -76,9 +76,12 @@ describe("the scale of the interface", () => {
       for (const path of ["/", `/search?q=${kitab}`, "/open?rank=6"]) {
         cy.visit(path);
         cy.get("body").should(($body) => expect(px($body.css("font-size")), path).to.be.at.least(16));
-        cy.get("input, select, textarea").each(($field) => {
-          if ($field.attr("type") === "hidden" || $field.attr("type") === "file") return;
-          expect(px($field.css("font-size")), `${path} ${$field.attr("aria-label") ?? $field.attr("name")}`).to.be.at.least(16);
+        cy.get("body").then(($body) => {
+          $body.find("input, select, textarea").each((_, element) => {
+            const $field = Cypress.$(element);
+            if ($field.attr("type") === "hidden" || $field.attr("type") === "file") return;
+            expect(px($field.css("font-size")), `${path} ${$field.attr("aria-label") ?? $field.attr("name")}`).to.be.at.least(16);
+          });
         });
       }
     });

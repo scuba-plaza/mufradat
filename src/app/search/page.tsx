@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import StatusMark from "@/components/StatusMark";
 import { lookup } from "@/lib/lexicon";
+import { wordStatus } from "@/lib/missing";
 import { context } from "@/lib/server";
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<{ q?: string }> }): Promise<Metadata> {
@@ -38,7 +39,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
                 <a key={n.id} href={`/cards/${n.id}`} className={row}>
                   <span className="ar justify-self-end text-ar-sm" lang="ar" dir="rtl">{n.lemma}</span>
                   <span className="truncate">{n.english}</span>
-                  <span className="flex items-center gap-3 text-xs text-quiet">{n.rank > 0 && n.rank}<StatusMark status={n.status} /></span>
+                  <span className="flex items-center gap-3 text-xs text-quiet">{n.rank > 0 && n.rank}<StatusMark status={wordStatus(n)} /></span>
                 </a>
               ))}
             </div>

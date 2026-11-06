@@ -111,23 +111,20 @@ describe("the layout of a card", () => {
     let rank = 80;
 
     for (const [width, height] of screens) {
-      it(`gives Skip, Approve and Next the same size at ${width}px`, () => {
+      it(`gives Approve and Next the same size at ${width}px`, () => {
         cy.viewport(width, height);
         openWord(rank++);
-        cy.contains(`${bar} button`, "Skip").then(($skip) => {
-          cy.contains(`${bar} button`, "Approve and next").then(($approve) => {
-            const pair = sizeOf($skip[0]);
-            expect(sizeOf($approve[0]), "Approve against Skip").to.deep.equal(pair);
-            if (width < 640) {
-              const text = $skip[0].ownerDocument.querySelector(`${bar} p`)!;
-              expect(text.getBoundingClientRect().bottom, "the status text above the buttons").to.be.at.most($skip[0].getBoundingClientRect().top);
-            }
-            cy.location("pathname").then((card) => {
-              cy.wrap($approve).click();
-              cy.location("pathname").should("not.eq", card);
-              cy.visit(card);
-              cy.contains(`${bar} a`, "Next").should(($next) => expect(sizeOf($next[0]), "Next against the pair").to.deep.equal(pair));
-            });
+        cy.contains(`${bar} button`, "Approve and next").then(($approve) => {
+          const approve = sizeOf($approve[0]);
+          if (width < 640) {
+            const text = $approve[0].ownerDocument.querySelector(`${bar} p`)!;
+            expect(text.getBoundingClientRect().bottom, "the status text above the button").to.be.at.most($approve[0].getBoundingClientRect().top);
+          }
+          cy.location("pathname").then((card) => {
+            cy.wrap($approve).click();
+            cy.location("pathname").should("not.eq", card);
+            cy.visit(card);
+            cy.contains(`${bar} a`, "Next").should(($next) => expect(sizeOf($next[0]), "Next against Approve").to.deep.equal(approve));
           });
         });
       });
