@@ -1,8 +1,9 @@
 import Database from "better-sqlite3";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { audioFiles, audioKey, audioPath } from "./audio";
-import type { BackupEntry } from "./backup-zip";
+import { NOT_A_BACKUP, openBackupZip, type BackupEntry, type BackupZip } from "./backup-zip";
 import { automaticSize, DEFAULT_LIMITS, selectRemovals, type Limits, type RetentionEntry } from "./retention";
 import { SCHEMA_VERSION, type Store } from "./store";
 import { SNAPSHOT_REASONS, type SnapshotInfo, type SnapshotReason, type SnapshotUsage } from "./types";
@@ -26,17 +27,23 @@ const snapshotsDir = (root: string) => path.join(root, "snapshots");
 
 export const snapshotAudioPath = (root: string, key: string) => audioPath(snapshotsDir(root), key);
 
+function storeClip(bytes: Uint8Array, to: string): void {
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  const staged = `${to}.tmp`;
+  fs.writeFileSync(staged, bytes);
+  fs.renameSync(staged, to);
+}
+
 function copyClip(from: string, to: string, key: string): boolean {
   if (fs.existsSync(to)) return true;
   if (!fs.existsSync(from)) return false;
   const bytes = fs.readFileSync(from);
   if (audioKey(bytes) !== key) return false;
-  fs.mkdirSync(path.dirname(to), { recursive: true });
-  const staged = `${to}.tmp`;
-  fs.writeFileSync(staged, bytes);
-  fs.renameSync(staged, to);
+  storeClip(bytes, to);
   return true;
 }
+
+const entryName = (key: string) => `audio/${key.slice(0, 2)}/${key}.mp3`;
 
 const ID_PATTERN = new RegExp(`^\\d{8}T\\d{6}Z-(${SNAPSHOT_REASONS.join("|")})(-\\d+)?$`);
 
@@ -123,16 +130,23 @@ export function createSnapshot(store: Store, reason: SnapshotReason, options: Sn
   return info;
 }
 
-function databaseIsSound(file: string): boolean {
+const NEWER = "This backup was written by a newer Mufradat.";
+const DAMAGED = "The backup's database is damaged.";
+
+function inspectDatabase(file: string): { cards: number; approved: number; version: number } | null {
   try {
     const db = new Database(file, { readonly: true, fileMustExist: true });
     try {
-      return db.pragma("integrity_check", { simple: true }) === "ok";
+      if (db.pragma("integrity_check", { simple: true }) !== "ok") return null;
+      const counts = db
+        .prepare("SELECT COUNT(*) AS cards, COALESCE(SUM(status = 'approved'), 0) AS approved FROM notes")
+        .get() as { cards: number; approved: number };
+      return { ...counts, version: db.pragma("user_version", { simple: true }) as number };
     } finally {
       db.close();
     }
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -143,8 +157,8 @@ function clipIsSound(file: string, key: string): boolean {
 function verifiedManifest(root: string, id: string): Manifest {
   const manifest = isSnapshotId(id) ? readManifest(root, id) : null;
   if (!manifest) throw new Error("There is no such backup.");
-  if (manifest.schema > SCHEMA_VERSION) throw new Error("This backup was written by a newer Mufradat.");
-  if (!databaseIsSound(path.join(snapshotsDir(root), id, "vocabulary.db"))) throw new Error("The backup's database is damaged.");
+  if (manifest.schema > SCHEMA_VERSION) throw new Error(NEWER);
+  if (!inspectDatabase(path.join(snapshotsDir(root), id, "vocabulary.db"))) throw new Error(DAMAGED);
   if (!manifest.audioKeys.every((key) => clipIsSound(snapshotAudioPath(root, key), key))) {
     throw new Error("The backup is missing or has damaged audio clips.");
   }
@@ -240,8 +254,84 @@ export function backupEntries(root: string, id: string): BackupEntry[] {
   return [
     { name: "manifest.json", file: path.join(dir, "manifest.json") },
     { name: "vocabulary.db", file: path.join(dir, "vocabulary.db") },
-    ...manifest.audioKeys.map((key) => ({ name: `audio/${key.slice(0, 2)}/${key}.mp3`, file: snapshotAudioPath(root, key) })),
+    ...manifest.audioKeys.map((key) => ({ name: entryName(key), file: snapshotAudioPath(root, key) })),
   ];
+}
+
+export function incomingFile(root: string): string {
+  fs.mkdirSync(snapshotsDir(root), { recursive: true });
+  return path.join(snapshotsDir(root), `.incoming-${randomUUID()}.zip`);
+}
+
+const refuseBackup = (): never => {
+  throw new Error(NOT_A_BACKUP);
+};
+
+function incomingManifest(bytes: Buffer): { schema: number; audioKeys: string[]; unavailable: number } | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(bytes.toString("utf8"));
+  } catch {
+    return null;
+  }
+  if (typeof raw !== "object" || raw === null) return null;
+  const { schema, audioKeys, unavailable } = raw as Record<string, unknown>;
+  const keys = Array.isArray(audioKeys) ? audioKeys : null;
+  const wellFormed = keys !== null && keys.every((key) => typeof key === "string" && /^[0-9a-f]{16}$/.test(key)) && new Set(keys).size === keys.length;
+  if (typeof schema !== "number" || !Number.isInteger(schema) || schema < 1 || !wellFormed) return null;
+  return { schema, audioKeys: keys as string[], unavailable: typeof unavailable === "number" ? unavailable : 0 };
+}
+
+function importFrom(root: string, backup: BackupZip, options: SnapshotOptions): SnapshotInfo {
+  const names = new Set(backup.names);
+  if (!names.has("manifest.json") || !names.has("vocabulary.db")) return refuseBackup();
+  const incoming = incomingManifest(backup.read("manifest.json")) ?? refuseBackup();
+  if (incoming.schema > SCHEMA_VERSION) throw new Error(NEWER);
+  const wanted = new Set(incoming.audioKeys.map(entryName));
+  const held = backup.names.filter((name) => name.startsWith("audio/"));
+  if (held.length !== wanted.size || !held.every((name) => wanted.has(name))) return refuseBackup();
+
+  const now = options.now ?? new Date();
+  const id = freeId(root, now, "imported");
+  const partial = path.join(snapshotsDir(root), `.partial-${id}`);
+  fs.mkdirSync(partial, { recursive: true });
+  try {
+    const database = path.join(partial, "vocabulary.db");
+    backup.copyTo("vocabulary.db", database);
+    const inspected = inspectDatabase(database);
+    if (!inspected) throw new Error(DAMAGED);
+    if (inspected.version > SCHEMA_VERSION) throw new Error(NEWER);
+    for (const key of incoming.audioKeys) {
+      const bytes = backup.read(entryName(key));
+      if (audioKey(bytes) !== key) return refuseBackup();
+      storeClip(bytes, snapshotAudioPath(root, key));
+    }
+    const manifest: Manifest = {
+      schema: incoming.schema,
+      createdAt: now.toISOString(),
+      reason: "imported",
+      cards: inspected.cards,
+      approved: inspected.approved,
+      audioKeys: incoming.audioKeys,
+      unavailable: incoming.unavailable,
+    };
+    fs.writeFileSync(path.join(partial, "manifest.json"), JSON.stringify(manifest));
+    fs.renameSync(partial, path.join(snapshotsDir(root), id));
+    return infoOf(id, manifest, fs.statSync(path.join(snapshotsDir(root), id, "vocabulary.db")).size);
+  } catch (error) {
+    fs.rmSync(partial, { recursive: true, force: true });
+    dropUnheldClips(root);
+    throw error;
+  }
+}
+
+export function importBackup(root: string, file: string, options: SnapshotOptions = {}): SnapshotInfo {
+  const backup = openBackupZip(file);
+  try {
+    return importFrom(root, backup, options);
+  } finally {
+    backup.close();
+  }
 }
 
 export function restoreSnapshot(store: Store, id: string, options: SnapshotOptions = {}): void {

@@ -1,12 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { refuseCrossSite } from "@/lib/origin";
 
 /** The app only answers pages it served itself: other sites cannot make the browser call it. */
 export function middleware(req: NextRequest) {
-  const origin = req.headers.get("origin");
-  if (origin && req.method !== "GET" && new URL(origin).host !== req.headers.get("host")) {
-    return NextResponse.json({ error: "Cross-site request refused." }, { status: 403 });
-  }
-  return NextResponse.next();
+  return refuseCrossSite(req) ?? NextResponse.next();
 }
 
-export const config = { matcher: "/api/:path*" };
+export const config = { matcher: "/api/((?!backups/import$).*)" };

@@ -111,7 +111,7 @@ interface Found {
   offset: number;
 }
 
-const NOT_A_BACKUP = "This is not a Mufradat backup.";
+export const NOT_A_BACKUP = "This is not a Mufradat backup.";
 const ENTRY_NAME = /^(manifest\.json|vocabulary\.db|audio\/([0-9a-f]{2})\/\2[0-9a-f]{14}\.mp3)$/;
 const COPY_CHUNK = 1024 * 1024;
 

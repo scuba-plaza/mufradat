@@ -1,9 +1,11 @@
+import Database from "better-sqlite3";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { audioKey, audioPath } from "./audio";
-import { createSnapshot, dailyDue, deleteSnapshot, listSnapshots, restoreSnapshot, snapshotAudioPath, snapshotUsage } from "./snapshots";
+import { backupZipStream } from "./backup-zip";
+import { backupEntries, createSnapshot, dailyDue, deleteSnapshot, importBackup, listSnapshots, restoreSnapshot, snapshotAudioPath, snapshotUsage } from "./snapshots";
 import type { SnapshotReason } from "./types";
 import { openStore } from "./store";
 
@@ -348,5 +350,136 @@ describe("deciding whether a daily snapshot is due", () => {
   it("is not satisfied by a snapshot of another kind", () => {
     const others = [made("manual", morning), made("before-reset", morning)];
     expect(dailyDue(others, new Date(2026, 10, 6, 9, 0), 1)).toBe(true);
+  });
+});
+
+async function zipOf(root: string, id: string): Promise<string> {
+  const reader = backupZipStream(backupEntries(root, id)).getReader();
+  const parts: Uint8Array[] = [];
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    parts.push(value);
+  }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-backup-zip-"));
+  roots.push(dir);
+  const file = path.join(dir, "backup.zip");
+  fs.writeFileSync(file, Buffer.concat(parts));
+  return file;
+}
+
+describe("importing a backup", () => {
+  it("brings a backup into a fresh workspace as an imported snapshot that a restore turns into the cards, approvals and clips", async () => {
+    const source = workspace();
+    const card = source.store.createNote(kitab);
+    source.store.setAudio(card.id, "word", mp3, "tts");
+    expect(source.store.approve(card.id).ok).toBe(true);
+    const made = createSnapshot(source.store, "manual", at("2026-11-06T10:00:00Z"));
+    const zip = await zipOf(source.root, made.id);
+
+    const fresh = workspace();
+    const imported = importBackup(fresh.root, zip, at("2026-11-07T09:00:00Z"));
+    expect(imported).toMatchObject({ reason: "imported", cards: 1, approved: 1, clips: 1, unavailable: 0 });
+    restoreSnapshot(fresh.store, imported.id, at("2026-11-07T09:05:00Z"));
+    const back = openStore(fresh.root);
+    expect(back.getNote(card.id)).toMatchObject({ lemma: "كِتَاب", status: "approved" });
+    expect(fs.readFileSync(audioPath(fresh.root, audioKey(mp3)))).toEqual(mp3);
+  });
+});
+
+describe("refusing an import", () => {
+  const refused = "This is not a Mufradat backup.";
+  const newer = "This backup was written by a newer Mufradat.";
+  const other = Buffer.concat([mp3, Buffer.alloc(4, 9)]);
+  const entry = (key: string) => `audio/${key.slice(0, 2)}/${key}.mp3`;
+  const now = at("2026-11-07T09:00:00Z");
+
+  interface Pieces {
+    manifest: Record<string, unknown>;
+    db: Buffer;
+  }
+
+  async function pieces(): Promise<Pieces> {
+    const source = workspace();
+    const card = source.store.createNote(kitab);
+    source.store.setAudio(card.id, "word", mp3, "tts");
+    const made = createSnapshot(source.store, "manual", at("2026-11-06T10:00:00Z"));
+    const dir = path.join(source.root, "snapshots", made.id);
+    return {
+      manifest: JSON.parse(fs.readFileSync(path.join(dir, "manifest.json"), "utf8")),
+      db: fs.readFileSync(path.join(dir, "vocabulary.db")),
+    };
+  }
+
+  async function zipFrom(contents: [string, Buffer | string][]): Promise<string> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-crafted-"));
+    roots.push(dir);
+    const entries = contents.map(([name, bytes], i) => {
+      const file = path.join(dir, `part-${i}`);
+      fs.writeFileSync(file, bytes);
+      return { name, file };
+    });
+    const reader = backupZipStream(entries).getReader();
+    const parts: Uint8Array[] = [];
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      parts.push(value);
+    }
+    const zip = path.join(dir, "crafted.zip");
+    fs.writeFileSync(zip, Buffer.concat(parts));
+    return zip;
+  }
+
+  const json = (value: unknown) => JSON.stringify(value);
+  const keyA = audioKey(mp3);
+  const keyB = audioKey(other);
+
+  const newerDatabase = (db: Buffer) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-newer-db-"));
+    roots.push(dir);
+    const file = path.join(dir, "v.db");
+    fs.writeFileSync(file, db);
+    const raw = new Database(file);
+    raw.pragma("user_version = 99");
+    raw.close();
+    return fs.readFileSync(file);
+  };
+
+  const cases: [string, (p: Pieces) => Promise<string>, string][] = [
+    ["a file that is not a zip", async () => zipFrom([]).then((zip) => (fs.writeFileSync(zip, "not a zip"), zip)), refused],
+    ["a backup with no manifest", async (p) => zipFrom([["vocabulary.db", p.db], [entry(keyA), mp3]]), refused],
+    ["a backup with no database", async (p) => zipFrom([["manifest.json", json(p.manifest)], [entry(keyA), mp3]]), refused],
+    ["a manifest that is not one", async (p) => zipFrom([["manifest.json", "{"], ["vocabulary.db", p.db]]), refused],
+    ["a manifest from a newer version", async (p) => zipFrom([["manifest.json", json({ ...p.manifest, schema: 99 })], ["vocabulary.db", p.db], [entry(keyA), mp3]]), newer],
+    ["a database from a newer version", async (p) => zipFrom([["manifest.json", json(p.manifest)], ["vocabulary.db", newerDatabase(p.db)], [entry(keyA), mp3]]), newer],
+    ["a damaged database", async (p) => zipFrom([["manifest.json", json(p.manifest)], ["vocabulary.db", "not a database"], [entry(keyA), mp3]]), "The backup's database is damaged."],
+    ["a clip that is not what its name says", async (p) => zipFrom([["manifest.json", json(p.manifest)], ["vocabulary.db", p.db], [entry(keyA), other]]), refused],
+    [
+      "a second clip that is not what its name says, after a good one",
+      async (p) =>
+        zipFrom([["manifest.json", json({ ...p.manifest, audioKeys: [keyA, keyB] })], ["vocabulary.db", p.db], [entry(keyA), mp3], [entry(keyB), mp3]]),
+      refused,
+    ],
+    ["a clip the manifest lists but the zip lacks", async (p) => zipFrom([["manifest.json", json(p.manifest)], ["vocabulary.db", p.db]]), refused],
+    ["a clip the zip holds but the manifest does not list", async (p) => zipFrom([["manifest.json", json({ ...p.manifest, audioKeys: [] })], ["vocabulary.db", p.db], [entry(keyA), mp3]]), refused],
+  ];
+
+  it.each(cases)("refuses %s and leaves nothing behind", async (_name, build, message) => {
+    const p = await pieces();
+    const zip = await build(p);
+    const fresh = workspace();
+    expect(() => importBackup(fresh.root, zip, now)).toThrow(message);
+    expect(listSnapshots(fresh.root)).toEqual([]);
+    expect(snapshotUsage(fresh.root).totalBytes).toBe(0);
+    const good = importBackup(fresh.root, await zipFrom([["manifest.json", json(p.manifest)], ["vocabulary.db", p.db], [entry(keyA), mp3]]), now);
+    expect(good.id).toBe("20261107T090000Z-imported");
+  });
+
+  it("takes the card counts from the database, not from what the manifest claims", async () => {
+    const p = await pieces();
+    const zip = await zipFrom([["manifest.json", json({ ...p.manifest, cards: 999, approved: 999 })], ["vocabulary.db", p.db], [entry(keyA), mp3]]);
+    const imported = importBackup(workspace().root, zip, now);
+    expect(imported).toMatchObject({ cards: 1, approved: 0 });
   });
 });
