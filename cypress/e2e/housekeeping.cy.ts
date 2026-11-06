@@ -1,6 +1,5 @@
 export {};
 
-const opener = 'button:contains("Delete unused audio")';
 const dialog = "dialog[open]";
 
 const clipBytes = (rank: number, length: number) => {
@@ -26,8 +25,7 @@ function withClip(rank: number, keep: boolean, length = 8) {
 
 function openDialog() {
   cy.visit("/");
-  cy.hydrated(opener);
-  cy.get(opener).click();
+  cy.menuItem("Delete unused audio");
   cy.get(dialog);
 }
 
@@ -45,13 +43,13 @@ describe("deleting the audio that no clip uses", () => {
     cy.get(dialog).contains("button", "Cancel").click();
     cy.get(dialog).should("not.exist");
     unused().should("deep.equal", { files: 2, bytes: 16 });
-    cy.get(opener).click();
+    cy.menuItem("Delete unused audio");
     cy.get(dialog).contains("button", "Delete").click();
     cy.get(dialog).should("contain", "Deleted 2 audio files (16 B).");
     unused().should("deep.equal", { files: 0, bytes: 0 });
     cy.get(dialog).contains("button", "Close").click();
     cy.get(dialog).should("not.exist");
-    cy.get(opener).click();
+    cy.menuItem("Delete unused audio");
     cy.get(dialog).should("contain", "No unused audio files.");
   });
 
@@ -89,18 +87,12 @@ describe("deleting the audio that no clip uses", () => {
   });
 
   for (const [width, height] of [[1920, 1100], [390, 844]]) {
-    it(`fits the footer and the dialog at ${width}px`, () => {
+    it(`fits the dialog at ${width}px`, () => {
       cy.viewport(width, height);
       withClip(306, false);
       cy.visit("/");
-      cy.hydrated(opener);
-      cy.get(opener).scrollIntoView().should(($button) => {
-        const box = $button[0].getBoundingClientRect();
-        expect(box.left).to.be.at.least(0);
-        expect(box.right).to.be.at.most(Cypress.config("viewportWidth"));
-      });
       cy.document().should((doc) => expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth));
-      cy.get(opener).click();
+      cy.menuItem("Delete unused audio");
       cy.get(dialog).should(($dialog) => {
         const box = $dialog[0].getBoundingClientRect();
         expect(box.left).to.be.at.least(0);
@@ -108,4 +100,17 @@ describe("deleting the audio that no clip uses", () => {
       });
     });
   }
+
+  it("gives the focus back to the menu button after Cancel and after Close", () => {
+    withClip(308, false);
+    openDialog();
+    cy.get(dialog).contains("button", "Cancel").click();
+    cy.get(dialog).should("not.exist");
+    cy.focused().should("have.attr", "aria-label", "Menu");
+    cy.menuItem("Delete unused audio");
+    cy.get(dialog).contains("button", "Delete").click();
+    cy.get(dialog).contains("button", "Close").click();
+    cy.get(dialog).should("not.exist");
+    cy.focused().should("have.attr", "aria-label", "Menu");
+  });
 });

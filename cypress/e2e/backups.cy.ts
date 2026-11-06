@@ -1,6 +1,5 @@
 export {};
 
-const opener = 'button:contains("Backups")';
 const dialog = "dialog[open]";
 const rows = `${dialog} ol[aria-label="Backups"] > li`;
 
@@ -8,8 +7,7 @@ const clipBytes = (rank: number) => new Uint8Array([0xff, 0xfb, 0x90, 0x00, 0x55
 
 function openDialog() {
   cy.visit("/");
-  cy.hydrated(opener);
-  cy.get(opener).click();
+  cy.menuItem("Backups");
   cy.contains(`${dialog} button`, "Back up now");
 }
 
@@ -128,17 +126,11 @@ describe("backups", () => {
   });
 
   for (const [width, height] of [[1920, 1100], [390, 844]]) {
-    it(`fits the footer and the dialog at ${width}px`, () => {
+    it(`fits the dialog at ${width}px`, () => {
       cy.viewport(width, height);
       cy.visit("/");
-      cy.hydrated(opener);
-      cy.get(opener).scrollIntoView().should(($button) => {
-        const box = $button[0].getBoundingClientRect();
-        expect(box.left).to.be.at.least(0);
-        expect(box.right).to.be.at.most($button[0].ownerDocument.documentElement.clientWidth);
-      });
       cy.document().should((doc) => expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth));
-      cy.get(opener).click();
+      cy.menuItem("Backups");
       cy.contains(`${dialog} button`, "Back up now");
       backUp();
       cy.get(dialog).should(($dialog) => {
@@ -150,12 +142,12 @@ describe("backups", () => {
     });
   }
 
-  it("closes on Escape, gives the focus back to the button that opened it, and opens again", () => {
+  it("closes on Escape, gives the focus back to the menu button, and opens again", () => {
     openDialog();
     cy.pressEscape();
     cy.get(dialog).should("not.exist");
-    cy.focused().should("contain.text", "Backups");
-    cy.get(opener).click();
+    cy.focused().should("have.attr", "aria-label", "Menu");
+    cy.menuItem("Backups");
     cy.get(dialog);
   });
 

@@ -26,10 +26,9 @@ interface Confirming {
   action: "restore" | "delete";
 }
 
-export default function Backups() {
+export default function Backups({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const picker = useRef<HTMLInputElement>(null);
-  const [open, setOpen] = useState(false);
   const [data, setData] = useState<BackupsData | null>(null);
   const [confirming, setConfirming] = useState<Confirming | null>(null);
   const [busy, setBusy] = useState(false);
@@ -41,6 +40,10 @@ export default function Backups() {
     if (!el) return;
     if (open && !el.open) el.showModal();
     if (!open && el.open) el.close();
+  }, [open]);
+
+  useEffect(() => {
+    if (open) run(load);
   }, [open]);
 
   async function run(call: () => Promise<void>) {
@@ -56,11 +59,6 @@ export default function Backups() {
   }
 
   const load = async () => setData(await api<BackupsData>("/api/backups"));
-
-  const show = () => {
-    setOpen(true);
-    return run(load);
-  };
 
   const backUp = () =>
     run(async () => {
@@ -94,15 +92,14 @@ export default function Backups() {
     });
 
   const close = () => {
-    setOpen(false);
     setData(null);
     setConfirming(null);
     setError("");
+    onClose();
   };
 
   return (
     <div className="text-sm">
-      <button className="action-quiet" aria-haspopup="dialog" disabled={busy} onClick={show}>Backups…</button>
       <dialog
         ref={dialog}
         aria-labelledby="backups-title"

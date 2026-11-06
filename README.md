@@ -19,7 +19,7 @@ With Nix: `nix build`; the flake's `overlays.default` adds `mufradat` to nixpkgs
    Mistral names the word of the card in its sentence and the app marks it, also when it is attached to another word (بِالْقَلَمِ) or has another ending. When the word cannot be told for certain the sentence is kept unmarked and the card says so: select the word and choose Mark target.
 4. Approve and next. Editing an approved card takes the approval back.
 5. Export to Anki: every approved card, written to `exports/` in the workspace. The same cards always give the same bytes.
-6. Now and then, Delete unused audio, a quiet button at the bottom of the home page beside Export. Audio files are named by the hash of their bytes and are never deleted when a clip is removed or replaced, a form is removed or a word is reset, so they pile up. The button counts the files that no clip refers to, asks, and deletes only those; a clip whose text changed since it was made still refers to its file, so that file is kept, and files in `exports/` are not touched.
+6. Now and then, Delete unused audio…, in the menu (the ⋯ button at the right of the top bar). Audio files are named by the hash of their bytes and are never deleted when a clip is removed or replaced, a form is removed or a word is reset, so they pile up. It counts the files that no clip refers to, asks, and deletes only those; a clip whose text changed since it was made still refers to its file, so that file is kept, and files in `exports/` are not touched.
 
 ## The search bar
 
@@ -45,7 +45,7 @@ A term the bar cannot read, or a quote that is not closed, is named under the ba
 
 ## Backups
 
-The Backups… button at the bottom of the home page opens the list of backups. A backup is the whole workspace at one moment: the database and every audio clip it needs, so a restore never needs audio generated again.
+Backups… in the menu (the ⋯ button at the right of the top bar) opens the list of backups. A backup is the whole workspace at one moment: the database and every audio clip it needs, so a restore never needs audio generated again.
 
 - Taken automatically, with no setting: once a day, on the first visit of the day that finds cards; and just before Reset word and just before a restore. Back up now takes one when you want it.
 - Kept: the newest 14 daily backups, the newest 14 of those taken before a reset or a restore, and at most 1 GiB for all of these together; a clip that several backups share counts once. The newest backup of each of those kinds is kept even when it alone is over the limit. Backups made with Back up now, and imported ones, are never removed on their own and do not count toward the limit.

@@ -1,8 +1,6 @@
-import Backups from "@/components/Backups";
 import ExportButton from "@/components/ExportButton";
 import Pager from "@/components/Pager";
 import StatusMark from "@/components/StatusMark";
-import UnusedAudio from "@/components/UnusedAudio";
 import WordBar from "@/components/WordBar";
 import { rankingSize } from "@/lib/lexicon";
 import { firstParam, listPath, paginate, requestedPage } from "@/lib/paging";
@@ -107,8 +105,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
       {rows.length > 0 && <Pager paging={paging} q={q} label="More pages" />}
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2 py-6">
         <ExportButton approved={count("approved")} />
-        <UnusedAudio />
-        <Backups />
       </div>
     </>
   );

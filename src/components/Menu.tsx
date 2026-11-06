@@ -1,8 +1,10 @@
 "use client";
 import { useId, useRef, useState } from "react";
+import Backups from "./Backups";
 import Shortcuts from "./Shortcuts";
+import UnusedAudio from "./UnusedAudio";
 
-type Open = "shortcuts" | null;
+type Open = "backups" | "audio" | "shortcuts" | null;
 
 export default function Menu() {
   const id = useId();
@@ -23,10 +25,18 @@ export default function Menu() {
         </svg>
       </button>
       <div id={id} popover="auto" className="options options-end" style={{ positionAnchor: anchor }}>
+        <button className="options-item" popoverTarget={id} popoverTargetAction="hide" onClick={() => setOpen("backups")}>
+          Backups…
+        </button>
+        <button className="options-item" popoverTarget={id} popoverTargetAction="hide" onClick={() => setOpen("audio")}>
+          Delete unused audio…
+        </button>
         <button className="options-item" popoverTarget={id} popoverTargetAction="hide" onClick={() => setOpen("shortcuts")}>
           Keyboard shortcuts
         </button>
       </div>
+      <Backups open={open === "backups"} onClose={close} />
+      <UnusedAudio open={open === "audio"} onClose={close} />
       <Shortcuts open={open === "shortcuts"} onClose={close} />
     </>
   );

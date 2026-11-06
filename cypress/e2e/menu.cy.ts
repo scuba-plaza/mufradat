@@ -66,4 +66,10 @@ describe("the menu", () => {
     cy.get("dialog[open]").should("not.exist");
     cy.focused().should("have.attr", "aria-label", "Menu");
   });
+
+  it("has Backups… and Delete unused audio… in the menu and nothing of them on the page", () => {
+    openMenu();
+    cy.get(popover).should("contain", "Backups…").and("contain", "Delete unused audio…");
+    cy.get("main").should("not.contain", "Backups").and("not.contain", "Delete unused audio");
+  });
 });

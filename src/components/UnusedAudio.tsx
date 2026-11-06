@@ -14,7 +14,7 @@ type Phase =
   | { kind: "done"; deleted: Totals }
   | { kind: "failed"; message: string };
 
-export default function UnusedAudio() {
+export default function UnusedAudio({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [phase, setPhase] = useState<Phase | null>(null);
   const [busy, setBusy] = useState(false);
@@ -25,6 +25,10 @@ export default function UnusedAudio() {
     if (phase && !el.open) el.showModal();
     if (!phase && el.open) el.close();
   }, [phase]);
+
+  useEffect(() => {
+    if (open) check();
+  }, [open]);
 
   async function run(call: () => Promise<Phase>) {
     setBusy(true);
@@ -43,6 +47,11 @@ export default function UnusedAudio() {
       return found.files === 0 ? { kind: "none" } : { kind: "ask", found };
     });
 
+  const close = () => {
+    setPhase(null);
+    onClose();
+  };
+
   const remove = () => run(async () => ({ kind: "done", deleted: await api<Totals>("/api/audio/unused", { method: "DELETE" }) }));
 
   const sentence =
@@ -56,12 +65,11 @@ export default function UnusedAudio() {
 
   return (
     <div className="text-sm">
-      <button className="action-quiet" aria-haspopup="dialog" disabled={busy} onClick={check}>Delete unused audio…</button>
       <dialog
         ref={dialog}
         aria-labelledby="unused-audio-title"
-        onClose={() => setPhase(null)}
-        onClick={(e) => e.target === dialog.current && setPhase(null)}
+        onClose={close}
+        onClick={(e) => e.target === dialog.current && close()}
         className="w-[calc(100%-2.5rem)] max-w-lg rounded-modal border border-rule bg-surface p-0 text-ink shadow-modal backdrop:bg-black/70"
       >
         <div className="p-6">
@@ -72,11 +80,11 @@ export default function UnusedAudio() {
           <div className="mt-6 flex justify-end gap-3">
             {phase?.kind === "ask" ? (
               <>
-                <button className="action" onClick={() => setPhase(null)}>Cancel</button>
+                <button className="action" onClick={close}>Cancel</button>
                 <button className="action-main" disabled={busy} onClick={remove}>Delete</button>
               </>
             ) : (
-              <button className="action" onClick={() => setPhase(null)}>Close</button>
+              <button className="action" onClick={close}>Close</button>
             )}
           </div>
         </div>
