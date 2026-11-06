@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { audioFileName } from "./audio";
+import { audioFileName, slotLabel, type ClipPlace } from "./audio";
 import { plainExample, splitExample } from "./validate";
 import { POS_LABELS } from "./types";
 import type { Note } from "./types";
@@ -146,7 +146,7 @@ const TEMPLATE_FILES = [
  * Builds an .apkg from approved notes. `readAudio` returns the bytes of a clip by key.
  * The same notes in any order give the same bytes.
  */
-export function buildApkg(notes: Note[], readAudio: (key: string) => Uint8Array, opts: ExportOptions): Buffer {
+export function buildApkg(notes: Note[], readAudio: (key: string, place: ClipPlace) => Uint8Array, opts: ExportOptions): Buffer {
   if (notes.length === 0) throw new Error("There are no approved cards to export.");
   const resources = opts.resources ?? path.join(process.cwd(), "data");
   const templates = Object.fromEntries(
@@ -173,7 +173,7 @@ export function buildApkg(notes: Note[], readAudio: (key: string) => Uint8Array,
     const use = (slot: string) => {
       const key = n.audio[slot]?.key;
       if (!key) return "";
-      media.set(audioFileName(key), readAudio(key));
+      media.set(audioFileName(key), readAudio(key, { lemma: n.lemma, slotName: slotLabel(n.forms, slot) }));
       return soundTag(key);
     };
     v.WordAudio = use("word");

@@ -54,3 +54,14 @@ export function slotLabel(forms: Form[], slot: Slot): string {
   const form = forms.find((f) => f.id === slot);
   return form ? `form "${form.label}"` : slot;
 }
+
+export interface ClipPlace {
+  lemma: string;
+  slotName: string;
+}
+
+export class MissingClipError extends Error {
+  constructor(place: ClipPlace) {
+    super(`The audio for ${place.lemma} (${place.slotName}) is missing from the workspace. Generate or upload it again on the card.`);
+  }
+}

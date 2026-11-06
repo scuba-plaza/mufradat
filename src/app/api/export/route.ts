@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { buildApkg } from "@/lib/anki";
-import { audioPath } from "@/lib/audio";
+import { audioPath, MissingClipError, type ClipPlace } from "@/lib/audio";
 import { context, fail, handle } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,18 @@ export const POST = () =>
     const { cfg, store } = context();
     const notes = store.approvedNotes();
     if (notes.length === 0) return fail("There are no approved cards to export.");
-    const apkg = buildApkg(notes, (key) => fs.readFileSync(audioPath(store.root, key)), cfg);
+    const read = (key: string, place: ClipPlace) => {
+      const file = audioPath(store.root, key);
+      if (!fs.existsSync(file)) throw new MissingClipError(place);
+      return fs.readFileSync(file);
+    };
+    let apkg: Buffer;
+    try {
+      apkg = buildApkg(notes, read, cfg);
+    } catch (e) {
+      if (e instanceof MissingClipError) return fail(e.message);
+      throw e;
+    }
     const dir = path.join(store.root, "exports");
     fs.mkdirSync(dir, { recursive: true });
     const name = `arabic-deck-${new Date().toISOString().slice(0, 10)}.apkg`;
