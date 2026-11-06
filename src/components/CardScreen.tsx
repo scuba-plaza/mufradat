@@ -106,7 +106,7 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
       <div className="mt-6 text-center">
         <InlineText label="Arabic headword" value={note.lemma} arabic className="mb-2 text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
         {clip("word", "the word", note.lemma)}
-        <InlineText label="English meaning" placeholder="Add the English meaning" value={note.english} className="mt-2 text-center text-2xl font-medium tracking-title" onSave={(english) => save({ english })} />
+        <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-2 text-center text-quiet" onSave={(hint) => save({ hint })} />
         {note.forms.length > 0 ? (
           <section aria-label="Forms" className="panel mx-auto mt-5 max-w-lg px-4 py-3">
             <div className="flex items-center justify-between">
@@ -126,7 +126,7 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
         ) : (
           <button className="action mt-4" aria-haspopup="dialog" onClick={() => setFormsOpen(true)}>Add forms</button>
         )}
-        <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-5 text-center text-quiet" onSave={(hint) => save({ hint })} />
+        <InlineText label="English meaning" placeholder="Add the English meaning" value={note.english} className="mt-5 text-center text-2xl font-medium tracking-title" onSave={(english) => save({ english })} />
       </div>
 
       <div className="mt-10 text-center">

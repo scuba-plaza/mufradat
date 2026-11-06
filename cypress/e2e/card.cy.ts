@@ -67,7 +67,7 @@ describe("a word", () => {
 
   it("lets Tab move on from the example, by way of Mark target", () => {
     openWord(24);
-    cy.get(by("Hint")).focus();
+    cy.get(by("English meaning")).focus();
     cy.press(Cypress.Keyboard.Keys.TAB);
     cy.focused().should("match", `textarea${by("Example")}`);
     cy.press(Cypress.Keyboard.Keys.TAB);

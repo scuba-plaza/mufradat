@@ -20,7 +20,7 @@ describe("the layout of a card", () => {
     it("keeps the control that Tab reaches clear of the action bar in a short window", () => {
       cy.viewport(1280, 400);
       openWord(100);
-      cy.get(by("English meaning")).focus();
+      cy.get(by("Hint")).focus();
       cy.press(Cypress.Keyboard.Keys.TAB);
       cy.focused().should("contain", "Edit forms").should(($field) => {
         let fixed = $field[0].ownerDocument.querySelector(bar) as HTMLElement;
@@ -28,6 +28,35 @@ describe("the layout of a card", () => {
         expect($field[0].getBoundingClientRect().bottom).to.be.at.most(fixed.getBoundingClientRect().top);
       });
     });
+  });
+
+  describe("the order of a card", () => {
+    const cards = [
+      { rank: 6, what: "forms", forms: by("Forms") },
+      { rank: 3, what: "no forms", forms: 'button[aria-haspopup="dialog"]' },
+    ];
+
+    for (const [width, height] of [[1920, 1100], [390, 844]]) {
+      for (const { rank, what, forms } of cards) {
+        it(`shows the headword, the hint, the forms, the English meaning and the example in that order at ${width}px with ${what}`, () => {
+          cy.viewport(width, height);
+          openWord(rank);
+          const order = [by("Arabic headword"), by("Hint"), forms, by("English meaning"), `div${by("Example")}`];
+          cy.document().should((doc) => {
+            const boxes = order.map((selector) => {
+              const element = doc.querySelector(selector);
+              expect(element, selector).to.not.equal(null);
+              return element!;
+            });
+            boxes.slice(1).forEach((element, i) => {
+              const before = boxes[i];
+              expect(element.getBoundingClientRect().top, `${order[i + 1]} below ${order[i]}`).to.be.at.least(before.getBoundingClientRect().bottom);
+              expect(before.compareDocumentPosition(element) & doc.defaultView!.Node.DOCUMENT_POSITION_FOLLOWING, `${order[i + 1]} after ${order[i]} for Tab`).to.not.equal(0);
+            });
+          });
+        });
+      }
+    }
   });
 
   describe("the action bar", () => {
