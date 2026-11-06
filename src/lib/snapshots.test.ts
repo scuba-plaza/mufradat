@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { audioKey, audioPath } from "./audio";
 import { createSnapshot, deleteSnapshot, listSnapshots, restoreSnapshot, snapshotAudioPath, snapshotUsage } from "./snapshots";
 import { openStore } from "./store";
@@ -299,5 +299,30 @@ describe("applying retention as snapshots are taken", () => {
     store.setAudio(card.id, "word", mp3, "tts");
     const manual = createSnapshot(store, "manual", at("2026-11-06T09:00:00Z"));
     expect(snapshotUsage(root)).toEqual({ automaticBytes: 0, totalBytes: manual.dbBytes + 8, budgetBytes: 1073741824 });
+  });
+});
+
+describe("retention never gets in the way of a restore", () => {
+  it("does not prune the snapshot it is restoring", () => {
+    const { root, store } = workspace();
+    const card = store.createNote(kitab);
+    const limits = { dailyKeep: 2, beforeKeep: 2, budgetBytes: Infinity };
+    const oldest = createSnapshot(store, "before-reset", { now: new Date("2026-11-06T10:00:00Z"), limits });
+    createSnapshot(store, "before-reset", { now: new Date("2026-11-06T11:00:00Z"), limits });
+    store.deleteNote(card.id);
+    restoreSnapshot(store, oldest.id, { now: new Date("2026-11-06T12:00:00Z"), limits });
+    expect(openStore(root).getNote(card.id)?.lemma).toBe("كِتَاب");
+  });
+
+  it("still takes the snapshot when retention cannot run", () => {
+    const { root, store } = workspace();
+    store.createNote(kitab);
+    fs.mkdirSync(path.join(root, "snapshots"));
+    fs.writeFileSync(path.join(root, "snapshots", "audio"), "in the way");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const snapshot = createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
+    expect(listSnapshots(root).map((s) => s.id)).toEqual([snapshot.id]);
+    expect(logged).toHaveBeenCalledTimes(1);
+    logged.mockRestore();
   });
 });

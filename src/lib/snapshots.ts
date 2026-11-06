@@ -97,10 +97,18 @@ function writeSnapshot(store: Store, reason: SnapshotReason, now: Date, id: stri
   }
 }
 
+function pruneQuietly(root: string, limits?: Limits): void {
+  try {
+    applyRetention(root, limits);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
 export function createSnapshot(store: Store, reason: SnapshotReason, options: SnapshotOptions = {}): SnapshotInfo {
   const now = options.now ?? new Date();
   const info = writeSnapshot(store, reason, now, freeId(store.root, now, reason));
-  applyRetention(store.root, options.limits);
+  pruneQuietly(store.root, options.limits);
   return info;
 }
 
@@ -157,7 +165,9 @@ function readAll(root: string): { info: SnapshotInfo; manifest: Manifest }[] {
     .sort((a, b) => (a.info.id < b.info.id ? 1 : -1));
 }
 
-export const listSnapshots = (root: string): SnapshotInfo[] => readAll(root).map((entry) => entry.info);
+export function listSnapshots(root: string): SnapshotInfo[] {
+  return readAll(root).map((entry) => entry.info);
+}
 
 function dropUnheldClips(root: string): void {
   const held = new Set(readAll(root).flatMap((entry) => entry.manifest.audioKeys));
@@ -198,7 +208,8 @@ export function snapshotUsage(root: string, limits: Limits = DEFAULT_LIMITS): Sn
 
 export function restoreSnapshot(store: Store, id: string, options: SnapshotOptions = {}): void {
   const manifest = verifiedManifest(store.root, id);
-  createSnapshot(store, "before-restore", options);
+  const now = options.now ?? new Date();
+  writeSnapshot(store, "before-restore", now, freeId(store.root, now, "before-restore"));
   for (const key of manifest.audioKeys) {
     const live = audioPath(store.root, key);
     if (!clipIsSound(live, key)) fs.rmSync(live, { force: true });
@@ -208,4 +219,5 @@ export function restoreSnapshot(store: Store, id: string, options: SnapshotOptio
   fs.copyFileSync(path.join(snapshotsDir(store.root), id, "vocabulary.db"), staged);
   store.close();
   fs.renameSync(staged, path.join(store.root, "vocabulary.db"));
+  pruneQuietly(store.root, options.limits);
 }
