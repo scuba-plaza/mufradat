@@ -101,16 +101,28 @@ describe("deleting the audio that no clip uses", () => {
     });
   }
 
-  it("gives the focus back to the menu button after Cancel and after Close", () => {
+  it("gives the focus back to the menu button after Cancel, Close, Escape and a click on the backdrop, and opens again each time", () => {
+    const closedWithFocusOnMenu = () => {
+      cy.get(dialog).should("not.exist");
+      cy.focused().should("have.attr", "aria-label", "Menu");
+    };
     withClip(308, false);
     openDialog();
     cy.get(dialog).contains("button", "Cancel").click();
-    cy.get(dialog).should("not.exist");
-    cy.focused().should("have.attr", "aria-label", "Menu");
+    closedWithFocusOnMenu();
     cy.menuItem("Delete unused audio");
     cy.get(dialog).contains("button", "Delete").click();
     cy.get(dialog).contains("button", "Close").click();
-    cy.get(dialog).should("not.exist");
-    cy.focused().should("have.attr", "aria-label", "Menu");
+    closedWithFocusOnMenu();
+    cy.menuItem("Delete unused audio");
+    cy.get(dialog).should("contain", "No unused audio files.");
+    cy.pressEscape();
+    closedWithFocusOnMenu();
+    cy.menuItem("Delete unused audio");
+    cy.get(dialog).should("contain", "No unused audio files.");
+    cy.clickBackdrop();
+    closedWithFocusOnMenu();
+    cy.menuItem("Delete unused audio");
+    cy.get(dialog);
   });
 });

@@ -64,31 +64,29 @@ export default function UnusedAudio({ open, onClose }: { open: boolean; onClose:
           : "";
 
   return (
-    <div className="text-sm">
-      <dialog
-        ref={dialog}
-        aria-labelledby="unused-audio-title"
-        onClose={close}
-        onClick={(e) => e.target === dialog.current && close()}
-        className="w-[calc(100%-2.5rem)] max-w-lg rounded-modal border border-rule bg-surface p-0 text-ink shadow-modal backdrop:bg-black/70"
-      >
-        <div className="p-6">
-          <h2 id="unused-audio-title" className="text-xl font-semibold tracking-title">Unused audio files</h2>
-          <p role="status" className="mt-2 empty:hidden">{sentence}</p>
-          {phase?.kind === "failed" && <p role="alert" className="mt-2 break-words text-danger">{phase.message}</p>}
-          {phase?.kind === "ask" && <p className="mt-2 text-sm text-quiet">Cards keep every clip they use.</p>}
-          <div className="mt-6 flex justify-end gap-3">
-            {phase?.kind === "ask" ? (
-              <>
-                <button className="action" onClick={close}>Cancel</button>
-                <button className="action-main" disabled={busy} onClick={remove}>Delete</button>
-              </>
-            ) : (
-              <button className="action" onClick={close}>Close</button>
-            )}
-          </div>
+    <dialog
+      ref={dialog}
+      aria-labelledby="unused-audio-title"
+      onClose={close}
+      onClick={(e) => e.target === dialog.current && close()}
+      className="text-sm w-[calc(100%-2.5rem)] max-w-lg rounded-modal border border-rule bg-surface p-0 text-ink shadow-modal backdrop:bg-black/70"
+    >
+      <div className="p-6">
+        <h2 id="unused-audio-title" className="text-xl font-semibold tracking-title">Unused audio files</h2>
+        <p role="status" className="mt-2 empty:hidden">{sentence}</p>
+        {phase?.kind === "failed" && <p role="alert" className="mt-2 break-words text-danger">{phase.message}</p>}
+        {phase?.kind === "ask" && <p className="mt-2 text-sm text-quiet">Cards keep every clip they use.</p>}
+        <div className="mt-6 flex justify-end gap-3">
+          {phase?.kind === "ask" ? (
+            <>
+              <button className="action" onClick={close}>Cancel</button>
+              <button className="action-main" disabled={busy} onClick={remove}>Delete</button>
+            </>
+          ) : (
+            <button className="action" onClick={close}>Close</button>
+          )}
         </div>
-      </dialog>
-    </div>
+      </div>
+    </dialog>
   );
 }

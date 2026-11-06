@@ -46,6 +46,21 @@ describe("the menu", () => {
     });
   }
 
+  for (const [width, height] of [[1920, 1100], [390, 844]]) {
+    it(`puts the button at the right end of the top bar at ${width}px`, () => {
+      cy.viewport(width, height);
+      cy.visit("/");
+      cy.hydrated(trigger);
+      cy.get(trigger).then(($button) => {
+        cy.get("header .topbar-inner").then(($bar) => {
+          const bar = $bar[0].getBoundingClientRect();
+          const inside = bar.right - parseFloat(getComputedStyle($bar[0]).paddingRight);
+          expect(Math.abs($button[0].getBoundingClientRect().right - inside)).to.be.at.most(1);
+        });
+      });
+    });
+  }
+
   it("gives the focus back to the menu button when the keyboard shortcuts close", () => {
     cy.visit("/");
     cy.menuItem("Keyboard shortcuts");
@@ -59,10 +74,10 @@ describe("the menu", () => {
     cy.focused().should("have.attr", "aria-label", "Menu");
   });
 
-  it("gives the focus back to the menu button when a click outside the dialog closes it", () => {
+  it("gives the focus back to the menu button when a click on the backdrop closes it", () => {
     cy.visit("/");
     cy.menuItem("Keyboard shortcuts");
-    cy.get("dialog[open]").click("topLeft");
+    cy.clickBackdrop();
     cy.get("dialog[open]").should("not.exist");
     cy.focused().should("have.attr", "aria-label", "Menu");
   });

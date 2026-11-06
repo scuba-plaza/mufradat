@@ -162,6 +162,19 @@ describe("backups", () => {
     cy.get(dialog);
   });
 
+  it("closes with Close and with a click on the backdrop, each giving the focus back to the menu button and leaving it openable", () => {
+    openDialog();
+    cy.contains(`${dialog} button`, "Close").click();
+    cy.get(dialog).should("not.exist");
+    cy.focused().should("have.attr", "aria-label", "Menu");
+    cy.menuItem("Backups");
+    cy.clickBackdrop();
+    cy.get(dialog).should("not.exist");
+    cy.focused().should("have.attr", "aria-label", "Menu");
+    cy.menuItem("Backups");
+    cy.get(dialog);
+  });
+
   it("lists a clip whose audio file is gone, and nothing once the clip is removed", () => {
     cy.visit("/open?rank=412");
     cy.location("pathname").then((path) => {

@@ -9,6 +9,7 @@ declare global {
       wordRow(rank: number): Chainable<JQuery<HTMLElement>>;
       pressEscape(): Chainable<void>;
       pressEnter(): Chainable<void>;
+      clickBackdrop(): Chainable<void>;
       axe(context?: string): Chainable<void>;
       menuItem(name: string): Chainable<void>;
     }
@@ -34,6 +35,12 @@ function pressKey(key: string, code: string, windowsVirtualKeyCode: number, text
 
 Cypress.Commands.add("pressEscape", () => pressKey("Escape", "Escape", 27));
 Cypress.Commands.add("pressEnter", () => pressKey("Enter", "Enter", 13, "\r"));
+
+Cypress.Commands.add("clickBackdrop", () => {
+  cy.get("dialog[open]").then(($dialog) => {
+    $dialog[0].click();
+  });
+});
 
 type AxeWindow = Window & { axe: Pick<typeof axe, "run"> };
 
