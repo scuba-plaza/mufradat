@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import type { Form, Slot } from "./types";
 
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 
@@ -46,4 +47,10 @@ export function mp3Problem(bytes: Uint8Array): string | null {
   const id3 = bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33;
   const frame = bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0;
   return id3 || frame ? null : "The audio is not an MP3 file.";
+}
+
+export function slotLabel(forms: Form[], slot: Slot): string {
+  if (slot === "word" || slot === "example") return slot;
+  const form = forms.find((f) => f.id === slot);
+  return form ? `form "${form.label}"` : slot;
 }

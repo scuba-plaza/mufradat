@@ -3,9 +3,9 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { audioFiles, audioKey, audioPath, mp3Problem, type AudioFile } from "./audio";
+import { audioFiles, audioKey, audioPath, mp3Problem, slotLabel, type AudioFile } from "./audio";
 import { approvalProblems, plainExample } from "./validate";
-import type { AudioSource, Clip, Form, Note, NoteEdit, NewNote, POS, Slot } from "./types";
+import type { AudioSource, Clip, Form, Note, NoteEdit, NewNote, POS, Slot, WorkspaceCheck } from "./types";
 
 export const SCHEMA_VERSION = 1;
 
@@ -288,13 +288,34 @@ export function openStore(dir: string) {
     return row?.id ?? null;
   }
 
+  function counts(): { cards: number; approved: number } {
+    const count = (where: string) => (db.prepare(`SELECT COUNT(*) AS n FROM notes ${where}`).get() as { n: number }).n;
+    return { cards: count(""), approved: count("WHERE status = 'approved'") };
+  }
+
+  function check(): WorkspaceCheck {
+    const rows = db
+      .prepare(
+        `SELECT a.note_id AS noteId, n.lemma AS lemma, a.slot AS slot, a.key AS key
+         FROM audio a JOIN notes n ON n.id = a.note_id WHERE a.key IS NOT NULL`,
+      )
+      .all() as { noteId: string; lemma: string; slot: Slot; key: string }[];
+    const missingAudio = rows
+      .filter((r) => !fs.existsSync(audioPath(root, r.key)))
+      .map((r) => {
+        const forms = db.prepare("SELECT id, label, arabic FROM forms WHERE note_id = ?").all(r.noteId) as Form[];
+        return { ...r, slotName: slotLabel(forms, r.slot) };
+      });
+    return { ...counts(), integrity: db.pragma("integrity_check", { simple: true }) as string, missingAudio };
+  }
+
   function approvedNotes(): Note[] {
     const ids = db.prepare("SELECT id FROM notes WHERE status = 'approved'").all() as { id: string }[];
     return ids.map((r) => getNote(r.id)!);
   }
 
   return {
-    root, findNote, approvedNotes, allNotes, close: () => db.close(), getNote, deleteNote, unusedAudio, deleteUnusedAudio, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
+    root, findNote, approvedNotes, allNotes, counts, check, close: () => db.close(), getNote, deleteNote, unusedAudio, deleteUnusedAudio, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
     applyGeneratedExample, approve,
   };
 }

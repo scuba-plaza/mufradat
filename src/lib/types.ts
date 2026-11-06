@@ -96,3 +96,18 @@ export interface WordRow {
   exampleBy: "mistral" | "user" | "";
   edited: string | null;
 }
+
+export interface MissingAudio {
+  noteId: string;
+  lemma: string;
+  slot: Slot;
+  slotName: string;
+  key: string;
+}
+
+export interface WorkspaceCheck {
+  cards: number;
+  approved: number;
+  integrity: string;
+  missingAudio: MissingAudio[];
+}

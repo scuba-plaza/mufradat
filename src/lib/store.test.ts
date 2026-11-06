@@ -446,3 +446,39 @@ describe("the workspace version", () => {
     });
   });
 });
+
+describe("checking the workspace", () => {
+  it("reports a healthy workspace as healthy", () => {
+    const s = openStore(":memory:");
+    const n = s.createNote(kitab);
+    s.setAudio(n.id, "word", mp3, "tts");
+    expect(s.check()).toEqual({ cards: 1, approved: 0, integrity: "ok", missingAudio: [] });
+  });
+
+  it("reports a clip whose file is gone with its card and slot", () => {
+    const s = openStore(":memory:");
+    const n = s.createNote(kitab);
+    s.setAudio(n.id, "word", mp3, "tts");
+    fs.rmSync(audioPath(s.root, audioKey(mp3)));
+    expect(s.check().missingAudio).toEqual([
+      { noteId: n.id, lemma: "كِتَاب", slot: "word", slotName: "word", key: audioKey(mp3) },
+    ]);
+  });
+
+  it("names a form's clip by the form's label", () => {
+    const s = openStore(":memory:");
+    const n = s.createNote(kitab);
+    const form = n.forms[0];
+    s.setAudio(n.id, form.id, mp3, "tts");
+    fs.rmSync(audioPath(s.root, audioKey(mp3)));
+    expect(s.check().missingAudio.map((m) => [m.slot, m.slotName])).toEqual([[form.id, 'form "pl."']]);
+  });
+
+  it("counts the cards and the approved ones", () => {
+    const s = openStore(":memory:");
+    const n = s.createNote(kitab);
+    s.createNote({ ...kitab, lemma: "قَلَم", english: "pen", forms: [] });
+    s.approve(n.id);
+    expect(s.counts()).toEqual({ cards: 2, approved: 1 });
+  });
+});
