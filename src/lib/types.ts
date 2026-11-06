@@ -87,7 +87,7 @@ export interface WordRow {
   rank: number | null;
   lemma: string;
   english: string;
-  pos: POS[];
+  pos: POS;
   gender: string;
   root: string;
   verbForm: string;

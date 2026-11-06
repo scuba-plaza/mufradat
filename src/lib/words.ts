@@ -10,7 +10,7 @@ const fromCard = (n: Note): WordRow => ({
   rank: n.rank > 0 ? n.rank : null,
   lemma: n.lemma,
   english: n.english,
-  pos: [n.pos],
+  pos: n.pos,
   gender: n.gender,
   root: n.root,
   verbForm: n.verbForm,
@@ -45,7 +45,7 @@ function entryRows(notes: Note[]): WordRow[] {
   const made = new Set(notes.map((n) => `${n.lemma}|${n.pos}`));
   return wiktionaryWords()
     .filter((e) => e.rank === 0 && !made.has(`${e.lemma}|${e.pos}`))
-    .map((e) => notStarted({ ...e, rank: null, pos: [e.pos] }));
+    .map((e) => notStarted({ ...e, rank: null }));
 }
 
 /** All 5000 frequency words in rank order, each showing its card when it has one, then the cards made outside the list. */
@@ -91,7 +91,8 @@ export function view(store: Store, text: string, now: Date = new Date()): View {
   const notes = store.allNotes();
   const rows = listRows(notes);
   if (parsed.query.texts.length > 0) rows.push(...entryRows(notes));
-  return { rows: runQuery(defaultOrder(rows), parsed.query, now), error: null };
+  const start = text.trim() === "" ? defaultOrder(rows) : rows;
+  return { rows: runQuery(start, parsed.query, now), error: null };
 }
 
 /** The id of the card for a ranked word or a Wiktionary entry, creating the bare card if there is none. */
@@ -113,8 +114,22 @@ export function nextCardPath(store: Store): string {
   return id ? `/cards/${id}` : "/";
 }
 
-export function rowHref(row: WordRow): string {
-  if (row.id) return `/cards/${row.id}`;
-  if (row.rank) return `/open?rank=${row.rank}`;
-  return `/open?${new URLSearchParams({ lemma: row.lemma, pos: row.pos[0] })}`;
+const WALK_ALL = "rank:>0 sort:rank";
+
+export function neighbour(store: Store, id: string, q: string, direction: "previous" | "next", now: Date = new Date()): WordRow | null {
+  const { rows } = view(store, q.trim() === "" ? WALK_ALL : q, now);
+  const at = rows.findIndex((r) => r.id === id);
+  if (at < 0 && q.trim() === "") return null;
+  return (direction === "next" ? rows[at + 1] : at > 0 ? rows[at - 1] : undefined) ?? null;
+}
+
+export function cardPath(id: string, q = ""): string {
+  return q === "" ? `/cards/${id}` : `/cards/${id}?${new URLSearchParams({ q })}`;
+}
+
+export function rowHref(row: WordRow, q = ""): string {
+  if (row.id) return cardPath(row.id, q);
+  const params = new URLSearchParams(row.rank ? { rank: String(row.rank) } : { lemma: row.lemma, pos: row.pos });
+  if (q !== "") params.set("q", q);
+  return `/open?${params}`;
 }

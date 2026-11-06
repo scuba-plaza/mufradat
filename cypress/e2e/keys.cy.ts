@@ -100,3 +100,43 @@ describe("the list of keys", () => {
     cy.get("dialog[open]").should("not.exist");
   });
 });
+
+describe("the keys of a card opened from a list", () => {
+  const rowOf = (rank: number) =>
+    cy.get('[aria-label="Word list"] > li').filter((_, row) => row.querySelector(".num")?.textContent === String(rank));
+
+  function openFrom(query: string, rank: number) {
+    cy.visit(`/?q=${encodeURIComponent(query)}`);
+    rowOf(rank).click();
+    cy.hydrated(by("Hint"));
+  }
+
+  it("walks the list it was opened from instead of the frequency list", () => {
+    openFrom("rank:181-185 sort:-rank", 184);
+    cy.contains("Word 184 of 5000");
+    cy.get("body").type("{ctrl}{rightarrow}");
+    cy.contains("Word 183 of 5000");
+    cy.hydrated(by("Hint"));
+    cy.get("body").type("{ctrl}{leftarrow}");
+    cy.contains("Word 184 of 5000");
+  });
+
+  it("keeps moving forward through a list when every step creates the card of the next word", () => {
+    openFrom("rank:186-190", 186);
+    for (const rank of [187, 188, 189, 190]) {
+      cy.get("body").type("{ctrl}{rightarrow}");
+      cy.contains(`Word ${rank} of 5000`);
+      cy.hydrated(by("Hint"));
+    }
+  });
+
+  it("stays on the last word of the list it was opened from", () => {
+    openFrom("rank:191-192", 192);
+    cy.location("pathname").then((card) => {
+      cy.get("body").type("{ctrl}{rightarrow}");
+      cy.wait(300);
+      cy.contains("Word 192 of 5000");
+      cy.location("pathname").should("eq", card);
+    });
+  });
+});

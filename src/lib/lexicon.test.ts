@@ -17,12 +17,12 @@ describe("the embedded Wiktionary data", () => {
     expect(verb.forms).toContainEqual({ label: "pres.", arabic: "يَعْلِي" });
   });
 
-  it("tells the part of speech, gender, root and verb form of each frequency word", () => {
+  it("tells the part of speech of the card, gender, root and verb form of each frequency word", () => {
     const words = rankedWords();
-    expect(words[0]).toEqual({ rank: 1, lemma: "فِي", english: "in, within", pos: ["prep"], gender: "", root: "", verbForm: "" });
-    expect(words[5]).toMatchObject({ lemma: "كَانَ", pos: ["verb"], verbForm: "I" });
-    expect(words[67]).toMatchObject({ lemma: "أَحَد", pos: ["noun", "adj"], gender: "m", root: "ء ح د" });
-    expect(words[211]).toMatchObject({ rank: 212, pos: ["det"] });
+    expect(words[0]).toEqual({ rank: 1, lemma: "فِي", english: "in, within", pos: "prep", gender: "", root: "", verbForm: "" });
+    expect(words[5]).toMatchObject({ lemma: "كَانَ", pos: "verb", verbForm: "I" });
+    expect(words[67]).toMatchObject({ lemma: "أَحَد", pos: "noun", gender: "m", root: "ء ح د" });
+    expect(words[211]).toMatchObject({ rank: 212, pos: "det" });
   });
 
   it("lists every Wiktionary entry once for its lemma and part of speech, ranked only where the ranking lists it", () => {

@@ -208,7 +208,7 @@ describe("the search bar", () => {
       const count = Number(label.match(/\d+/)![0]);
       expect(count).to.be.at.least(1);
       cy.get(tabs).contains("a", "In progress").click();
-      cy.location("search").should("eq", "?q=status%3Aprogress");
+      cy.location("search").should("eq", "?q=status%3Aprogress+sort%3A-edited");
       cy.get(tabs).contains("a", "In progress").should("have.attr", "aria-current", "page");
       cy.contains(new RegExp(`^${count} words?$`));
       cy.get(rows).first().should("contain", "in progress");
@@ -216,6 +216,13 @@ describe("the search bar", () => {
     cy.get(tabs).contains("a", /^All/).click();
     cy.location("search").should("eq", "");
     cy.get(tabs).contains("a", /^All/).should("have.attr", "aria-current", "page");
+  });
+
+  it("carries the query to the cards it opens, so that their arrows follow the list", () => {
+    cy.visit(typed("rank:181-182"));
+    cy.get(rows).first().find("a").should("have.attr", "href").and("match", /q=rank%3A181-182$/);
+    cy.visit("/");
+    cy.get(rows).first().find("a").should("have.attr", "href").and("not.include", "q=");
   });
 
   it("lists the words not started under their tab", () => {

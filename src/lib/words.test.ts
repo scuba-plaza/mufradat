@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { continueFrom, continueTarget, defaultOrder, nextCardPath, openCard, rowHref, view, wordRows } from "./words";
+import { continueFrom, continueTarget, defaultOrder, cardPath, neighbour, nextCardPath, openCard, rowHref, view, wordRows } from "./words";
 import { openStore, type Store } from "./store";
 import { MISSING_KINDS, type WordRow } from "./types";
 
@@ -13,7 +13,7 @@ function finish(s: Store, id: string) {
 }
 
 const blank: WordRow = {
-  id: null, rank: null, lemma: "", english: "", pos: ["noun"], gender: "", root: "", verbForm: "", status: "todo",
+  id: null, rank: null, lemma: "", english: "", pos: "noun", gender: "", root: "", verbForm: "", status: "todo",
   missing: [...MISSING_KINDS], error: false, exampleBy: "", edited: null,
 };
 
@@ -23,7 +23,7 @@ describe("the list of words", () => {
   it("has all 5000 frequency words in rank order, each one still to do without a card", () => {
     const rows = wordRows(openStore(":memory:"));
     expect(rows).toHaveLength(5000);
-    expect(rows[0]).toEqual({ ...blank, rank: 1, lemma: "فِي", english: "in, within", pos: ["prep"] });
+    expect(rows[0]).toEqual({ ...blank, rank: 1, lemma: "فِي", english: "in, within", pos: "prep" });
     expect(rows.map((w) => w.rank)).toEqual(rows.map((_, i) => i + 1));
   });
 
@@ -73,10 +73,10 @@ describe("the list of words", () => {
 });
 
 describe("what a row says about a word", () => {
-  it("tells a frequency word that has no card by its parts of speech, root and verb form, and says it still lacks everything", () => {
+  it("tells a frequency word that has no card by the part of speech its card will have, root and verb form, and says it still lacks everything", () => {
     const rows = wordRows(openStore(":memory:"));
-    expect(rows[5]).toEqual({ ...blank, rank: 6, lemma: "كَانَ", english: "to be", pos: ["verb"], verbForm: "I" });
-    expect(rows[67]).toMatchObject({ pos: ["noun", "adj"], gender: "m", root: "ء ح د" });
+    expect(rows[5]).toEqual({ ...blank, rank: 6, lemma: "كَانَ", english: "to be", pos: "verb", verbForm: "I" });
+    expect(rows[67]).toMatchObject({ pos: "noun", gender: "m", root: "ء ح د" });
   });
 
   it("tells a card by what it has and what it lacks", () => {
@@ -84,7 +84,7 @@ describe("what a row says about a word", () => {
     const id = openCard(s, { rank: 6 })!;
     s.setAudio(id, "word", mp3, "tts");
     expect(wordRows(s)[5]).toEqual({
-      ...blank, id, rank: 6, lemma: "كَانَ", english: "to be", pos: ["verb"], verbForm: "I", status: "progress",
+      ...blank, id, rank: 6, lemma: "كَانَ", english: "to be", pos: "verb", verbForm: "I", status: "progress",
       missing: ["example", "audio"], edited: s.getNote(id)!.updatedAt,
     });
   });
@@ -237,7 +237,15 @@ describe("the words a query asks for", () => {
     expect(lemmas("status:ready", s)).toEqual(["فِي"]);
     expect(view(s, "status:progress", now).rows.map((r) => r.rank)).toEqual([2]);
     expect(view(s, "status:todo rank:<5", now).rows.map((r) => r.rank)).toEqual([3, 4]);
-    expect(view(s, "pos:verb rank:<10", now).rows.map((r) => r.rank)).toEqual([3, 4, 6]);
+    expect(view(s, "pos:prep rank:<10", now).rows.map((r) => r.rank)).toEqual([1, 2, 3, 9]);
+  });
+
+  it("lists the words of a query in the order of the frequency list, whatever you worked on last", () => {
+    const s = openStore(":memory:");
+    openCard(s, { rank: 9 });
+    expect(view(s, "", now).rows[0]).toMatchObject({ rank: 9 });
+    expect(view(s, "pos:prep rank:<12", now).rows.map((r) => r.rank)).toEqual([1, 2, 3, 9]);
+    expect(view(s, "status:progress", now).rows.map((r) => r.rank)).toEqual([9]);
   });
 
   it("reports the problem with the query and shows no rows", () => {
@@ -251,8 +259,8 @@ describe("the words a query asks for", () => {
     const s = openStore(":memory:");
     const found = view(s, "على", now).rows.filter((r) => r.lemma === "عَلَى");
     expect(found).toEqual([
-      { ...blank, rank: 3, lemma: "عَلَى", english: "on, over", pos: ["prep", "verb"] },
-      { ...blank, lemma: "عَلَى", english: "to climb", pos: ["verb"], verbForm: "I" },
+      { ...blank, rank: 3, lemma: "عَلَى", english: "on, over", pos: "prep" },
+      { ...blank, lemma: "عَلَى", english: "to climb", pos: "verb", verbForm: "I" },
     ]);
   });
 
@@ -265,7 +273,7 @@ describe("the words a query asks for", () => {
     const id = openCard(s, { lemma: "عَلَى", pos: "verb" })!;
     const found = view(s, "على", now).rows.filter((r) => r.lemma === "عَلَى");
     expect(found).toHaveLength(2);
-    expect(found.find((r) => r.rank === null)).toMatchObject({ id, pos: ["verb"], status: "progress" });
+    expect(found.find((r) => r.rank === null)).toMatchObject({ id, pos: "verb", status: "progress" });
   });
 
   it("finds every entry whose letters match, each as its own row", () => {
@@ -291,10 +299,101 @@ describe("where a row leads", () => {
   });
 
   it("opens a Wiktionary entry by its lemma and part of speech, written so that they read back unchanged", () => {
-    const href = rowHref({ ...blank, lemma: "عَلَى", pos: ["verb"] });
+    const href = rowHref({ ...blank, lemma: "عَلَى", pos: "verb" });
     const url = new URL(href, "http://localhost");
     expect(url.pathname).toBe("/open");
     expect(url.searchParams.get("lemma")).toBe("عَلَى");
     expect(url.searchParams.get("pos")).toBe("verb");
+  });
+});
+
+describe("where a row leads when the list came from a query", () => {
+  it("puts the query on the address of a card, so that the card knows the list it was opened from", () => {
+    expect(cardPath("abc")).toBe("/cards/abc");
+    expect(cardPath("abc", "")).toBe("/cards/abc");
+    expect(cardPath("abc", "pos:noun")).toBe("/cards/abc?q=pos%3Anoun");
+    expect(rowHref({ ...blank, id: "abc" }, "pos:noun")).toBe("/cards/abc?q=pos%3Anoun");
+  });
+
+  it("hands the query on through the page that creates the card", () => {
+    const query = '"to write" sort:-rank';
+    const byRank = new URL(rowHref({ ...blank, rank: 7 }, query), "http://localhost");
+    expect([byRank.pathname, byRank.searchParams.get("rank"), byRank.searchParams.get("q")]).toEqual(["/open", "7", query]);
+    const byLemma = new URL(rowHref({ ...blank, lemma: "عَلَى", pos: "verb" }, query), "http://localhost");
+    expect([byLemma.searchParams.get("lemma"), byLemma.searchParams.get("pos"), byLemma.searchParams.get("q")]).toEqual(["عَلَى", "verb", query]);
+  });
+});
+
+describe("the word an arrow leads to", () => {
+  const now = new Date("2026-11-06T12:00:00Z");
+
+  it("is the next or the previous word of the frequency list when the card came from no query", () => {
+    const s = openStore(":memory:");
+    const [a, b, c] = [3, 4, 5].map((rank) => openCard(s, { rank })!);
+    expect(neighbour(s, b, "", "next", now)).toMatchObject({ id: c, rank: 5 });
+    expect(neighbour(s, b, "", "previous", now)).toMatchObject({ id: a, rank: 3 });
+  });
+
+  it("is a word without a card when its neighbour has none", () => {
+    const s = openStore(":memory:");
+    const id = openCard(s, { rank: 10 })!;
+    expect(neighbour(s, id, "", "next", now)).toMatchObject({ id: null, rank: 11 });
+    expect(neighbour(s, id, "", "previous", now)).toMatchObject({ id: null, rank: 9 });
+  });
+
+  it("is nothing past the ends of the list", () => {
+    const s = openStore(":memory:");
+    const [first, last] = [1, 5000].map((rank) => openCard(s, { rank })!);
+    expect(neighbour(s, first, "", "previous", now)).toBeNull();
+    expect(neighbour(s, last, "", "next", now)).toBeNull();
+  });
+
+  it("is nothing for a card made outside the list when there is no query", () => {
+    const s = openStore(":memory:");
+    const id = openCard(s, { lemma: "عَلَى", pos: "verb" })!;
+    expect(neighbour(s, id, "", "next", now)).toBeNull();
+    expect(neighbour(s, id, "", "previous", now)).toBeNull();
+  });
+
+  it("follows the list of the query the card was opened from", () => {
+    const s = openStore(":memory:");
+    const [a, b, c] = [1, 2, 3].map((rank) => openCard(s, { rank })!);
+    expect(neighbour(s, b, "pos:prep rank:<12", "next", now)).toMatchObject({ id: c, rank: 3 });
+    expect(neighbour(s, b, "pos:prep rank:<12", "previous", now)).toMatchObject({ id: a, rank: 1 });
+  });
+
+  it("keeps moving forward through a list when every step creates a card", () => {
+    const s = openStore(":memory:");
+    const query = "pos:noun rank:<60";
+    let at = openCard(s, { rank: 36 })!;
+    const seen = [36];
+    for (let step = 0; step < 5; step++) {
+      const next = neighbour(s, at, query, "next", now)!;
+      seen.push(next.rank!);
+      at = next.id ?? openCard(s, { rank: next.rank! })!;
+    }
+    expect(seen).toEqual([...seen].sort((x, y) => x - y));
+    expect(new Set(seen).size).toBe(seen.length);
+  });
+
+  it("goes to the top of the list when the card no longer belongs to it, and has nothing before it", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const s = openStore(":memory:");
+    vi.setSystemTime(new Date("2026-11-01T10:00:00Z"));
+    openCard(s, { rank: 1 });
+    vi.setSystemTime(new Date("2026-11-01T10:01:00Z"));
+    const second = openCard(s, { rank: 2 })!;
+    vi.setSystemTime(new Date("2026-11-01T10:02:00Z"));
+    const done = openCard(s, { rank: 3 })!;
+    finish(s, done);
+    const query = "status:progress sort:-edited";
+    expect(neighbour(s, done, query, "next", now)).toMatchObject({ id: second });
+    expect(neighbour(s, done, query, "previous", now)).toBeNull();
+  });
+
+  it("is nothing for a query it cannot read", () => {
+    const s = openStore(":memory:");
+    const id = openCard(s, { rank: 3 })!;
+    expect(neighbour(s, id, "pos:animal", "next", now)).toBeNull();
   });
 });

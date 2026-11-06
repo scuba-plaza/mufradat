@@ -38,6 +38,8 @@ The bar on the home page searches, filters and sorts the one list. Words you typ
 | `-pos:verb` | a minus in front of a field term takes the words out |
 | `sort:-edited` | order by `rank`, `edited`, `arabic` or `english`; a minus is descending, words without a value come last |
 
+Without a `sort:` the words come in the order of the frequency list, the ones you added last, and with text the closest match first; only the list with nothing typed puts the cards you are working on at the top. The In progress and Ready tabs add `sort:-edited`.
+
 A term the bar cannot read is named under it and no words are listed. Clicking Arabic, English or # above the list sorts by it, again for the other way, a third time for the default order; only the `sort:` term changes.
 
 ## Layout
@@ -46,7 +48,7 @@ One centered column, 44rem wide on small screens and 58rem from 1024px up, where
 
 ## Keyboard
 
-On a word, while no field has focus and no dialog is open: Ctrl+← and Ctrl+→ open the previous and the next word of the frequency list, leaving the current one as it is, Ctrl+↑ plays the word and Ctrl+↓ plays the example. The keys are matched by their position, so they work in any keyboard layout. The ? button in the top bar lists them.
+On a word, while no field has focus and no dialog is open: Ctrl+← and Ctrl+→ open the previous and the next word of the list the card was opened from, leaving the current one as it is (a card opened from Continue or from the list with nothing typed walks the frequency list by rank), Ctrl+↑ plays the word and Ctrl+↓ plays the example. The list is read again on every press, so in a list sorted by last edit the order changes as you edit. The keys are matched by their position, so they work in any keyboard layout. The ? button in the top bar lists them.
 
 ## Pages
 

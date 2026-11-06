@@ -15,8 +15,8 @@ const PAGE_SIZE = 100;
 const TABS = [
   { label: "All", query: "", status: null },
   { label: "Not started", query: "status:todo", status: "todo" },
-  { label: "In progress", query: "status:progress", status: "progress" },
-  { label: "Ready", query: "status:ready", status: "ready" },
+  { label: "In progress", query: "status:progress sort:-edited", status: "progress" },
+  { label: "Ready", query: "status:ready sort:-edited", status: "ready" },
   { label: "Approved", query: "status:approved", status: "approved" },
 ] as const;
 
@@ -94,7 +94,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
           <ol aria-label="Word list">
             {rows.slice(paging.start, paging.end).map((w) => (
               <li key={rowHref(w)}>
-                <a href={rowHref(w)} className="entry grid-cols-[2.5rem_5rem_1fr_auto] sm:grid-cols-[2.5rem_6rem_1fr_7rem]">
+                <a href={rowHref(w, q)} className="entry grid-cols-[2.5rem_5rem_1fr_auto] sm:grid-cols-[2.5rem_6rem_1fr_7rem]">
                   <span className="num text-right text-xs text-quiet">{w.rank ?? "—"}</span>
                   <span className="ar justify-self-end text-ar-sm" lang="ar" dir="rtl">{w.lemma}</span>
                   <span className="truncate">{w.english}</span>

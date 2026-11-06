@@ -14,7 +14,7 @@ import { keyPressed } from "./keys";
 const SAVE_TEXT = { idle: "", saving: "Saving…", saved: "Saved", failed: "Not saved" };
 
 /** One word as its card: the text is edited where it is shown, and the actions stay in the bar below. */
-export default function CardScreen({ initial, total }: { initial: Note; total: number }) {
+export default function CardScreen({ initial, total, q }: { initial: Note; total: number; q: string }) {
   const [note, setNote] = useState(initial);
   const [saved, setSaved] = useState<keyof typeof SAVE_TEXT>("idle");
   const [problems, setProblems] = useState<string[]>([]);
@@ -77,19 +77,26 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
 
   useEffect(() => {
     const play = (name: string) => document.querySelector<HTMLButtonElement>(`button[aria-label="Play ${name}"]`)?.click();
-    const go = (rank: number) => later(async () => window.location.assign(`/open?rank=${rank}`));
+    const go = (direction: "previous" | "next") =>
+      later(async () => {
+        try {
+          const { href } = await api<{ href: string | null }>(`/api/step?${new URLSearchParams({ id: note.id, dir: direction, q })}`);
+          if (href) window.location.assign(href);
+        } catch (e) {
+          setProblems([(e as Error).message]);
+        }
+      });
     function onKey(e: KeyboardEvent) {
       const key = keyPressed(e);
       if (!key) return;
       e.preventDefault();
-      if (key === "previous" && note.rank > 1) go(note.rank - 1);
-      else if (key === "next" && note.rank > 0 && note.rank < total) go(note.rank + 1);
+      if (key === "previous" || key === "next") go(key);
       else if (key === "playWord") play("the word");
       else if (key === "playExample") play("the example");
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [note.rank, total]);
+  }, [note.id, q]);
 
   const clip = (slot: string, name: string, text: string) => (
     <div className="mt-2">

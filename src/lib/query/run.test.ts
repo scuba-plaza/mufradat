@@ -7,16 +7,16 @@ const now = new Date(2026, 10, 6, 12, 0, 0);
 const at = (day: number, hour = 12) => new Date(2026, 10, day, hour, 0, 0).toISOString();
 
 const row = (over: Partial<WordRow>): WordRow => ({
-  id: null, rank: null, lemma: "", english: "", pos: ["noun"], gender: "", root: "", verbForm: "", status: "todo",
+  id: null, rank: null, lemma: "", english: "", pos: "noun", gender: "", root: "", verbForm: "", status: "todo",
   missing: ["example", "translation", "target", "audio"], error: false, exampleBy: "", edited: null, ...over,
 });
 
 const rows: WordRow[] = [
   row({ rank: 1, lemma: "كِتَاب", english: "book", gender: "m", root: "ك ت ب", status: "approved", missing: [], exampleBy: "mistral", edited: at(1), id: "a" }),
-  row({ rank: 2, lemma: "كَتَبَ", english: "to write", pos: ["verb"], verbForm: "I", root: "ك ت ب", status: "progress", missing: ["audio"], error: true, exampleBy: "user", edited: at(5), id: "b" }),
+  row({ rank: 2, lemma: "كَتَبَ", english: "to write", pos: "verb", verbForm: "I", root: "ك ت ب", status: "progress", missing: ["audio"], error: true, exampleBy: "user", edited: at(5), id: "b" }),
   row({ rank: 3, lemma: "مَدْرَسَة", english: "school", gender: "f", root: "د ر س", status: "ready", missing: [], exampleBy: "mistral", edited: at(6, 9), id: "c" }),
-  row({ rank: 4, lemma: "أَنَّ", english: "that", pos: ["conj", "particle"] }),
-  row({ rank: null, lemma: "إِنَّ", english: "indeed", pos: ["particle"], status: "progress", missing: ["example", "translation", "target", "audio"], edited: at(6, 10), id: "d" }),
+  row({ rank: 4, lemma: "أَنَّ", english: "that", pos: "conj" }),
+  row({ rank: null, lemma: "إِنَّ", english: "indeed", pos: "particle", status: "progress", missing: ["example", "translation", "target", "audio"], edited: at(6, 10), id: "d" }),
   row({ rank: 2500, lemma: "مَكْتَبَة", english: "library, bookshop", gender: "f", root: "ك ت ب" }),
 ];
 
@@ -65,7 +65,7 @@ describe("filtering by field", () => {
     expect(find("status:approved")).toEqual(["book"]);
     expect(find("status:progress,ready")).toEqual(["to write", "school", "indeed"]);
     expect(find("pos:verb,conj")).toEqual(["to write", "that"]);
-    expect(find("pos:particle")).toEqual(["that", "indeed"]);
+    expect(find("pos:particle")).toEqual(["indeed"]);
   });
 
   it("needs every field to match", () => {

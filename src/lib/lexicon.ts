@@ -49,8 +49,8 @@ function load(): Data {
   const rankOfLemma = new Map<string, RankRow>();
   for (const r of ranking) if (!rankOfLemma.has(r.id)) rankOfLemma.set(r.id, r);
   const ranked = ranking.map((r): Word => {
-    const pos = [...new Set(r.pos.split(",").map((p) => POS_FROM_WIKTIONARY[p]).filter(Boolean))];
-    const entry = lexicon.get(r.id)?.find((e) => POS_FROM_WIKTIONARY[e.pos] === pos[0]);
+    const pos = POS_FROM_WIKTIONARY[r.pos.split(",")[0]];
+    const entry = lexicon.get(r.id)?.find((e) => POS_FROM_WIKTIONARY[e.pos] === pos);
     const { gender, root, verbForm } = entry ? summary(r.id, entry, r) : { gender: "", root: "", verbForm: "" };
     return { rank: r.rank, lemma: r.id, english: r.gloss, pos, gender, root, verbForm };
   });
@@ -74,7 +74,7 @@ export interface Word {
   rank: number;
   lemma: string;
   english: string;
-  pos: POS[];
+  pos: POS;
   gender: string;
   root: string;
   verbForm: string;
