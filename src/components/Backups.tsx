@@ -125,13 +125,13 @@ export default function Backups() {
       >
         <div className="p-6">
           <h2 id="backups-title" className="text-xl font-semibold tracking-title">Backups</h2>
-          <p className="mt-2 text-sm text-quiet">These backups are on this computer. Download one to keep a copy somewhere else.</p>
+          <p className="mt-2 text-sm text-quiet">
+            These backups are on this computer. Download one to keep a copy somewhere else.
+            {data && ` Last downloaded: ${data.lastDownloadedAt ? new Date(data.lastDownloadedAt).toLocaleString() : "never"}.`}
+          </p>
           {error && <p role="alert" className="mt-2 break-words text-danger">{error}</p>}
           {data && (
             <>
-              <p className="mt-2 text-sm text-quiet">
-                Last downloaded: {data.lastDownloadedAt ? new Date(data.lastDownloadedAt).toLocaleString() : "never"}.
-              </p>
               <p className="mt-2 text-sm text-quiet">
                 Automatic backups use {size(data.usage.automaticBytes)} of {size(data.usage.budgetBytes)}; all backups use {size(data.usage.totalBytes)}.
                 {data.usage.automaticBytes > data.usage.budgetBytes && " The newest automatic backups alone are over that limit, and they are still kept."}
@@ -174,7 +174,6 @@ export default function Backups() {
                       type="file"
                       accept=".zip,application/zip"
                       hidden
-                      aria-label="Backup file"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         e.target.value = "";
