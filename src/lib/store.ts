@@ -7,6 +7,8 @@ import { audioFiles, audioKey, audioPath, mp3Problem, type AudioFile } from "./a
 import { approvalProblems, plainExample } from "./validate";
 import type { AudioSource, Clip, Form, Note, NoteEdit, NewNote, POS, Slot } from "./types";
 
+export const SCHEMA_VERSION = 1;
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS notes (
   id TEXT PRIMARY KEY,
@@ -66,8 +68,14 @@ export function openStore(dir: string) {
   const root = memory ? fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-")) : dir;
   fs.mkdirSync(root, { recursive: true });
   const db = new Database(memory ? ":memory:" : path.join(root, "vocabulary.db"));
+  const found = db.pragma("user_version", { simple: true }) as number;
+  if (found > SCHEMA_VERSION) {
+    db.close();
+    throw new Error("This workspace was written by a newer Mufradat.");
+  }
   db.pragma("foreign_keys = ON");
   db.exec(SCHEMA);
+  if (found < SCHEMA_VERSION) db.pragma(`user_version = ${SCHEMA_VERSION}`);
 
   const now = () => new Date().toISOString();
 

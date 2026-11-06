@@ -410,3 +410,39 @@ describe("audio files that no clip uses", () => {
     });
   });
 });
+
+describe("the workspace version", () => {
+  function inDir(run: (dir: string) => void) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-version-"));
+    try {
+      run(dir);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  const setVersion = (dir: string, version: number) => {
+    const raw = new Database(path.join(dir, "vocabulary.db"));
+    raw.pragma(`user_version = ${version}`);
+    raw.close();
+  };
+
+  it("refuses a workspace written by a newer version", () => {
+    inDir((dir) => {
+      setVersion(dir, 99);
+      expect(() => openStore(dir)).toThrow("This workspace was written by a newer Mufradat.");
+    });
+  });
+
+  it("opens a workspace from before the version existed and keeps its cards", () => {
+    inDir((dir) => {
+      const first = openStore(dir);
+      const card = first.createNote(kitab);
+      first.close();
+      setVersion(dir, 0);
+      const again = openStore(dir);
+      expect(again.getNote(card.id)?.lemma).toBe("كِتَاب");
+      again.close();
+    });
+  });
+});
