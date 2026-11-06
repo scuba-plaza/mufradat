@@ -288,6 +288,14 @@ export function openStore(dir: string) {
     return row?.id ?? null;
   }
 
+  function audioKeys(): string[] {
+    return (db.prepare("SELECT DISTINCT key FROM audio WHERE key IS NOT NULL").all() as { key: string }[]).map((r) => r.key);
+  }
+
+  function exportDatabase(dest: string): void {
+    db.prepare("VACUUM INTO ?").run(dest);
+  }
+
   function counts(): { cards: number; approved: number } {
     return db
       .prepare("SELECT COUNT(*) AS cards, COALESCE(SUM(status = 'approved'), 0) AS approved FROM notes")
@@ -313,7 +321,7 @@ export function openStore(dir: string) {
   }
 
   return {
-    root, findNote, approvedNotes, allNotes, counts, check, close: () => db.close(), getNote, deleteNote, unusedAudio, deleteUnusedAudio, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
+    root, findNote, approvedNotes, allNotes, counts, check, exportDatabase, audioKeys, close: () => db.close(), getNote, deleteNote, unusedAudio, deleteUnusedAudio, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
     applyGeneratedExample, approve,
   };
 }

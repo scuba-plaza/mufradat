@@ -113,3 +113,15 @@ export interface WorkspaceCheck {
 }
 
 export type SnapshotReason = "manual" | "daily" | "before-reset" | "before-restore" | "imported";
+
+export interface SnapshotInfo {
+  id: string;
+  reason: SnapshotReason;
+  createdAt: string;
+  schema: number;
+  cards: number;
+  approved: number;
+  clips: number;
+  unavailable: number;
+  dbBytes: number;
+}
