@@ -84,7 +84,7 @@ A new module, so the 290-line closure in `store.ts` does not grow.
 - A snapshot is the database copy, the manifest, and every clip the manifest names being present in `snapshots/audio/`. It is built in a `.partial` folder and renamed into place, so an interrupted snapshot never appears in the list.
 - The id is `YYYYMMDDTHHMMSSZ-<reason>`, so sorting by name is sorting by time. Reasons: `manual`, `daily`, `before-reset`, `before-restore`, `imported`.
 - Manifest: `{ schema, createdAt, reason, cards, approved, audioKeys, unavailable }`.
-- The database is copied with `VACUUM INTO`: synchronous, consistent and compact. The first test of Phase 1 settles whether the bundled SQLite supports it; the fallback is `db.backup()`.
+- The database is copied with `VACUUM INTO`: synchronous, consistent and compact. The first test of Phase 1 settles whether the bundled SQLite supports it; the fallback is writing `db.serialize()` to the file, which is synchronous like `VACUUM INTO`.
 - Audio is copied into the shared folder only when its key is not there yet, and every clip is hashed on the way in: the bytes must hash to the key in their name. A clip that is missing or does not match is skipped and counted in `unavailable`; the snapshot is still taken, because a daily snapshot that fails on one bad clip would protect nothing. The workspace check names those clips.
 - Why a shared folder and not a copy per snapshot: clips never change, so one copy serves every snapshot, and the cost is about one extra copy of the audio instead of one per snapshot. A copy per snapshot would put fourteen times the audio on disk. Why a real copy and not a hard link: a link shares its bytes with the live file and behaves differently across file systems; the owner asked for the audio to be in the snapshot.
 - Delete unused audio does not change. It deletes only from `audio/`, never from the snapshot folder, so a clip a backup holds survives it and comes back on restore.
@@ -216,7 +216,7 @@ README gets a Backups section and a corrected Files list. Moving the size and pl
 3. (4) Download a snapshot, post it to the import route in a fresh workspace: the list shows an `imported` snapshot, and restoring it gives the cards, the approvals and playing audio. This is the "new laptop" case.
 4. (4) A body that is garbage or truncated gets a 400, leaves the workspace untouched and leaves no temporary file behind.
 5. (4) A request to the import route from another origin is refused by the route itself, and nothing is written.
-6. (6) Import backup… with the file picker takes in a backup larger than 10 MiB whole, made by downloading a snapshot of a workspace with an 11 MiB clip, and shows it as `imported`. This proves the matcher exclusion.
+6. (6) Import backup… with the file picker takes in a backup larger than 10 MiB whole, made by downloading a snapshot of a workspace with two 6 MiB clips (the app accepts one clip of at most 10 MiB), and shows it as `imported`. This proves the matcher exclusion.
 7. (6) The running server refuses a cross-site request to the import route and to another route that changes data, so leaving one route out of the middleware dropped no other guard.
 8. (6) Download starts a file.
 
