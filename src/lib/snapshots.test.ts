@@ -127,4 +127,11 @@ describe("refusing a restore", () => {
     createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
     expect(() => restoreSnapshot(store, id)).toThrow("There is no such backup.");
   });
+
+  it("refuses an id that walks out of the snapshot folder into a real one", () => {
+    const { store } = workspace();
+    store.createNote(kitab);
+    const snapshot = createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
+    expect(() => restoreSnapshot(store, `../snapshots/${snapshot.id}`)).toThrow("There is no such backup.");
+  });
 });

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { audioKey, audioPath } from "./audio";
 import { SCHEMA_VERSION, type Store } from "./store";
-import type { SnapshotInfo, SnapshotReason } from "./types";
+import { SNAPSHOT_REASONS, type SnapshotInfo, type SnapshotReason } from "./types";
 
 export interface SnapshotOptions {
   now?: Date;
@@ -29,7 +29,7 @@ function copyClip(from: string, to: string): void {
   fs.copyFileSync(from, to);
 }
 
-const ID_PATTERN = /^\d{8}T\d{6}Z-(manual|daily|before-reset|before-restore|imported)(-\d+)?$/;
+const ID_PATTERN = new RegExp(`^\\d{8}T\\d{6}Z-(${SNAPSHOT_REASONS.join("|")})(-\\d+)?$`);
 
 export const isSnapshotId = (id: string): boolean => ID_PATTERN.test(id);
 

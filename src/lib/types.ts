@@ -112,7 +112,8 @@ export interface WorkspaceCheck {
   missingAudio: MissingAudio[];
 }
 
-export type SnapshotReason = "manual" | "daily" | "before-reset" | "before-restore" | "imported";
+export const SNAPSHOT_REASONS = ["manual", "daily", "before-reset", "before-restore", "imported"] as const;
+export type SnapshotReason = (typeof SNAPSHOT_REASONS)[number];
 
 export interface SnapshotInfo {
   id: string;
