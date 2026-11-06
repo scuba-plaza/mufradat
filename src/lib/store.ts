@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { audioKey, audioPath, mp3Problem } from "./audio";
+import { audioFiles, audioKey, audioPath, mp3Problem, type AudioFile } from "./audio";
 import { approvalProblems, plainExample } from "./validate";
 import type { AudioSource, Clip, Form, Note, NoteEdit, NewNote, POS, Slot } from "./types";
 
@@ -257,6 +257,24 @@ export function openStore(dir: string) {
     db.prepare("DELETE FROM notes WHERE id = ?").run(id);
   }
 
+  function findUnusedAudio(): AudioFile[] {
+    const rows = db.prepare("SELECT DISTINCT key FROM audio WHERE key IS NOT NULL").all() as { key: string }[];
+    const used = new Set(rows.map((r) => r.key));
+    return audioFiles(root).filter((file) => !used.has(file.key));
+  }
+
+  const totals = (files: AudioFile[]) => ({ files: files.length, bytes: files.reduce((sum, file) => sum + file.bytes, 0) });
+
+  function unusedAudio(): { files: number; bytes: number } {
+    return totals(findUnusedAudio());
+  }
+
+  function deleteUnusedAudio(): { files: number; bytes: number } {
+    const unused = findUnusedAudio();
+    for (const file of unused) fs.rmSync(file.path, { force: true });
+    return totals(unused);
+  }
+
   function findNote(lemma: string, pos: POS): string | null {
     const row = db.prepare("SELECT id FROM notes WHERE lemma = ? AND pos = ?").get(lemma, pos) as { id: string } | undefined;
     return row?.id ?? null;
@@ -268,7 +286,7 @@ export function openStore(dir: string) {
   }
 
   return {
-    root, findNote, approvedNotes, allNotes, close: () => db.close(), getNote, deleteNote, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
+    root, findNote, approvedNotes, allNotes, close: () => db.close(), getNote, deleteNote, unusedAudio, deleteUnusedAudio, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
     applyGeneratedExample, approve,
   };
 }

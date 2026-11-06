@@ -3,9 +3,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { audioPath } from "./audio";
+import { audioKey, audioPath } from "./audio";
 import { missingParts } from "./missing";
-import { openStore } from "./store";
+import { openStore, type Store } from "./store";
 
 const mp3 = Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]);
 const kitab = {
@@ -302,5 +302,111 @@ describe("deleting a card", () => {
     s.deleteNote(n.id);
     expect(() => s.deleteNote(n.id)).not.toThrow();
     expect(() => s.deleteNote("no-such-card")).not.toThrow();
+  });
+});
+
+describe("audio files that no clip uses", () => {
+  const bytes = (n: number) => Buffer.from([0xff, 0xfb, 0x90, 0x00, n, n, n, n]);
+  const fileOf = (dir: string, content: Buffer) => audioPath(dir, audioKey(content));
+
+  function inWorkspace(run: (s: Store, dir: string) => void) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-unused-"));
+    try {
+      const s = openStore(dir);
+      run(s, dir);
+      s.close();
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("reports the file a removed clip left behind, deletes it, and then finds nothing", () => {
+    inWorkspace((s, dir) => {
+      const n = s.createNote(kitab);
+      s.setAudio(n.id, "word", bytes(1), "tts");
+      expect(s.unusedAudio()).toEqual({ files: 0, bytes: 0 });
+      s.removeAudio(n.id, "word");
+      expect(s.unusedAudio()).toEqual({ files: 1, bytes: 8 });
+      expect(fs.existsSync(fileOf(dir, bytes(1)))).toBe(true);
+      expect(s.deleteUnusedAudio()).toEqual({ files: 1, bytes: 8 });
+      expect(fs.existsSync(fileOf(dir, bytes(1)))).toBe(false);
+      expect(s.unusedAudio()).toEqual({ files: 0, bytes: 0 });
+      expect(s.deleteUnusedAudio()).toEqual({ files: 0, bytes: 0 });
+    });
+  });
+
+  it("keeps the file of a clip whose text has changed since it was made", () => {
+    inWorkspace((s, dir) => {
+      const n = s.createNote(kitab);
+      s.setAudio(n.id, "word", bytes(1), "tts");
+      s.updateNote(n.id, { lemma: "كُتُب" });
+      expect(s.getNote(n.id)!.audio.word.outdated).toBe(true);
+      expect(s.deleteUnusedAudio()).toEqual({ files: 0, bytes: 0 });
+      expect(fs.existsSync(fileOf(dir, bytes(1)))).toBe(true);
+    });
+  });
+
+  it("finds the file that a replaced clip left behind and keeps the new one", () => {
+    inWorkspace((s, dir) => {
+      const n = s.createNote(kitab);
+      s.setAudio(n.id, "word", bytes(1), "tts");
+      s.setAudio(n.id, "word", bytes(2), "user");
+      expect(s.deleteUnusedAudio()).toEqual({ files: 1, bytes: 8 });
+      expect(fs.existsSync(fileOf(dir, bytes(1)))).toBe(false);
+      expect(fs.existsSync(fileOf(dir, bytes(2)))).toBe(true);
+      expect(s.getNote(n.id)!.audio.word.key).toBe(audioKey(bytes(2)));
+    });
+  });
+
+  it("keeps a file that two clips share until neither has it", () => {
+    inWorkspace((s, dir) => {
+      const a = s.createNote(kitab);
+      const b = s.createNote({ ...kitab, lemma: "قَلَم", english: "pen", rank: 121 });
+      s.setAudio(a.id, "word", bytes(1), "tts");
+      s.setAudio(b.id, "word", bytes(1), "tts");
+      s.removeAudio(a.id, "word");
+      expect(s.deleteUnusedAudio()).toEqual({ files: 0, bytes: 0 });
+      expect(fs.existsSync(fileOf(dir, bytes(1)))).toBe(true);
+      s.removeAudio(b.id, "word");
+      expect(s.deleteUnusedAudio()).toEqual({ files: 1, bytes: 8 });
+    });
+  });
+
+  it("finds the files that a removed form and a deleted card left behind", () => {
+    inWorkspace((s, dir) => {
+      const n = s.createNote(kitab);
+      s.setAudio(n.id, n.forms[0].id, bytes(3), "tts");
+      s.setAudio(n.id, "word", bytes(4), "tts");
+      s.updateNote(n.id, { forms: [] });
+      expect(s.unusedAudio()).toEqual({ files: 1, bytes: 8 });
+      s.deleteNote(n.id);
+      expect(s.unusedAudio()).toEqual({ files: 2, bytes: 16 });
+      expect(s.deleteUnusedAudio()).toEqual({ files: 2, bytes: 16 });
+      expect(fs.existsSync(fileOf(dir, bytes(3)))).toBe(false);
+      expect(fs.existsSync(fileOf(dir, bytes(4)))).toBe(false);
+    });
+  });
+
+  it("leaves alone whatever is not an audio file of its own", () => {
+    inWorkspace((s, dir) => {
+      const stray = ["notes.txt", "ab/notes.txt", "ab/abcdef0123456789.wav", "cd/0123456789abcdef.mp3", "ab/ABCDEF0123456789.mp3", "ab/abcdef01234567.mp3"].map((name) =>
+        path.join(dir, "audio", name),
+      );
+      for (const file of stray) {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, "x");
+      }
+      expect(s.unusedAudio()).toEqual({ files: 0, bytes: 0 });
+      expect(s.deleteUnusedAudio()).toEqual({ files: 0, bytes: 0 });
+      expect(stray.every((file) => fs.existsSync(file))).toBe(true);
+    });
+  });
+
+  it("finds nothing, without failing, in a workspace that has no audio folder yet", () => {
+    inWorkspace((s, dir) => {
+      expect(fs.existsSync(path.join(dir, "audio"))).toBe(false);
+      expect(s.unusedAudio()).toEqual({ files: 0, bytes: 0 });
+      expect(s.deleteUnusedAudio()).toEqual({ files: 0, bytes: 0 });
+    });
   });
 });

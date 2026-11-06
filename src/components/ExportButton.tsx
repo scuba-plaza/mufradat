@@ -16,7 +16,7 @@ export default function ExportButton({ approved }: { approved: number }) {
     }
   }
   return (
-    <div className="py-6 text-sm">
+    <div className="text-sm">
       <button className="action" disabled={approved === 0} onClick={run}>
         {approved === 0 ? "Export to Anki (nothing approved yet)" : `Export ${approved} approved ${approved === 1 ? "card" : "cards"} to Anki`}
       </button>
