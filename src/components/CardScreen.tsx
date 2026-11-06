@@ -92,7 +92,9 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
   }, [note.rank, total]);
 
   const clip = (slot: string, name: string, text: string) => (
-    <Clip note={note} slot={slot} name={name} text={text} onNote={setNote} />
+    <div className="mt-2">
+      <Clip note={note} slot={slot} name={name} text={text} onNote={setNote} />
+    </div>
   );
 
   return (
@@ -104,7 +106,7 @@ export default function CardScreen({ initial, total }: { initial: Note; total: n
       </div>
 
       <div className="mt-6 text-center">
-        <InlineText label="Arabic headword" value={note.lemma} arabic className="mb-2 text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
+        <InlineText label="Arabic headword" value={note.lemma} arabic className="text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
         {clip("word", "the word", note.lemma)}
         <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-2 text-center text-quiet" onSave={(hint) => save({ hint })} />
         {note.forms.length > 0 ? (

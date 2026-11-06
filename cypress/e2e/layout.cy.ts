@@ -59,6 +59,54 @@ describe("the layout of a card", () => {
     }
   });
 
+  describe("the space under a text field", () => {
+    const minimumGap = 8;
+    const byText = (doc: Document, text: string) =>
+      Array.from(doc.querySelectorAll("button")).find((button) => button.textContent?.trim() === text) ?? null;
+    const example = `div${by("Example")}`;
+    const pairs: {
+      what: string;
+      rank: number;
+      written?: boolean;
+      editing?: boolean;
+      above: (doc: Document) => Element | null;
+      below: (doc: Document) => Element | null;
+    }[] = [
+      { what: "the headword and the audio of the word", rank: 7, above: (doc) => doc.querySelector(by("Arabic headword")), below: (doc) => doc.querySelector(`${by("Audio for the word")} button`) },
+      { what: "the hint and Add forms", rank: 7, above: (doc) => doc.querySelector(by("Hint")), below: (doc) => byText(doc, "Add forms") },
+      { what: "the hint and Edit forms", rank: 6, above: (doc) => doc.querySelector(by("Hint")), below: (doc) => byText(doc, "Edit forms") },
+      { what: "the English meaning and the example", rank: 7, above: (doc) => doc.querySelector(by("English meaning")), below: (doc) => doc.querySelector(`${example} button`) },
+      { what: "an empty example and Generate example", rank: 7, above: (doc) => doc.querySelector(example), below: (doc) => byText(doc, "Generate example") },
+      { what: "the example and its translation", rank: 110, written: true, above: (doc) => doc.querySelector(example), below: (doc) => doc.querySelector(by("Example in English")) },
+      { what: "the translation and the audio of the example", rank: 110, written: true, above: (doc) => doc.querySelector(by("Example in English")), below: (doc) => doc.querySelector(`${by("Audio for the example")} button`) },
+      { what: "the example being edited and Mark target", rank: 111, editing: true, above: (doc) => doc.querySelector(`textarea${by("Example")}`), below: (doc) => byText(doc, "Mark target") },
+    ];
+
+    for (const [width, height] of [[1920, 1100], [390, 844]]) {
+      for (const { what, rank, written, editing, above, below } of pairs) {
+        it(`leaves ${minimumGap}px between ${what} at ${width}px`, () => {
+          cy.viewport(width, height);
+          openWord(rank);
+          if (written) {
+            cy.location("pathname").then((path) => {
+              cy.request("PUT", `/api/notes/${path.split("/").pop()}`, { example: "كَانَ [الْكِتَابُ] جَمِيلًا جِدًّا", exampleEn: "The book was very beautiful." });
+              cy.visit(path);
+              cy.hydrated(by("Hint"));
+            });
+          }
+          if (editing) cy.get(by("Example")).click();
+          cy.document().should((doc) => {
+            const upper = above(doc);
+            const lower = below(doc);
+            expect(upper, `${what}: the upper element`).to.not.equal(null);
+            expect(lower, `${what}: the lower element`).to.not.equal(null);
+            expect(lower!.getBoundingClientRect().top - upper!.getBoundingClientRect().bottom, `gap between ${what}`).to.be.at.least(minimumGap);
+          });
+        });
+      }
+    }
+  });
+
   describe("the action bar", () => {
     let rank = 80;
 
