@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
 import { audioFiles, audioKey, audioPath } from "./audio";
+import type { BackupEntry } from "./backup-zip";
 import { automaticSize, DEFAULT_LIMITS, selectRemovals, type Limits, type RetentionEntry } from "./retention";
 import { SCHEMA_VERSION, type Store } from "./store";
 import { SNAPSHOT_REASONS, type SnapshotInfo, type SnapshotReason, type SnapshotUsage } from "./types";
@@ -214,6 +215,33 @@ export function snapshotUsage(root: string, limits: Limits = DEFAULT_LIMITS): Sn
     automaticBytes: automaticSize(entries),
     budgetBytes: limits.budgetBytes,
   };
+}
+
+export function recordDownload(root: string, now: Date = new Date()): void {
+  fs.mkdirSync(snapshotsDir(root), { recursive: true });
+  fs.writeFileSync(path.join(snapshotsDir(root), "last-download"), now.toISOString());
+}
+
+export function lastDownload(root: string): string | null {
+  try {
+    return fs.readFileSync(path.join(snapshotsDir(root), "last-download"), "utf8").trim();
+  } catch {
+    return null;
+  }
+}
+
+export function backupEntries(root: string, id: string): BackupEntry[] {
+  const manifest = isSnapshotId(id) ? readManifest(root, id) : null;
+  if (!manifest) throw new Error("There is no such backup.");
+  if (!manifest.audioKeys.every((key) => fs.existsSync(snapshotAudioPath(root, key)))) {
+    throw new Error("The backup is missing or has damaged audio clips.");
+  }
+  const dir = path.join(snapshotsDir(root), id);
+  return [
+    { name: "manifest.json", file: path.join(dir, "manifest.json") },
+    { name: "vocabulary.db", file: path.join(dir, "vocabulary.db") },
+    ...manifest.audioKeys.map((key) => ({ name: `audio/${key.slice(0, 2)}/${key}.mp3`, file: snapshotAudioPath(root, key) })),
+  ];
 }
 
 export function restoreSnapshot(store: Store, id: string, options: SnapshotOptions = {}): void {
