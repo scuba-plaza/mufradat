@@ -1,38 +1,55 @@
-import { cardForRank, lookup, rankedWords } from "./lexicon";
-import { wordStatus } from "./missing";
+import { cardForRank, lookup, rankedWords, wiktionaryWords } from "./lexicon";
+import { missingKinds, wordStatus } from "./missing";
+import { parseQuery } from "./query/parse";
+import { runQuery } from "./query/run";
 import type { Store } from "./store";
-import { POS_VALUES, type Note, type POS, type WordStatus } from "./types";
-
-/** One word of the list: a card, or a frequency word that has none yet. */
-export interface WordRow {
-  id: string | null;
-  rank: number | null;
-  lemma: string;
-  english: string;
-  status: WordStatus;
-  edited: string | null;
-}
+import { MISSING_KINDS, POS_VALUES, type Note, type POS, type WordRow } from "./types";
 
 const fromCard = (n: Note): WordRow => ({
   id: n.id,
   rank: n.rank > 0 ? n.rank : null,
   lemma: n.lemma,
   english: n.english,
+  pos: [n.pos],
+  gender: n.gender,
+  root: n.root,
+  verbForm: n.verbForm,
   status: wordStatus(n),
+  missing: missingKinds(n),
+  error: n.exampleError !== null || Object.values(n.audio).some((clip) => clip.error !== null),
+  exampleBy: n.exampleSource,
   edited: n.updatedAt,
 });
 
-/** All 5000 frequency words in rank order, each showing its card when it has one, then the cards made outside the list. */
-export function wordRows(store: Store): WordRow[] {
-  const notes = store.allNotes();
+const notStarted = (row: Pick<WordRow, "rank" | "lemma" | "english" | "pos" | "gender" | "root" | "verbForm">): WordRow => ({
+  ...row,
+  id: null,
+  status: "todo",
+  missing: [...MISSING_KINDS],
+  error: false,
+  exampleBy: "",
+  edited: null,
+});
+
+function listRows(notes: Note[]): WordRow[] {
   const byRank = new Map(notes.filter((n) => n.rank > 0).map((n) => [n.rank, n]));
-  const listed = rankedWords().map((w): WordRow => {
+  const listed = rankedWords().map((w) => {
     const card = byRank.get(w.rank);
-    return card ? fromCard(card) : { id: null, rank: w.rank, lemma: w.lemma, english: w.english, status: "todo", edited: null };
+    return card ? fromCard(card) : notStarted(w);
   });
   const added = notes.filter((n) => n.rank === 0).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(fromCard);
   return [...listed, ...added];
 }
+
+function entryRows(notes: Note[]): WordRow[] {
+  const made = new Set(notes.map((n) => `${n.lemma}|${n.pos}`));
+  return wiktionaryWords()
+    .filter((e) => e.rank === 0 && !made.has(`${e.lemma}|${e.pos}`))
+    .map((e) => notStarted({ ...e, rank: null, pos: [e.pos] }));
+}
+
+/** All 5000 frequency words in rank order, each showing its card when it has one, then the cards made outside the list. */
+export const wordRows = (store: Store): WordRow[] => listRows(store.allNotes());
 
 const working = (r: WordRow) => r.status === "progress" || r.status === "ready";
 const group = (r: WordRow) => (working(r) ? 0 : r.status === "todo" ? 1 : 2);
@@ -63,6 +80,20 @@ export function continueFrom(rows: WordRow[]): WordRow | null {
 
 export const continueTarget = (store: Store): WordRow | null => continueFrom(wordRows(store));
 
+export interface View {
+  rows: WordRow[];
+  error: string | null;
+}
+
+export function view(store: Store, text: string, now: Date = new Date()): View {
+  const parsed = parseQuery(text);
+  if ("error" in parsed) return { rows: [], error: parsed.error };
+  const notes = store.allNotes();
+  const rows = listRows(notes);
+  if (parsed.query.texts.length > 0) rows.push(...entryRows(notes));
+  return { rows: runQuery(defaultOrder(rows), parsed.query, now), error: null };
+}
+
 /** The id of the card for a ranked word or a Wiktionary entry, creating the bare card if there is none. */
 export function openCard(store: Store, target: { rank: number } | { lemma: string; pos: string }): string | null {
   const card =
@@ -80,4 +111,10 @@ export function nextCardPath(store: Store): string {
   const target = continueTarget(store);
   const id = target?.id ?? (target?.rank ? openCard(store, { rank: target.rank }) : null);
   return id ? `/cards/${id}` : "/";
+}
+
+export function rowHref(row: WordRow): string {
+  if (row.id) return `/cards/${row.id}`;
+  if (row.rank) return `/open?rank=${row.rank}`;
+  return `/open?${new URLSearchParams({ lemma: row.lemma, pos: row.pos[0] })}`;
 }

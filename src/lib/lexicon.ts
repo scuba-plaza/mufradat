@@ -21,6 +21,8 @@ interface Data {
   rankOfLemma: Map<string, RankRow>;
   lexicon: Map<string, Entry[]>;
   bySkeleton: Map<string, string[]>;
+  ranked: Word[];
+  entries: WiktionaryWord[];
 }
 
 let cached: Data | null = null;
@@ -46,7 +48,23 @@ function load(): Data {
   }
   const rankOfLemma = new Map<string, RankRow>();
   for (const r of ranking) if (!rankOfLemma.has(r.id)) rankOfLemma.set(r.id, r);
-  cached = { ranking, rankOfLemma, lexicon, bySkeleton };
+  const ranked = ranking.map((r): Word => {
+    const pos = [...new Set(r.pos.split(",").map((p) => POS_FROM_WIKTIONARY[p]).filter(Boolean))];
+    const entry = lexicon.get(r.id)?.find((e) => POS_FROM_WIKTIONARY[e.pos] === pos[0]);
+    const { gender, root, verbForm } = entry ? summary(r.id, entry, r) : { gender: "", root: "", verbForm: "" };
+    return { rank: r.rank, lemma: r.id, english: r.gloss, pos, gender, root, verbForm };
+  });
+  const entries: WiktionaryWord[] = [];
+  for (const [id, list] of lexicon) {
+    const seen = new Set<POS>();
+    for (const e of list) {
+      const pos = POS_FROM_WIKTIONARY[e.pos];
+      if (seen.has(pos)) continue;
+      seen.add(pos);
+      entries.push(summary(id, e, rankOfLemma.get(id)));
+    }
+  }
+  cached = { ranking, rankOfLemma, lexicon, bySkeleton, ranked, entries };
   return cached;
 }
 
@@ -56,10 +74,26 @@ export interface Word {
   rank: number;
   lemma: string;
   english: string;
+  pos: POS[];
+  gender: string;
+  root: string;
+  verbForm: string;
+}
+
+export interface WiktionaryWord {
+  lemma: string;
+  english: string;
+  pos: POS;
+  gender: string;
+  root: string;
+  verbForm: string;
+  rank: number;
 }
 
 /** The frequency list as Wiktionary gives it. */
-export const rankedWords = (): Word[] => load().ranking.map((r) => ({ rank: r.rank, lemma: r.id, english: r.gloss }));
+export const rankedWords = (): Word[] => load().ranked;
+
+export const wiktionaryWords = (): WiktionaryWord[] => load().entries;
 
 function forms(e: Entry): { label: string; arabic: string }[] {
   const out: { label: string; arabic: string }[] = [];
@@ -75,19 +109,22 @@ function forms(e: Entry): { label: string; arabic: string }[] {
   return out;
 }
 
-function bareCard(lemma: string, e: Entry, rankRow: RankRow | undefined, gloss?: string): NewNote {
+function summary(id: string, e: Entry, rankRow: RankRow | undefined, gloss?: string): WiktionaryWord {
   const pos = POS_FROM_WIKTIONARY[e.pos];
   const ranked = rankRow && POS_FROM_WIKTIONARY[rankRow.pos.split(",")[0]] === pos;
   return {
-    lemma: e.canonical || lemma,
+    lemma: e.canonical || id,
     english: gloss ?? e.senses[0].gloss,
     pos,
     gender: e.gender ?? "",
     root: e.root ?? "",
     verbForm: e.verb_form ?? "",
     rank: ranked ? rankRow.rank : 0,
-    forms: forms(e),
   };
+}
+
+function bareCard(id: string, e: Entry, rankRow: RankRow | undefined, gloss?: string): NewNote {
+  return { ...summary(id, e, rankRow, gloss), forms: forms(e) };
 }
 
 /** The bare card for a rank in the frequency list, from its first listed part of speech. */

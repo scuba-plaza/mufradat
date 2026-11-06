@@ -77,3 +77,23 @@ export interface NoteEdit {
   /** Entries with an id keep their audio; entries without one are new. Omitted entries are removed. */
   forms?: { id?: string; label: string; arabic: string }[];
 }
+
+export const MISSING_KINDS = ["example", "translation", "target", "audio"] as const;
+export type MissingKind = (typeof MISSING_KINDS)[number];
+
+/** One word of the list: a card, a frequency word that has none yet, or a Wiktionary entry that matched a search. */
+export interface WordRow {
+  id: string | null;
+  rank: number | null;
+  lemma: string;
+  english: string;
+  pos: POS[];
+  gender: string;
+  root: string;
+  verbForm: string;
+  status: WordStatus;
+  missing: MissingKind[];
+  error: boolean;
+  exampleBy: "mistral" | "user" | "";
+  edited: string | null;
+}

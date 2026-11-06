@@ -27,3 +27,11 @@ export function requestedPage(query: { page?: string }): number {
   const page = query.page === undefined || query.page.trim() === "" ? Number.NaN : Number(query.page);
   return Number.isFinite(page) ? page : 1;
 }
+
+export function listPath(q: string, page = 1): string {
+  const params = new URLSearchParams();
+  if (q !== "") params.set("q", q);
+  if (page > 1) params.set("page", String(page));
+  const query = params.toString();
+  return query === "" ? "/" : `/?${query}`;
+}

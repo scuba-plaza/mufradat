@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { paginate, requestedPage } from "./paging";
+import { listPath, paginate, requestedPage } from "./paging";
 
 describe("paginating the frequency list", () => {
   it("gives the first of 50 pages for 5000 words in pages of 100", () => {
@@ -43,5 +43,20 @@ describe("choosing the page to show", () => {
   it("falls back to the first page when what was asked for is not a number", () => {
     expect(requestedPage({ page: "abc" })).toBe(1);
     expect(requestedPage({ page: "" })).toBe(1);
+  });
+});
+
+describe("the address of a page of the list", () => {
+  it("is the home page for the first page of every word", () => {
+    expect(listPath("")).toBe("/");
+    expect(listPath("", 1)).toBe("/");
+  });
+
+  it("carries the query and the page, written so that they read back unchanged", () => {
+    expect(listPath("", 3)).toBe("/?page=3");
+    expect(listPath("pos:noun", 1)).toBe("/?q=pos%3Anoun");
+    const url = new URL(listPath('"to write" sort:-rank', 2), "http://localhost");
+    expect(url.searchParams.get("q")).toBe('"to write" sort:-rank');
+    expect(url.searchParams.get("page")).toBe("2");
   });
 });
