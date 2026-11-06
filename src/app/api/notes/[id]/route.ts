@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { context, fail, handle, readJson } from "@/lib/server";
+import { createSnapshot } from "@/lib/snapshots";
 import { POS_VALUES, type NoteEdit, type POS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,16 @@ export const PUT = (req: Request, { params }: Ctx) =>
 
 export const DELETE = (_req: Request, { params }: Ctx) =>
   handle(async () => {
-    context().store.deleteNote((await params).id);
+    const { id } = await params;
+    const { store } = context();
+    if (store.getNote(id)) {
+      try {
+        createSnapshot(store, "before-reset");
+      } catch (e) {
+        const reason = e instanceof Error ? e.message : "an unknown error";
+        return fail(`The card was not reset because a backup could not be made first: ${reason}`, 500);
+      }
+    }
+    store.deleteNote(id);
     return new Response(null, { status: 204 });
   });
