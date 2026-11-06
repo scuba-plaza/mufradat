@@ -144,7 +144,7 @@
     @apply bg-paper;
   }
   .topbar-inner {
-    @apply mx-auto flex max-w-column items-center justify-between px-5;
+    @apply mx-auto flex max-w-column flex-wrap items-center justify-between px-5;
     min-height: var(--topbar-h);
   }
   .wordmark {

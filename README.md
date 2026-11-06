@@ -18,7 +18,7 @@ With Nix: `nix build`; the flake's `overlays.default` adds `mufradat` to nixpkgs
 3. Optionally generate an example (Mistral), and generate or upload audio per clip (Google TTS, MP3 upload). A clip that has audio shows a play button and an options button with Generate again, Upload MP3… and Remove audio; removing a clip takes the card's approval back and leaves the audio file in place until Delete unused audio (step 6). A failure is shown under its text and changes nothing else. The bar at the bottom says what the card still needs.
    Mistral names the word of the card in its sentence and the app marks it, also when it is attached to another word (بِالْقَلَمِ) or has another ending. When the word cannot be told for certain the sentence is kept unmarked and the card says so: select the word and choose Mark target.
 4. Approve and next. Editing an approved card takes the approval back.
-5. Export to Anki: every approved card, written to `exports/` in the workspace. The same cards always give the same bytes.
+5. Export to Anki, from the menu (the ⋯ button at the right of the top bar): every approved card, written to `exports/` in the workspace and downloaded. The same cards always give the same bytes.
 6. Now and then, Delete unused audio…, in the menu (the ⋯ button at the right of the top bar). Audio files are named by the hash of their bytes and are never deleted when a clip is removed or replaced, a form is removed or a word is reset, so they pile up. It counts the files that no clip refers to, asks, and deletes only those; a clip whose text changed since it was made still refers to its file, so that file is kept, and files in `exports/` are not touched.
 
 ## The search bar
