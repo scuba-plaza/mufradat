@@ -289,8 +289,9 @@ export function openStore(dir: string) {
   }
 
   function counts(): { cards: number; approved: number } {
-    const count = (where: string) => (db.prepare(`SELECT COUNT(*) AS n FROM notes ${where}`).get() as { n: number }).n;
-    return { cards: count(""), approved: count("WHERE status = 'approved'") };
+    return db
+      .prepare("SELECT COUNT(*) AS cards, COALESCE(SUM(status = 'approved'), 0) AS approved FROM notes")
+      .get() as { cards: number; approved: number };
   }
 
   function check(): WorkspaceCheck {
@@ -302,10 +303,7 @@ export function openStore(dir: string) {
       .all() as { noteId: string; lemma: string; slot: Slot; key: string }[];
     const missingAudio = rows
       .filter((r) => !fs.existsSync(audioPath(root, r.key)))
-      .map((r) => {
-        const forms = db.prepare("SELECT id, label, arabic FROM forms WHERE note_id = ?").all(r.noteId) as Form[];
-        return { ...r, slotName: slotLabel(forms, r.slot) };
-      });
+      .map((r) => ({ ...r, slotName: slotLabel(getNote(r.noteId)!.forms, r.slot) }));
     return { ...counts(), integrity: db.pragma("integrity_check", { simple: true }) as string, missingAudio };
   }
 
