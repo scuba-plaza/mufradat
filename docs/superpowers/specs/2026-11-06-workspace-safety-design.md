@@ -1,15 +1,24 @@
 # Workspace safety and long-term management: plan and design
 
-Status: proposed, waiting for review. Nothing in this document is implemented.
+Status: revised after the owner's answers, waiting for the seams in "Seams to confirm" to be agreed. Nothing here is implemented.
 
 ## How this plan is to be used
 
-Implementation of every phase below is to be guided by two skills, loaded before each phase starts:
+Implementation of every phase is guided by the `tdd` and `laws-of-simplicity` skills (in this environment `anthropic-skills:tdd` and `anthropic-skills:laws-of-simplicity`). Load both before each phase. How their rules apply here:
 
-- `tdd`: red, green, refactor. One failing test at a time, written through the public seams the repo already tests (the store, the route handlers, the Cypress specs), against real temporary directories as the existing tests do. The "Red" lists in each phase are the first tests to write, in order.
-- `laws-of-simplicity`: every addition is checked against Maeda's laws before it is written. The ledger near the end records how the laws shaped this plan; extend it when a phase adds something.
+`tdd`
+- Tests live only at the seams agreed in "Seams to confirm". No test is written at a seam the owner has not confirmed.
+- Vertical slices: one failing test, the minimum code to pass it, then choose the next test from what that taught. The slice lists below are candidates in a likely order, not a batch to write up front.
+- Tests observe behaviour through the public interface. A restore is checked by reading the card back through the store, not by opening the snapshot database; audio is checked by playing it, not by listing the backup folder.
+- Expected values are literals (a byte count, a count of snapshots), never recomputed the way the code computes them.
+- Mock only at boundaries: time (`vi.setSystemTime`) and nothing else. The file system is a real temporary directory, as in the existing tests. Limits such as the byte budget are passed in, so a test uses a budget of a few bytes instead of a gigabyte.
+- Refactoring is not part of the red-green loop. It happens at the review stage, with `code-review`.
 
-When the plan was written, the Skill tool in that session reported both names as unknown, although both are enabled in the claude.ai skill library, so their text was not read. The ledger below is therefore written from the general laws, not from the skill. Whoever implements this loads both skills first; if either contradicts this plan, stop and raise it rather than quietly following one of the two. `superpowers:test-driven-development` is a usable stand-in for `tdd` if the library one still does not load.
+`laws-of-simplicity`
+- Frame each phase with the ten laws before starting; run the ten-question checklist before review.
+- After each change record a `simplicity_delta` from -5 to +5 in the commit message or PR description, and apply the keep/discard matrix: keep when the main goal improves and the delta is at least -2.
+- Evidence before declaring problems: claims about the code are traced to the code and stated with the evidence; what is unchecked is written as an open question. "Evidence" below follows that.
+- A failure gets a root-cause hypothesis written down before the next attempt; the same approach is not retried without a different hypothesis, and three failed attempts in one direction mean changing direction.
 
 Repo conventions that apply throughout: no comments in code, never the `any` type, `pnpm typecheck` and `pnpm test` green before each commit, `pnpm e2e` for UI phases, README updated in the same commit as the behaviour it describes.
 
@@ -17,193 +26,244 @@ Repo conventions that apply throughout: no comments in code, never the `any` typ
 
 | Part | What it holds | Replaceable? |
 |---|---|---|
-| `vocabulary.db` | Cards, forms, audio rows. One SQLite file, default rollback journal, no schema version. | No: hand-edited text and approvals |
-| `audio/<xx>/<16 hex>.mp3` | Clips named by the hash of their bytes, written once, never deleted except by Delete unused audio | Only by paying for generation again, or by hand for uploads |
+| `vocabulary.db` | Cards, forms, audio rows. One SQLite file, no schema version | No: hand-edited text and approvals |
+| `audio/<xx>/<16 hex>.mp3` | Clips named by the hash of their bytes, written once, deleted only by Delete unused audio | Only by paying for generation again, or by hand for uploads |
 | `exports/*.apkg` | Anki packages | Yes: the same cards always give the same bytes |
 | `~/.config/mufradat/config.toml` | API keys | Outside the workspace; must never end up in a backup |
 
-What cannot be undone today, read from the code:
+What cannot be undone today:
 
 - Reset word calls `DELETE /api/notes/:id`, which deletes the card and cascades to its forms and audio rows.
-- An edit overwrites in place (`updateNote`); there is no history. Fields save on blur, so a "history of every change" would be one entry per blur.
+- An edit overwrites in place; there is no history.
 - Delete unused audio removes files for good.
-- There is no schema version (`CREATE TABLE IF NOT EXISTS` only), so a later schema change cannot tell an old database from a new one, and a backup from another app version cannot be checked.
-- Export reads every clip with `fs.readFileSync` inside `buildApkg`. One audio row whose file is gone makes the whole export fail with a raw `ENOENT` message and a 500. Nothing tells the owner which card is at fault.
-- `zip.ts` can write a stored zip but cannot read one.
-- The cross-site guard in `src/middleware.ts` covers non-GET requests. Anything that restores or imports must therefore be POST, PUT or DELETE, never GET.
+- A database row can point at an audio file that is not there. Nothing checks for it, and Export then fails (see Evidence).
 
 ## What this plan is for
 
-Said by the owner: make long-term management of the workspace easier; decide between full version control on every minor change, manual backups and imports, or something in between.
+Confirmed by the owner:
 
-Assumed, to be confirmed in review:
+- One person on one machine, a NixOS laptop.
+- Mistakes that can be undone matter more than an audit trail.
+- Automatic snapshots are silent; the list in the dialog is the only place they show.
+- Snapshots must include the audio. Clips cost money to generate and must come back without regeneration.
+- Automatic backups are limited both by count and by total size: 1 GiB preferred, 3 GiB at most and only if really needed. The count is left to this plan.
 
-- One person, mostly one machine, hundreds to low thousands of cards.
-- The pain to remove is losing work: a wrong Reset word, a bad overwrite, a damaged file, a moved machine. It is not auditing who changed what.
-- No new setting should have to be learned or maintained.
-
-Success looks like: any mistake of the last weeks can be undone from the app in a few clicks; a disk loss or a move to another computer costs one file copy; and nothing about the existing flow (Continue, edit, approve, export) gets slower or longer.
+Success looks like: any mistake of the last weeks can be undone from the app in a few clicks, including the audio; a lost disk costs one file copy; and nothing about the existing flow (Continue, edit, approve, export) gets slower or longer.
 
 ## The options
 
-| | A. Manual backup and import only | B. Version control of every change | C. Snapshots (recommended) |
+| | A. Manual backup and import only | B. Version control of every change | C. Snapshots (chosen) |
 |---|---|---|---|
-| What it is | A "Back up" button that writes one file, and an import | Every edit recorded, browsable, restorable per card or per time | Whole-workspace snapshots taken automatically at the right moments and on demand, with one-file export and import |
+| What it is | A "Back up" button that writes one file, and an import | Every edit recorded, browsable, restorable per card or per time | Whole-workspace snapshots, database and audio, taken automatically at the right moments and on demand, with one-file download and import |
 | Undo a wrong Reset word | Only if a backup was taken beforehand | Yes, exactly | Yes: a snapshot is taken just before it |
 | Undo a bad overwrite from last week | Only if remembered | Yes, exactly | Yes, to the daily snapshot; coarser than B |
-| Survive disk loss or move machines | Yes | No, unless also exported | Yes, through Download and Import |
+| Survive disk loss | Yes, if the file was copied away | No, unless also exported | Yes, through Download |
 | Needs the owner to remember | Yes | No | No for mistakes; Download is manual |
-| New code | Small | Large: history storage, diffs, browsing UI, restore-at-revision across notes, forms and audio rows, pruning | Medium |
+| New code | Small | Large: history storage, diffs, browsing UI, restore at a revision across notes, forms and audio, pruning | Medium |
 | New surface to learn | Two buttons | A history browser | One dialog, one list |
-| Touches existing code | Little | Every write path, or triggers plus a restore engine | Reset route, `context()`, the unused-audio check |
 
-Why not B in full. Git in the workspace diffs a binary database poorly, needs git installed and shows git ideas to someone studying vocabulary. A log kept in SQLite triggers captures everything with little code but is useless without a restore interface, and that interface (per-field diffs, restore of forms and clips, pruning) is where the cost is. Because each field saves on blur, the log would be mostly noise. Most of what B gives, undoing a recent mistake, C gives at coarser grain for a fraction of the code.
+Why not B. Fields save on blur, so a history of every change is mostly noise, and the cost sits in the interface that makes it usable (diffs, restoring forms and clips, pruning). Git in the workspace diffs a binary database poorly and shows git ideas to someone studying vocabulary. C gives the part of B that matters, undoing a recent mistake, at coarser grain for a fraction of the code. Restoring a single card from a snapshot is kept as an optional last phase.
 
-Why not A alone. It protects against nothing unless the owner remembers, and the dangerous moments (Reset word, a restore, a version upgrade) are exactly the moments nobody remembers.
-
-C, in one sentence: take a whole-database snapshot automatically once a day and just before anything destructive, keep a bounded number, make a snapshot the only thing you ever restore from, and let the same snapshot be downloaded as one file and imported back as a new snapshot.
-
-The cheap, valuable part of B is restoring a single card from a snapshot. That is kept as an optional last phase, decided after living with the first three.
+Why not A alone. It protects nothing unless the owner remembers, and the dangerous moments (Reset word, a restore) are the ones nobody remembers.
 
 ## Design
 
 ### 1. Schema stamp
 
-Set `PRAGMA user_version = 1` after the existing schema is created. Databases created before this have 0 and hold exactly the same schema, so they are stamped without any change to their rows. `openStore` refuses a database whose version is higher than the app knows: "This workspace was written by a newer Mufradat." No migration mechanism is built until a second version exists.
+Set `PRAGMA user_version = 1` once the existing schema exists. Databases from before this have 0 and the same schema, and are stamped without touching their rows. `openStore` refuses a database with a higher version: "This workspace was written by a newer Mufradat." No migration mechanism is built until a second version exists.
 
 ### 2. Snapshots: `src/lib/snapshots.ts`
 
 A new module, so the 290-line closure in `store.ts` does not grow.
 
-- Layout: `<workspace>/snapshots/<id>/vocabulary.db` and `manifest.json`. The id is `YYYYMMDDTHHMMSSZ-<reason>`, so sorting by name is sorting by time; two in the same second get a numeric suffix.
-- Reasons: `manual`, `daily`, `before-reset`, `before-restore`, `imported`.
-- Manifest: `{ schema, createdAt, reason, cards, approved, audioKeys }`. It is the single source for the list rows, the restore preview and the audio pinning below.
-- The database is copied with `VACUUM INTO`: synchronous, consistent, compact. Phase 1's first test proves the bundled SQLite supports it; the fallback is `db.backup()`.
-- Audio is not copied. Clips are immutable and content-addressed, so a snapshot only needs to know which keys it needs.
-- Pinning: `findUnusedAudio` treats keys named by any retained snapshot's manifest as in use. Delete unused audio therefore can never break a restore, and no snapshot is needed before it. The dialog says how many files are kept for backups, and they become unused again when their snapshots are pruned or deleted.
-- Retention: `daily` keeps the newest 14; `before-reset` and `before-restore` together keep the newest 14; `manual` and `imported` are never pruned automatically. Two groups, one number, so a burst of resets cannot push out the dailies. Fourteen daily snapshots cover fourteen days of use, not fourteen calendar days.
-- Daily: `context()` already runs on every request. It checks a cached date; when no `daily` exists for today and the workspace has at least one card, it takes one. The snapshot is therefore the state at the end of the previous session, which is what a mistake made today needs. This puts a side effect in a function tests call everywhere, so the decision is a pure function (`dailyDue(snapshots, today, cards)`) tested on its own, and tests control the date with `vi.setSystemTime`.
-- Reset word: the `DELETE /api/notes/:id` handler takes a `before-reset` snapshot first, only when the card exists.
+    <workspace>/snapshots/
+      audio/<xx>/<16 hex>.mp3        one copy of each clip any snapshot needs
+      <id>/vocabulary.db
+      <id>/manifest.json
+
+- A snapshot is the database copy, the manifest, and every clip the manifest names being present in `snapshots/audio/`. It is built in a `.partial` folder and renamed into place, so an interrupted snapshot never appears in the list.
+- The id is `YYYYMMDDTHHMMSSZ-<reason>`, so sorting by name is sorting by time. Reasons: `manual`, `daily`, `before-reset`, `before-restore`, `imported`.
+- Manifest: `{ schema, createdAt, reason, cards, approved, audioKeys, unavailable }`.
+- The database is copied with `VACUUM INTO`: synchronous, consistent and compact. The first test of Phase 1 settles whether the bundled SQLite supports it; the fallback is `db.backup()`.
+- Audio is copied into the shared folder only when its key is not there yet, and every clip is hashed on the way in: the bytes must hash to the key in their name. A clip that is missing or does not match is skipped and counted in `unavailable`; the snapshot is still taken, because a daily snapshot that fails on one bad clip would protect nothing. The workspace check names those clips.
+- Why a shared folder and not a copy per snapshot: clips never change, so one copy serves every snapshot, and the cost is about one extra copy of the audio instead of one per snapshot. A copy per snapshot would put fourteen times the audio on disk. Why a real copy and not a hard link: a link shares its bytes with the live file and behaves differently across file systems; the owner asked for the audio to be in the snapshot.
+- Delete unused audio does not change. It deletes only from `audio/`, never from the snapshot folder, so a clip a backup holds survives it and comes back on restore.
+- On disk, audio is therefore stored twice once snapshots exist: live, and in the snapshot folder. That is the price of an independent copy. It is counted in the budget and shown in the dialog.
+- The snapshot folder lives inside the workspace, so copying the workspace folder with any ordinary tool copies the snapshots too.
+
+Retention, two limits applied to automatic snapshots only (`daily`, `before-reset`, `before-restore`):
+
+- Count: the newest 14 `daily` and the newest 14 `before-*` together. Fourteen daily snapshots cover fourteen days of use, which is where mistakes are noticed; the count is small because the byte budget is the real bound.
+- Size: the automatic snapshots may use at most 1 GiB. Their size is the sum of their database copies plus every distinct clip they name, a shared clip counted once. When over a limit, the oldest automatic snapshot goes, then the size is worked out again, until both limits hold. The newest `daily` and the newest `before-*` are never removed for size: if they alone exceed the budget the dialog says so, and nothing is silently dropped.
+- Clips held by no remaining snapshot are then removed from the snapshot folder.
+- `manual` and `imported` snapshots are never removed automatically and do not count toward the budget. The dialog shows the total used by everything.
+- The decision of what to remove is a pure function of snapshot sizes and limits, so its arithmetic is tested with small literal numbers.
+
+When it runs: `context()` already runs on every request. It checks a cached date; when no `daily` exists for today and the workspace holds at least one card, it takes one. That snapshot is the state at the end of the previous session, which is what a mistake made today needs. This puts a side effect in a function tests call everywhere, so the decision is a pure function (`dailyDue`) tested on its own. The first snapshot ever copies all the audio and is synchronous; later ones copy only new clips.
+
+Reset word: the `DELETE /api/notes/:id` handler takes a `before-reset` snapshot first, only when the card exists.
 
 ### 3. Restore
 
 `POST /api/backups/<id>/restore`:
 
-1. Validate without changing anything: manifest parses, schema not newer than the app, `PRAGMA integrity_check` on the snapshot database is `ok`, every audio key in the manifest exists in `audio/`.
+1. Check, changing nothing: the manifest parses, its schema is not newer than the app's, `PRAGMA integrity_check` on the snapshot database says `ok`, and every clip in `audioKeys` is in the snapshot folder and hashes to its key.
 2. Take a `before-restore` snapshot of the current state.
-3. Close the store, copy the snapshot database beside `vocabulary.db`, rename it over, drop the cached store so `context()` reopens it.
+3. Copy every clip the snapshot names that `audio/` lacks back from the snapshot folder, then close the store, copy the snapshot database beside `vocabulary.db`, rename it over, and drop the cached store so `context()` reopens it. The database is swapped last, so a failure while copying clips leaves the workspace as it was.
 
-A failure at step 1 changes nothing. Because step 2 always runs, a restore is itself undone by restoring the `before-restore` snapshot. That is the whole undo story.
+Step 2 always runs, so a restore is itself undone by restoring the `before-restore` snapshot.
 
-### 4. One file in, one file out
+### 4. One file out, one file in
 
-- Download: `GET /api/backups/<id>` streams a zip of `manifest.json`, `vocabulary.db` and only the audio that snapshot needs. Config is never included, and neither are exports.
-- Import: `PUT /api/backups` with the zip as the body, like the existing MP3 upload. Import does not replace anything: it adds the file to the list as an `imported` snapshot, and the same Restore button switches to it. One restore path, and the list row shows the manifest counts as the preview.
-- The zip reader accepts only what the writer produces: stored entries, no zip64, no encryption, no duplicates. Entry names must match an allowlist (`manifest.json`, `vocabulary.db`, `audio/xx/<16 hex>.mp3`) and are rebuilt from the matched groups, never used as paths. Each entry's CRC is checked, an audio entry's hash must equal the key in its name, and the database must pass `integrity_check` before the snapshot appears.
-- Not merged: importing never combines two workspaces. That needs a conflict rule for `UNIQUE (lemma, pos)` and for edits on both sides, and nobody has asked for it.
+- Download: `GET /api/backups/<id>` serves a zip of `manifest.json`, `vocabulary.db` and the snapshot's clips, built file by file from the snapshot folder with a streaming writer (data descriptors), not in memory. It never contains the config or the exports. The dialog shows when a snapshot was last downloaded, quietly and only as information: this is the one protection that survives losing the laptop, and automatic snapshots cannot give it.
+- Import reads from a folder, not from an upload: the owner puts the zip in `<workspace>/imports/`, the dialog lists the zips it finds there, and Import turns one into an `imported` snapshot. The same Restore button then switches to it, so there is one restore path, and the list row shows the manifest counts as the preview. `POST /api/backups/import` takes the file name, which must match `^[\w.-]+\.zip$` and is resolved only inside `imports/`.
+- The zip reader reads from a file with positional reads, so memory stays flat. It accepts only what the writer produces: stored entries, no zip64, no encryption, no duplicates. Entry names must match an allowlist (`manifest.json`, `vocabulary.db`, `audio/xx/<16 hex>.mp3`) and are rebuilt from the matched groups, never used as paths. Each entry's CRC is checked, a clip's hash must equal the key in its name, and the database must pass `integrity_check` before the snapshot appears.
+- Why not an upload button: the Next version in use (15.5.29) clones request bodies for middleware with a default cap of 10 MiB (see Evidence), and the backup is hundreds of megabytes. Raising the cap or moving the route out from under the cross-site guard would change how the whole app is protected, to save the owner from copying one file into one folder, once, after a disaster.
+- Not merged: importing never combines two workspaces. That needs a rule for `UNIQUE (lemma, pos)` and for edits on both sides, and a single-machine owner has no use for it.
 
 ### 5. Workspace check
 
-`GET /api/backups` returns the snapshot list and a check: card and approved counts, database and audio sizes, `integrity_check` result, and the audio rows whose file is missing (note id, slot, key). The dialog shows the check only when something is wrong, with a link to each affected card, since regenerating a clip is already a card action. Export is changed to name the card and slot it cannot read.
+`GET /api/backups` returns the snapshot list, the zips waiting in `imports/`, the sizes, and a check: card and approved counts, the `integrity_check` result, and the clips whose audio file is missing (note id, slot, key). The dialog shows the check only when something is wrong, with a link to each affected card, since regenerating a clip is already a card action. Export is changed to name the card and slot it cannot read.
 
 ### 6. Interface
 
-One new quiet button, "Backups…", in the home footer beside Export and Delete unused audio, using the same dialog pattern as `UnusedAudio`. Inside:
+One new quiet button, "Backups…", in the home footer beside Export and Delete unused audio, with the same dialog pattern as `UnusedAudio`. Inside:
 
-- Top line: the last backup, and a plain statement of what the list is: "These backups are on this computer. Download one to keep a copy somewhere else." Automatic snapshots protect against mistakes, not against losing the disk, and the dialog says so.
-- Buttons: Back up now, Import backup…
+- A line saying what the list is: "These backups are on this computer. Download one to keep a copy somewhere else." and, beside it, when one was last downloaded.
+- Usage: what the automatic snapshots use of the 1 GiB, and the total, with a plain sentence when the newest snapshots alone exceed the budget.
+- Back up now, and the zips found in `imports/` with an Import button each.
 - The list, newest first: time, reason in words, "412 cards · 230 approved", and per row Download, Restore…, Delete.
 - Restore asks once, showing that row's counts beside the current ones and saying the current state is saved first.
-- No nagging, no toast for automatic snapshots, no settings.
+- No nagging, no notification for automatic snapshots, no settings.
 
-The routes, all in the existing `handle` / `fail` / `context` style: `GET` and `POST` and `PUT` on `/api/backups`, `GET` and `DELETE` on `/api/backups/[id]`, `POST` on `/api/backups/[id]/restore`.
+Routes, in the existing `handle` / `fail` / `context` style: `GET` and `POST` on `/api/backups`, `POST` on `/api/backups/import`, `GET` and `DELETE` on `/api/backups/[id]`, `POST` on `/api/backups/[id]/restore`. Everything that changes anything is POST or DELETE, so the existing cross-site guard covers it.
+
+## How big is a snapshot
+
+Not measured; the real workspace is on the owner's laptop. What I can say:
+
+- The database copy is small: cards are short text rows, so a few megabytes at 5,000 cards (an estimate).
+- Audio is the bulk and is stored once for all snapshots. The word list has 5,000 entries, so a finished deck is at most 5,000 cards. Speech MP3 is on the order of 4 to 16 KB per second; a word is about a second, an example about four, a form about one. That is roughly 30 to 120 KB per fully voiced card, so 150 to 600 MB of audio for a finished deck (an estimate).
+- Total for the automatic snapshots: about one copy of the audio, plus clips since replaced, plus up to 28 database copies of a few megabytes. That is expected to be well under 1 GiB now and to stay under it through a finished deck. 3 GiB is not expected to be needed.
+- Decision rule: ship with 1 GiB. Raise it, to 3 GiB at most, only if the numbers measured on the real workspace say it is needed: audio plus database above about 0.7 GiB. The limit is a constant in `snapshots.ts`, not a setting.
+
+To measure, on the laptop (adjust the path if `MUFRADAT_WORKSPACE` is set):
+
+    du -sh ~/.local/share/mufradat/audio ~/.local/share/mufradat/vocabulary.db
+    find ~/.local/share/mufradat/audio -name '*.mp3' | wc -l
+
+## Seams to confirm
+
+The `tdd` skill requires these to be agreed before any test is written.
+
+| # | Seam | What it catches | What it misses |
+|---|---|---|---|
+| 1 | `openStore`: schema version, the workspace check, unchanged unused-audio behaviour | Data-layer rules, legacy and newer workspaces | HTTP wiring, the interface |
+| 2 | The snapshot module's public functions (create, list, restore, delete, `dailyDue`) driven with a real store in a temporary workspace, observed through the store and by playing clips | Snapshot, restore and retention behaviour end to end on disk | HTTP wiring, the cached store in `context()` |
+| 3 | The retention decision (pure: snapshot sizes and limits in, what to remove out) | Count and byte-budget arithmetic exactly, shared clips counted once | Whether anything is actually deleted (seam 2) |
+| 4 | Route handlers called as functions with the environment stubbed, as `audio/unused/route.test.ts` does: `/api/backups*`, `DELETE /api/notes/:id`, `/api/export` | Status codes, wiring, the daily snapshot through `context()`, the store reopening after a restore | A real browser, a real HTTP server |
+| 5 | The zip writer and reader (file in, entries out) | Bad and hostile input, round trips | Everything outside the zip |
+| 6 | Cypress against a production build | The dialog, a real download, layout at 1920px and 390px, hydration | Fine-grained logic; slow, so few specs |
 
 ## Phases
 
-Each phase ships on its own and leaves the app working. Phases 0 and 1 give most of the protection.
+Each phase ships on its own and leaves the app working. Phases 0 and 1 give most of the protection. Slices are listed in the order they are likely to be taken, each one a single red-green cycle; the next is chosen after the last.
 
 ### Phase 0: stamp and check
 
-Red, in order:
-1. A new workspace has `user_version` 1.
-2. A database with `user_version` 0 and cards opens, is stamped, and loses nothing.
-3. A database with `user_version` 99 makes `openStore` throw with the "newer Mufradat" message.
-4. The check reports a missing audio file with its note and slot, the unused count, and `integrity_check` ok.
-5. Export with a missing clip fails with a message naming the card and the slot, not a path.
+1. (1) A workspace written by a newer version is refused with a clear message.
+2. (1) A workspace from before this change opens and keeps its cards.
+3. (1) The check reports a clip whose file is missing, with its note and slot, and reports a healthy workspace as healthy.
+4. (4) Export with a missing clip answers with a message naming the card and the slot, not a path.
 
 ### Phase 1: snapshot engine, no interface
 
-Red, in order:
-1. `VACUUM INTO` works on the store's database in a temporary directory.
-2. A snapshot holds a database with the same rows, and a manifest with the right counts and audio keys.
-3. Editing a card afterwards does not change the snapshot.
-4. The list is newest first and ignores a directory with no manifest.
-5. Retention: the fifteenth `daily` removes the oldest `daily` only; a burst of `before-reset` never removes a `daily`; `manual` is never removed.
-6. Pinning: a clip removed or replaced after a snapshot keeps its file through Delete unused audio; once the snapshot is deleted the file is reported unused and deleted. This changes the sentence in README step 6 and in the dialog.
-7. `dailyDue`: one `daily` per date, none for an empty workspace, one again the next day.
-8. Reset word through the route takes a `before-reset` snapshot that contains the card, and none when the card does not exist.
-9. Restore brings a reset card back with its forms and clips playing; the previous state is saved as `before-restore`; restoring that returns to the starting point; the store keeps working afterwards.
-10. Restore refuses, and changes nothing, for a snapshot with a missing audio file, with a newer schema, or with a failing `integrity_check`.
+1. (2) Tracer bullet: take a snapshot, reset the card, restore, and the card is back with its forms. This first cycle settles `VACUUM INTO`.
+2. (2) The card's clip plays after a restore, also when Delete unused audio ran in between.
+3. (2) Restore saves the current state first; restoring that undoes the restore.
+4. (2) Restore refuses and changes nothing for a newer schema, a damaged database, and a clip that is gone or does not match its hash.
+5. (2) A snapshot taken while one clip's file is missing is still taken and reports one unavailable clip.
+6. (3) The retention table with literal numbers: the 15th `daily` removes the oldest `daily` only; `before-*` has its own count; `manual` and `imported` are never removed; the byte budget removes oldest first; a clip shared by two snapshots counts once; the newest of each group stays even over budget.
+7. (2) Applying retention removes the snapshots and the clips only they held, and keeps a clip another snapshot still holds; the reported usage drops by the literal number of bytes.
+8. (2) `dailyDue`: one per date, none for an empty workspace, one again the next day.
+9. (4) Reset word through the route takes a `before-reset` snapshot containing the card, and none for a card that does not exist.
+10. (4) The first request of a day through `context()` takes the daily; a restore through the route leaves the app showing the restored cards.
+11. (2) The list is newest first, ignores an unfinished snapshot, and Delete removes one.
 
 ### Phase 2: the Backups dialog
 
-Red: a Cypress spec following `housekeeping.cy.ts`. Back up now adds a row; Cancel on Restore changes nothing; Restore brings back a card that was reset; the dialog and footer fit at 1920px and at 390px; Escape closes the dialog and focus returns to the opener. The size and plural helpers in `UnusedAudio.tsx` move to a shared module as the refactor step, with the existing spec as the safety net. README gets a Backups section and a corrected Files list.
+1. (6) Backups… opens a dialog listing snapshots with their counts; Back up now adds a row.
+2. (6) Restore… asks once; Cancel changes nothing; Restore brings back a card that was reset.
+3. (6) The dialog and the footer fit at 1920px and 390px; Escape closes the dialog and focus returns to its opener.
+4. (6) The problem lines (missing clips with links to their cards, over budget) appear only when there is a problem.
+
+README gets a Backups section and a corrected Files list. Moving the size and plural helpers out of `UnusedAudio.tsx` is a review-stage refactor.
 
 ### Phase 3: download and import
 
-Red, in order:
-1. The zip reader reads back what `zipStored` writes.
-2. It rejects: a deflated entry, a duplicate name, a name such as `../x` or `audio/zz/…`, a wrong CRC, a truncated file, an unexpected entry.
-3. An audio entry whose hash is not its name is rejected.
-4. Garbage as the body gives a 400 and leaves the workspace untouched.
-5. Import adds one `imported` snapshot and the audio it needs, and changes nothing else.
-6. Two fresh workspaces: download from one, import and restore in the other, and the cards, approvals and playing audio match. This is the "new computer" scenario.
-7. A cross-origin `PUT` to the import route is refused by the middleware.
-
-Cypress: Download starts a file download; Import takes a file through `selectFile` and shows the new row.
+1. (5) The zip reader reads back what the writer writes.
+2. (5) It rejects: a compressed entry, a duplicate name, a name such as `../x`, a wrong CRC, a truncated file, an unexpected entry, a clip whose hash is not its name.
+3. (2, 4) Download a snapshot, put it in a fresh workspace's `imports/`, import it: the list shows an `imported` snapshot, and restoring it gives the cards, the approvals and playing audio. This is the "new laptop" case.
+4. (4) A zip that is garbage leaves the workspace untouched and says why.
+5. (6) Download starts a file; a file placed in `imports/` shows an Import button.
 
 ### Phase 4: restore one card (decide after using 0 to 3)
 
-Only if restoring a whole workspace to bring back one card has actually cost other work. Sketch: attach a snapshot read-only, copy that card's `notes`, `forms` and `audio` rows back by id, refuse with a clear message on a `(lemma, pos)` clash. Pinning already guarantees the clips exist. It would sit in Details beside Reset word.
+Only if restoring a whole workspace to bring back one card has actually cost other work. Sketch: attach a snapshot read-only, copy that card's rows back by id, refuse with a clear message on a `(lemma, pos)` clash; its clips are already in the snapshot folder. It would sit in Details beside Reset word.
 
 ## Not in this plan
 
-Per-edit history, merging imported workspaces, syncing between machines, cloud or scheduled off-machine backups, encryption, backing up the config, a setting for retention, notifications about backups, and a migration framework.
+Per-edit history, merging imported workspaces, syncing between machines, upload-based import, scheduled or cloud off-machine backups, encryption, backing up the config, a retention setting, notifications about backups, a migration framework.
 
 ## Laws of simplicity ledger
 
-Written from the general laws; check against the `laws-of-simplicity` skill when implementing.
+Scored at design time with the skill's scale (-5 to +5) and its keep rule: keep when the main goal improves and the delta is at least -2. The main goal is the owner's: undo mistakes, keep the audio, stay within the budget.
 
-| Law | Where it shows |
-|---|---|
-| Reduce | No settings, no merge, no per-edit history, no snapshot of audio files, no snapshot before Delete unused audio (pinning makes it unnecessary) |
-| Organize | One button, one dialog, one list; import and restore are the same list and the same verb |
-| Time | Automatic snapshots cost the owner no time and no habit; Restore needs one confirmation |
-| Learn | One new word, "backup"; a restore is undone with the same Restore button |
-| Differences | Automatic and manual snapshots look different and are pruned differently; the dialog says what is on this computer and what a download is for |
-| Context | The check appears only when something is wrong, with a link to the card; the restore preview is the row's own counts |
-| Emotion | No nagging and no alarm; a restore says the current state is saved first |
-| Trust | Validate before touching anything; hash and CRC checks on import; a failed restore changes nothing |
-| Failure | Some risk cannot be simplified away (a lost disk), so the dialog states it and Download covers it |
-| The One | Snapshots are the one idea; everything else is subtracted or reuses it |
+| Choice | Law | Delta | Verdict |
+|---|---|---|---|
+| Snapshots instead of per-edit history | Reduce, The One | -2: a new subsystem, but a fraction of B's | Keep |
+| Audio in a shared snapshot folder | Differences, Trust | -2 | Keep |
+| Audio only pinned by reference to live files | Reduce | 0 | Discard: fails "snapshots must include the audio" |
+| A full copy of the audio per snapshot | Reduce | -3 | Discard: fourteen times the audio breaks the budget |
+| Hard links instead of copies | Reduce | 0 | Discard: not an independent copy, differs by file system |
+| One restore path; import adds a snapshot, then Restore | Organize, Learn | +2 | Keep |
+| Import from a folder, not an upload | Reduce, Trust | +2: removes the body-limit and guard questions | Keep |
+| Upload-based import | Time | -3 | Discard |
+| No settings; limits are constants | Reduce | +1 | Keep |
+| A `before-restore` snapshot as the only undo | Trust, Emotion | 0 | Keep |
+| Daily check inside `context()` | Time, Context | -1: a side effect in a shared function | Keep, with `dailyDue` pure and tested |
+| Never silently dropping the newest snapshots | Trust, Failure | -1 | Keep: said in the dialog instead |
+| "Last downloaded" line | Context | -1 | Keep, and removable: the one risk automatic snapshots cannot cover |
+| No snapshot before Delete unused audio | Reduce | +1: unnecessary, since backups hold their own clips | Keep |
 
-## Risks and open points
+Checklist before each phase's review, from the skill: what can be removed; is the organisation clear; is time spent where it matters; can someone learn it quickly; is necessary complexity kept; does it fit the system; how does it feel to use; is it reliable; what did failures teach; does it serve what matters.
 
-- `VACUUM INTO` support in the bundled SQLite is expected but unverified; Phase 1 test 1 settles it.
-- The Anki export builds its zip in memory, and a full backup including audio would too. Fine at hundreds of cards; measure on the real workspace and stream the zip if it passes a few hundred megabytes. Import reads the body into memory in the same way.
-- Pinning means Delete unused audio frees less space until old snapshots age out. The dialog says so.
-- Restore replaces `vocabulary.db` under a live connection: close first, then rename. The e2e spec covers reopening in a production build.
-- The daily check runs inside `context()`, on the first request of a day. Time it on the real database; if it is noticeable, take it after the response.
-- The day boundary is the local date; snapshot ids use UTC. A test pins this across midnight.
-- Snapshots live inside the workspace, so copying the workspace folder copies them too. They are small.
+## Evidence
 
-## Questions for review
+Traced in the code:
 
-1. Is the assumption right that mistakes you can undo matter more than an audit trail? If not, B's history comes back into scope.
-2. Is fourteen per group the right retention?
-3. Silent automatic snapshots, with the list as the only place they show: agreed?
-4. Do you ever work on more than one machine? If so, Phase 3 moves up and merging may deserve its own design.
+- No schema version: no `user_version` or migration code anywhere in `src`.
+- Export with a missing clip: `POST /api/export` calls `buildApkg` with a reader that is `fs.readFileSync(audioPath(...))`; that throws inside `buildApkg`, and `handle` turns the error into a 500 carrying the raw message. `validate.ts`, `missing.ts` and `words.ts` never touch the file system, so nothing earlier catches it.
+- Reset word: the route calls `store.deleteNote`, which is one `DELETE` that cascades.
+- The cross-site guard in `src/middleware.ts` refuses only non-GET requests whose `Origin` differs; that is why everything that changes data in this plan is POST or DELETE.
+- `zip.ts` can write a stored zip and cannot read one.
+- Next 15.5.29, read from the package source: `experimental.middlewareClientMaxBodySize` defaults to 10485760 bytes; the body-cloning code ends the stream after that many bytes and logs a warning, so only the first 10 MiB would be available. Not traced: whether a route handler is affected when its path is outside the middleware matcher. The design does not depend on the answer.
+- The word list has 5,000 entries (`data/ranking.tsv`), which bounds the deck.
+
+Open, to be settled by the first slices:
+
+- Whether the bundled SQLite supports `VACUUM INTO` (Phase 1, slice 1).
+- Real clip and database sizes on the owner's workspace; the numbers above are estimates.
+- How long the first snapshot takes with the audio of a real workspace. It is synchronous; if it is noticeable, the first one moves out of the request.
+- Whether the daily check in `context()` is measurable on a real database.
+- The day boundary is the local date and snapshot ids use UTC; a test pins this across midnight.
+
+## Questions
+
+1. Are the six seams above the right ones to test at? The `tdd` skill needs this answered before the first test.
+2. Import from a folder (copy the zip into `imports/`), not from an upload button: acceptable?
+3. Optional: running the two commands above on the laptop and sending the numbers would replace the estimates; the plan starts at 1 GiB either way.
 
 ## Next step
 
-After review, the `writing-plans` skill turns each phase into task-sized steps; `tdd` and `laws-of-simplicity` guide those steps as described at the top.
+After the seams are confirmed, the `writing-plans` skill turns each phase into task-sized steps; `tdd` and `laws-of-simplicity` guide those steps as described at the top.
