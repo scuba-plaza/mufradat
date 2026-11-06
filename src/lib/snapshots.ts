@@ -132,6 +132,7 @@ export function createSnapshot(store: Store, reason: SnapshotReason, options: Sn
 
 const NEWER = "This backup was written by a newer Mufradat.";
 const DAMAGED = "The backup's database is damaged.";
+const CLIPS_GONE = "The backup is missing or has damaged audio clips.";
 
 function inspectDatabase(file: string): { cards: number; approved: number; version: number } | null {
   try {
@@ -156,14 +157,17 @@ function clipIsSound(file: string, key: string): boolean {
   return fs.existsSync(file) && audioKey(fs.readFileSync(file)) === key;
 }
 
-function verifiedManifest(root: string, id: string): Manifest {
+function knownManifest(root: string, id: string): Manifest {
   const manifest = isSnapshotId(id) ? readManifest(root, id) : null;
   if (!manifest) throw new Error("There is no such backup.");
+  return manifest;
+}
+
+function verifiedManifest(root: string, id: string): Manifest {
+  const manifest = knownManifest(root, id);
   if (manifest.schema > SCHEMA_VERSION) throw new Error(NEWER);
   if (!inspectDatabase(path.join(snapshotsDir(root), id, "vocabulary.db"))) throw new Error(DAMAGED);
-  if (!manifest.audioKeys.every((key) => clipIsSound(snapshotAudioPath(root, key), key))) {
-    throw new Error("The backup is missing or has damaged audio clips.");
-  }
+  if (!manifest.audioKeys.every((key) => clipIsSound(snapshotAudioPath(root, key), key))) throw new Error(CLIPS_GONE);
   return manifest;
 }
 
@@ -202,7 +206,7 @@ function dropUnheldClips(root: string): void {
 }
 
 export function deleteSnapshot(root: string, id: string): void {
-  if (!isSnapshotId(id) || !readManifest(root, id)) throw new Error("There is no such backup.");
+  knownManifest(root, id);
   fs.rmSync(path.join(snapshotsDir(root), id), { recursive: true, force: true });
   dropUnheldClips(root);
 }
@@ -247,11 +251,8 @@ export function lastDownload(root: string): string | null {
 }
 
 export function backupEntries(root: string, id: string): BackupEntry[] {
-  const manifest = isSnapshotId(id) ? readManifest(root, id) : null;
-  if (!manifest) throw new Error("There is no such backup.");
-  if (!manifest.audioKeys.every((key) => fs.existsSync(snapshotAudioPath(root, key)))) {
-    throw new Error("The backup is missing or has damaged audio clips.");
-  }
+  const manifest = knownManifest(root, id);
+  if (!manifest.audioKeys.every((key) => fs.existsSync(snapshotAudioPath(root, key)))) throw new Error(CLIPS_GONE);
   const dir = path.join(snapshotsDir(root), id);
   return [
     { name: "manifest.json", file: path.join(dir, "manifest.json") },

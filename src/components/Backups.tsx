@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { SnapshotInfo, SnapshotReason, SnapshotUsage, WorkspaceCheck } from "@/lib/types";
 import { api } from "./api";
+import { plural, size } from "./format";
 
 interface BackupsData {
   snapshots: SnapshotInfo[];
@@ -18,26 +19,12 @@ const REASONS: Record<SnapshotReason, string> = {
   imported: "Imported",
 };
 
-const noun = (count: number) => (count === 1 ? "card" : "cards");
-
 const when = (s: SnapshotInfo) => new Date(s.createdAt).toLocaleString();
 
 interface Confirming {
   snapshot: SnapshotInfo;
   action: "restore" | "delete";
 }
-
-const MEGABYTE = 1024 * 1024;
-const GIGABYTE = 1024 * MEGABYTE;
-
-const size = (bytes: number) =>
-  bytes < 1024
-    ? `${bytes} B`
-    : bytes < MEGABYTE
-      ? `${Math.round(bytes / 1024)} KB`
-      : bytes < GIGABYTE
-        ? `${(bytes / MEGABYTE).toFixed(1)} MB`
-        : `${(bytes / GIGABYTE).toFixed(1)} GB`;
 
 export default function Backups() {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -150,7 +137,7 @@ export default function Backups() {
                 <div className="mt-4">
                   <p role="status">
                     {confirming.action === "restore"
-                      ? `Restore the backup from ${when(confirming.snapshot)}? It has ${confirming.snapshot.cards} ${noun(confirming.snapshot.cards)} (${confirming.snapshot.approved} approved); the workspace has ${data.check.cards} (${data.check.approved} approved) now. Your current state is saved first.`
+                      ? `Restore the backup from ${when(confirming.snapshot)}? It has ${confirming.snapshot.cards} ${plural(confirming.snapshot.cards, "card")} (${confirming.snapshot.approved} approved); the workspace has ${data.check.cards} (${data.check.approved} approved) now. Your current state is saved first.`
                       : `Delete the backup from ${when(confirming.snapshot)}? It cannot be brought back.`}
                   </p>
                   <div className="mt-4 flex justify-end gap-3">
@@ -189,7 +176,7 @@ export default function Backups() {
                       {data.snapshots.map((s) => (
                         <li key={s.id} className="border-t border-rule py-3">
                           <p>{REASONS[s.reason]} · {when(s)}</p>
-                          <p className="text-quiet">{s.cards} {noun(s.cards)} · {s.approved} approved</p>
+                          <p className="text-quiet">{s.cards} {plural(s.cards, "card")} · {s.approved} approved</p>
                           <div className="mt-1 flex flex-wrap gap-1">
                             <button
                               className="action-quiet"

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import { plural, size } from "./format";
 
 interface Totals {
   files: number;
@@ -12,13 +13,6 @@ type Phase =
   | { kind: "none" }
   | { kind: "done"; deleted: Totals }
   | { kind: "failed"; message: string };
-
-const MEGABYTE = 1024 * 1024;
-
-const size = (bytes: number) =>
-  bytes < 1024 ? `${bytes} B` : bytes < MEGABYTE ? `${Math.round(bytes / 1024)} KB` : `${(bytes / MEGABYTE).toFixed(1)} MB`;
-
-const noun = (count: number) => (count === 1 ? "file" : "files");
 
 export default function UnusedAudio() {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -53,11 +47,11 @@ export default function UnusedAudio() {
 
   const sentence =
     phase?.kind === "ask"
-      ? `Delete ${phase.found.files} unused audio ${noun(phase.found.files)} (${size(phase.found.bytes)})?`
+      ? `Delete ${phase.found.files} unused audio ${plural(phase.found.files, "file")} (${size(phase.found.bytes)})?`
       : phase?.kind === "none"
         ? "No unused audio files."
         : phase?.kind === "done"
-          ? `Deleted ${phase.deleted.files} audio ${noun(phase.deleted.files)} (${size(phase.deleted.bytes)}).`
+          ? `Deleted ${phase.deleted.files} audio ${plural(phase.deleted.files, "file")} (${size(phase.deleted.bytes)}).`
           : "";
 
   return (

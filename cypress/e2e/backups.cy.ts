@@ -6,15 +6,6 @@ const rows = `${dialog} ol[aria-label="Backups"] > li`;
 
 const clipBytes = (rank: number) => new Uint8Array([0xff, 0xfb, 0x90, 0x00, 0x55, rank % 256, rank >> 8, 0x55]);
 
-function pressEscape() {
-  for (const type of ["keyDown", "keyUp"]) {
-    cy.then(() => Cypress.automation("remote:debugger:protocol", {
-      command: "Input.dispatchKeyEvent",
-      params: { type, key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 },
-    }));
-  }
-}
-
 function openDialog() {
   cy.visit("/");
   cy.hydrated(opener);
@@ -31,9 +22,10 @@ function backUp() {
 }
 
 describe("backups", () => {
-  it("adds a row when Back up now is pressed", () => {
+  it("adds a row when Back up now is pressed, and shows what the backups use of the limit", () => {
     openDialog();
     backUp();
+    cy.get(dialog).should("contain", "Automatic backups use").and("contain", "of 1.0 GB");
   });
 
   it("brings back a card that was reset, and Cancel changes nothing", () => {
@@ -160,7 +152,7 @@ describe("backups", () => {
 
   it("closes on Escape, gives the focus back to the button that opened it, and opens again", () => {
     openDialog();
-    pressEscape();
+    cy.pressEscape();
     cy.get(dialog).should("not.exist");
     cy.focused().should("contain.text", "Backups");
     cy.get(opener).click();

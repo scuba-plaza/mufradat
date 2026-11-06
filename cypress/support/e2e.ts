@@ -5,6 +5,7 @@ declare global {
       /** Waits until React has attached its handlers to the element, so that an event sent to it is not lost. */
       hydrated(selector: string): Chainable<JQuery<HTMLElement>>;
       wordRow(rank: number): Chainable<JQuery<HTMLElement>>;
+      pressEscape(): Chainable<void>;
     }
   }
 }
@@ -16,5 +17,14 @@ Cypress.Commands.add("hydrated", (selector: string) =>
 Cypress.Commands.add("wordRow", (rank: number) =>
   cy.get('[aria-label="Word list"] > li').filter((_, row) => row.querySelector(".num")?.textContent === String(rank)),
 );
+
+Cypress.Commands.add("pressEscape", () => {
+  for (const type of ["keyDown", "keyUp"]) {
+    cy.then(() => Cypress.automation("remote:debugger:protocol", {
+      command: "Input.dispatchKeyEvent",
+      params: { type, key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 },
+    }));
+  }
+});
 
 export {};

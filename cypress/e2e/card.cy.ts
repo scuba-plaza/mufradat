@@ -204,15 +204,6 @@ describe("a word", () => {
     const menu = `${word} [popover]`;
     const another = { ...unplayable, contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 9, 9, 9, 9]) };
 
-    function pressEscape() {
-      for (const type of ["keyDown", "keyUp"]) {
-        cy.then(() => Cypress.automation("remote:debugger:protocol", {
-          command: "Input.dispatchKeyEvent",
-          params: { type, key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 },
-        }));
-      }
-    }
-
     function openWordWithAudio(rank: number) {
       openWord(rank);
       cy.get(`${word} input[type="file"]`).selectFile(unplayable, { force: true });
@@ -247,7 +238,7 @@ describe("a word", () => {
       openWordWithAudio(43);
       cy.get(options).click();
       cy.get(`${menu} button`).first().focus();
-      pressEscape();
+      cy.pressEscape();
       cy.get(menu).should("not.be.visible");
       cy.focused().should("have.attr", "aria-label", "Audio options for the word");
     });
