@@ -95,6 +95,7 @@ describe("the backups API", () => {
     fs.writeFileSync(path.join(store.root, "snapshots"), "in the way");
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => context()).not.toThrow();
+    context();
     expect(logged).toHaveBeenCalledTimes(1);
     logged.mockRestore();
   });

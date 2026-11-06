@@ -267,6 +267,7 @@ Traced in the code:
 - Next 15.5.29, read from the package source: `experimental.middlewareClientMaxBodySize` defaults to 10485760 bytes. When middleware runs for a request, `cloneBodyStream` copies the body into two streams (`sandbox.js`) and ends both after that many bytes with a warning; afterwards `finalize` swaps the request's body for the buffered copy. So a request behind middleware is held in memory whole and cut at 10 MiB. `cloneBodyStream` is called only on those paths (middleware and edge-function execution, and proxying), and `getCloneableBody` itself only attaches end and error listeners, so a route outside the matcher should read the raw stream. That last step is inferred from the source, not run.
 - The word list has 5,000 entries (`data/ranking.tsv`), which bounds the deck.
 - `VACUUM INTO ?` with a bound parameter works with the bundled SQLite (the first snapshot test passes); the `serialize()` fallback is not needed.
+- The day boundary is the local date and snapshot ids use UTC; the rule test pins this across midnight (00:05 the next day is due, 23:59 the same day is not).
 - Snapshot speed, measured in the development container with 150 clips of 1 MB: the first snapshot (read, hash and write 150 MB) took 226 ms, a second with nothing new 8 ms, a third with one new clip 11 ms. That is about 1.5 ms per MB there, so a finished deck's 160 to 325 MB is well under a second; the owner's disk may be several times slower and will still be a few seconds at most, once. The first snapshot stays synchronous.
 - Measured on the owner's workspace (about 30 words): `audio/` 976 KB, `vocabulary.db` 88 KB. The size table is derived from these.
 
@@ -275,7 +276,6 @@ Open, to be settled by the first slices:
 - Whether a route left out of the middleware matcher really escapes the 10 MiB cap (Phase 3, slice 6).
 - The average size of one clip: the clip count of the owner's workspace was not supplied, so the per-card audio figure assumes all 30 cards are voiced.
 - Whether the daily check in `context()` is measurable on a real database.
-- The day boundary is the local date and snapshot ids use UTC; a test pins this across midnight.
 
 ## Questions
 
