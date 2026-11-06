@@ -1,6 +1,7 @@
 export {};
 
 const kitab = encodeURIComponent("كتاب");
+const by = (label: string) => `[aria-label="${label}"]`;
 
 describe("search", () => {
   it("opens from the header", () => {
@@ -46,6 +47,22 @@ describe("search", () => {
     cy.location("pathname").then((card) => {
       cy.visit(`/search?q=${kitab}`);
       cy.contains("h2", "Your cards (1)").parent().find("a").first().should("have.attr", "href", card);
+    });
+  });
+
+  it("opens each result as its own card when several share their letters and part of speech", () => {
+    const search = `/search?q=${encodeURIComponent("على")}`;
+    const verbs = () =>
+      cy.contains("h2", "Wiktionary").parent().find("a").filter((_, row) => row.lastElementChild!.textContent === "verb");
+    cy.visit(search);
+    verbs().should("have.length", 3).then(($rows) => {
+      const lemmas = [...$rows].map((row) => row.querySelector("[lang=ar]")!.textContent);
+      expect(new Set(lemmas).size).to.equal(3);
+      lemmas.forEach((lemma, i) => {
+        cy.visit(search);
+        verbs().eq(i).click();
+        cy.get(by("Arabic headword")).should("have.value", lemma);
+      });
     });
   });
 });

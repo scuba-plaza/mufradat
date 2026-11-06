@@ -25,7 +25,7 @@ export function openCard(store: Store, target: { rank: number } | { lemma: strin
     "rank" in target
       ? cardForRank(target.rank)
       : POS_VALUES.includes(target.pos as POS)
-        ? lookup(target.lemma).find((c) => c.pos === target.pos)
+        ? lookup(target.lemma).find((c) => c.lemma === target.lemma && c.pos === target.pos)
         : undefined;
   if (!card) return null;
   return store.findNote(card.lemma, card.pos) ?? store.createNote(card).id;

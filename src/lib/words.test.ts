@@ -42,8 +42,20 @@ describe("opening a word", () => {
 
   it("opens a Wiktionary entry that is not in the list as an unranked card", () => {
     const s = openStore(":memory:");
-    const id = openCard(s, { lemma: "على", pos: "verb" })!;
+    const id = openCard(s, { lemma: "عَلَى", pos: "verb" })!;
     expect(s.getNote(id)).toMatchObject({ pos: "verb", rank: 0 });
+  });
+
+  it("opens the entry that was chosen when other entries share its letters and part of speech", () => {
+    const s = openStore(":memory:");
+    const chosen = [
+      { lemma: "إِن", pos: "conj" },
+      { lemma: "أَنْ", pos: "conj" },
+      { lemma: "آنَ", pos: "verb" },
+    ];
+    const ids = chosen.map((target) => openCard(s, target)!);
+    expect(ids.map((id) => s.getNote(id)!.lemma)).toEqual(chosen.map((target) => target.lemma));
+    expect(new Set(ids).size).toBe(chosen.length);
   });
 
   it("says so when there is no such word", () => {
