@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Form, Slot } from "./types";
 
-const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
+export const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 
 /** First 16 hex characters of the SHA-256 of the audio bytes. */
 export function audioKey(bytes: Uint8Array): string {

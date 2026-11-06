@@ -1,8 +1,8 @@
 import { crc32 } from "node:zlib";
 
 // 2000-01-01 00:00:00 in DOS format, so the same files always zip to the same bytes.
-const DOS_TIME = 0;
-const DOS_DATE = ((2000 - 1980) << 9) | (1 << 5) | 1;
+export const DOS_TIME = 0;
+export const DOS_DATE = ((2000 - 1980) << 9) | (1 << 5) | 1;
 
 interface ZipEntry {
   name: string;
