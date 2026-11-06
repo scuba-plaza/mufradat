@@ -224,7 +224,7 @@ export function recordDownload(root: string, now: Date = new Date()): void {
 
 export function lastDownload(root: string): string | null {
   try {
-    return fs.readFileSync(path.join(snapshotsDir(root), "last-download"), "utf8").trim();
+    return fs.readFileSync(path.join(snapshotsDir(root), "last-download"), "utf8");
   } catch {
     return null;
   }

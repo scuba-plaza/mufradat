@@ -14,12 +14,17 @@ export const GET = (_req: Request, { params }: Ctx) =>
     try {
       entries = backupEntries(store.root, id);
     } catch (e) {
-      return fail(e instanceof Error ? e.message : "The backup could not be read.");
+      return fail((e as Error).message);
     }
-    recordDownload(store.root);
-    return new Response(backupZipStream(entries), {
+    const response = new Response(backupZipStream(entries), {
       headers: { "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="mufradat-backup-${id}.zip"` },
     });
+    try {
+      recordDownload(store.root);
+    } catch (error) {
+      console.error(error);
+    }
+    return response;
   });
 
 export const DELETE = (_req: Request, { params }: Ctx) =>

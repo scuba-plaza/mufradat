@@ -19,6 +19,8 @@ const removeBackup = (id: string) =>
 const downloadBackup = (id: string) =>
   download(new Request(`http://127.0.0.1/api/backups/${id}`), { params: Promise.resolve({ id }) });
 
+const lastDownloadedAt = async () => (await (await GET()).json()).lastDownloadedAt;
+
 const manuals = async () =>
   ((await (await GET()).json()).snapshots as SnapshotInfo[]).filter((s) => s.reason === "manual");
 
@@ -130,12 +132,11 @@ describe("the backups API", () => {
     vi.setSystemTime(new Date("2026-11-06T10:00:00Z"));
     openCard(context().store, { rank: 10 });
     const { snapshot } = await (await POST()).json();
-    const last = async () => (await (await GET()).json()).lastDownloadedAt;
-    expect(await last()).toBeNull();
+    expect(await lastDownloadedAt()).toBeNull();
     expect((await downloadBackup("20260101T000000Z-manual")).status).toBe(404);
-    expect(await last()).toBeNull();
+    expect(await lastDownloadedAt()).toBeNull();
     await downloadBackup(snapshot.id);
-    expect(await last()).toBe("2026-11-06T10:00:00.000Z");
+    expect(await lastDownloadedAt()).toBe("2026-11-06T10:00:00.000Z");
   });
 
   it("answers 400 instead of a broken download when a clip is missing from the backup", async () => {
@@ -147,5 +148,21 @@ describe("the backups API", () => {
     const res = await downloadBackup(snapshot.id);
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "The backup is missing or has damaged audio clips." });
+    expect(await lastDownloadedAt()).toBeNull();
+  });
+
+  it("still downloads when the note of the download cannot be written", async () => {
+    const { store } = context();
+    openCard(store, { rank: 10 });
+    const { snapshot } = await (await POST()).json();
+    fs.mkdirSync(path.join(store.root, "snapshots", "last-download"));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await downloadBackup(snapshot.id);
+    expect(res.status).toBe(200);
+    const file = path.join(home, "download.zip");
+    fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+    expect(openBackupZip(file).names).toContain("manifest.json");
+    expect(logged).toHaveBeenCalledTimes(1);
+    logged.mockRestore();
   });
 });
