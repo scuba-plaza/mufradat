@@ -221,3 +221,15 @@ describe("snapshots made within the same second", () => {
     expect(retry.id).toBe("20261106T100000Z-manual");
   });
 });
+
+describe("restoring over damaged audio", () => {
+  it("replaces a damaged clip in the audio folder with the snapshot's good copy", () => {
+    const { root, store } = workspace();
+    const card = store.createNote(kitab);
+    store.setAudio(card.id, "word", mp3, "tts");
+    const snapshot = createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
+    fs.writeFileSync(audioPath(root, audioKey(mp3)), Buffer.from("damaged"));
+    restoreSnapshot(store, snapshot.id);
+    expect(fs.readFileSync(audioPath(root, audioKey(mp3)))).toEqual(mp3);
+  });
+});

@@ -154,7 +154,9 @@ export function restoreSnapshot(store: Store, id: string, options: SnapshotOptio
   const manifest = verifiedManifest(store.root, id);
   createSnapshot(store, "before-restore", options);
   for (const key of manifest.audioKeys) {
-    copyClip(snapshotAudioPath(store.root, key), audioPath(store.root, key), key);
+    const live = audioPath(store.root, key);
+    if (!clipIsSound(live, key)) fs.rmSync(live, { force: true });
+    copyClip(snapshotAudioPath(store.root, key), live, key);
   }
   const staged = path.join(store.root, "vocabulary.db.restoring");
   fs.copyFileSync(path.join(snapshotsDir(store.root), id, "vocabulary.db"), staged);
