@@ -71,6 +71,70 @@ describe("backups", () => {
     });
   });
 
+  it("downloads a backup as a file and then says when it was last downloaded", () => {
+    openDialog();
+    backUp();
+    cy.contains(rows, "Backed up by you").contains("a", "Download").then(($link) => {
+      const id = String($link.attr("href")).split("/").pop()!;
+      cy.wrap($link).click();
+      cy.readFile(`${Cypress.config("downloadsFolder")}/mufradat-backup-${id}.zip`, null).should("have.length.greaterThan", 0);
+    });
+    openDialog();
+    cy.get(dialog).should("contain", "Last downloaded:").and("not.contain", "Last downloaded: never");
+  });
+
+  it("imports a backup larger than 10 MiB whole through the file picker", () => {
+    interface Listed {
+      id: string;
+      reason: string;
+      clips: number;
+    }
+    cy.visit("/open?rank=421");
+    cy.location("pathname").then((path) => {
+      const id = path.split("/").pop()!;
+      cy.window().then(async (win) => {
+        for (const [slot, marker] of [["word", 1], ["example", 2]] as const) {
+          const bytes = new win.Uint8Array(6 * 1024 * 1024);
+          bytes.set([0xff, 0xfb, 0x90, 0x00, marker]);
+          const res = await win.fetch(`/api/audio/${id}/${slot}`, { method: "PUT", body: bytes });
+          expect(res.ok).to.eq(true);
+        }
+      });
+      openDialog();
+      backUp();
+      cy.request("/api/backups").its("body.snapshots").then((snapshots: Listed[]) => {
+        const source = snapshots.find((s) => s.reason === "manual")!;
+        cy.window().then(async (win) => {
+          const zip = await (await win.fetch(`/api/backups/${source.id}`)).arrayBuffer();
+          expect(zip.byteLength).to.be.greaterThan(10 * 1024 * 1024);
+          const input = win.document.querySelector<HTMLInputElement>('input[type="file"]')!;
+          const transfer = new win.DataTransfer();
+          transfer.items.add(new win.File([zip], "backup.zip", { type: "application/zip" }));
+          input.files = transfer.files;
+          input.dispatchEvent(new win.Event("change", { bubbles: true }));
+        });
+        cy.contains(rows, "Imported");
+        cy.request("/api/backups").its("body.snapshots").then((after: Listed[]) => {
+          const imported = after.find((s) => s.reason === "imported")!;
+          expect(imported.clips).to.eq(source.clips);
+          cy.request("DELETE", `/api/backups/${imported.id}`);
+          cy.request("DELETE", `/api/backups/${source.id}`);
+          cy.request("DELETE", `/api/audio/${id}/word`);
+          cy.request("DELETE", `/api/audio/${id}/example`);
+        });
+      });
+    });
+  });
+
+  it("refuses cross-site requests on the import route and on another route, and answers a same-site import", () => {
+    for (const url of ["/api/backups/import", "/api/backups"]) {
+      cy.request({ method: "POST", url, headers: { Origin: "http://evil.example" }, body: "x", failOnStatusCode: false })
+        .its("status")
+        .should("eq", 403);
+    }
+    cy.request({ method: "POST", url: "/api/backups/import", body: "x", failOnStatusCode: false }).its("status").should("eq", 400);
+  });
+
   for (const [width, height] of [[1920, 1100], [390, 844]]) {
     it(`fits the footer and the dialog at ${width}px`, () => {
       cy.viewport(width, height);

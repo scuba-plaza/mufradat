@@ -51,6 +51,9 @@ The Backups… button at the bottom of the home page opens the list of backups. 
 - Kept: the newest 14 daily backups, the newest 14 of those taken before a reset or a restore, and at most 1 GiB for all of these together; a clip that several backups share counts once. Backups made with Back up now are never removed on their own, and do not count toward the limit.
 - Restore brings the workspace back to a backup. It first takes a backup of the current state, so a restore is undone by restoring that one. A backup that is damaged, written by a newer Mufradat, or missing audio is refused and nothing changes.
 - The dialog also names any clip whose audio file is missing from the workspace, with a link to its card, and any problem the database reports about itself.
+- Download saves a backup as one zip file with the database, a manifest and every clip, so a copy can live somewhere other than this computer. The dialog says when you last downloaded one.
+- Import backup… takes such a zip, checks it (it must be a whole, consistent backup of this app, from this or an older version) and adds it to the list as an Imported backup; it changes nothing by itself. Restore then brings the workspace to it, which is how a new computer or an empty workspace gets the cards and the audio back. A backup can be hundreds of megabytes; the limit is 3 GiB.
+- Delete unused audio never touches a backup's own copies of the audio.
 - These backups are on this computer. Copying the workspace folder copies them too.
 
 ## Layout

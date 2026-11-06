@@ -7,6 +7,7 @@ interface BackupsData {
   snapshots: SnapshotInfo[];
   usage: SnapshotUsage;
   check: WorkspaceCheck;
+  lastDownloadedAt: string | null;
 }
 
 const REASONS: Record<SnapshotReason, string> = {
@@ -40,10 +41,12 @@ const size = (bytes: number) =>
 
 export default function Backups() {
   const dialog = useRef<HTMLDialogElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<BackupsData | null>(null);
   const [confirming, setConfirming] = useState<Confirming | null>(null);
   const [busy, setBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -76,6 +79,17 @@ export default function Backups() {
     run(async () => {
       await api("/api/backups", { method: "POST" });
       await load();
+    });
+
+  const importFile = (file: File) =>
+    run(async () => {
+      setImporting(true);
+      try {
+        await api("/api/backups/import", { method: "POST", body: file });
+        await load();
+      } finally {
+        setImporting(false);
+      }
     });
 
   const restore = (s: SnapshotInfo) =>
@@ -116,6 +130,9 @@ export default function Backups() {
           {data && (
             <>
               <p className="mt-2 text-sm text-quiet">
+                Last downloaded: {data.lastDownloadedAt ? new Date(data.lastDownloadedAt).toLocaleString() : "never"}.
+              </p>
+              <p className="mt-2 text-sm text-quiet">
                 Automatic backups use {size(data.usage.automaticBytes)} of {size(data.usage.budgetBytes)}; all backups use {size(data.usage.totalBytes)}.
                 {data.usage.automaticBytes > data.usage.budgetBytes && " The newest automatic backups alone are over that limit, and they are still kept."}
               </p>
@@ -149,9 +166,23 @@ export default function Backups() {
                 </div>
               ) : (
                 <>
-                  <div className="mt-4">
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <button className="action" disabled={busy} onClick={backUp}>Back up now</button>
+                    <button className="action" disabled={busy} onClick={() => picker.current?.click()}>Import backup…</button>
+                    <input
+                      ref={picker}
+                      type="file"
+                      accept=".zip,application/zip"
+                      hidden
+                      aria-label="Backup file"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) importFile(file);
+                      }}
+                    />
                   </div>
+                  {importing && <p role="status" className="mt-2">Importing…</p>}
                   {data.snapshots.length === 0 ? (
                     <p className="mt-4">No backups yet.</p>
                   ) : (
@@ -169,6 +200,9 @@ export default function Backups() {
                             >
                               Restore…
                             </button>
+                            <a className="action-quiet" href={`/api/backups/${s.id}`} download aria-label={`Download the backup from ${when(s)}`}>
+                              Download
+                            </a>
                             <button
                               className="action-quiet"
                               aria-label={`Delete the backup from ${when(s)}`}
