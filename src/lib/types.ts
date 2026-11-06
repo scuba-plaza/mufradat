@@ -111,3 +111,5 @@ export interface WorkspaceCheck {
   integrity: string;
   missingAudio: MissingAudio[];
 }
+
+export type SnapshotReason = "manual" | "daily" | "before-reset" | "before-restore" | "imported";
