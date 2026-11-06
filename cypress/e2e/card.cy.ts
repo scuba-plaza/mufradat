@@ -357,3 +357,51 @@ describe("a word", () => {
     cy.contains("a", "Back to the word list").should("have.attr", "href", "/");
   });
 });
+
+describe("resetting a word", () => {
+  const editByMistake = (rank: number) => {
+    openWord(rank);
+    cy.get(by("Hint")).type("by mistake").blur();
+    cy.contains(status, "Saved");
+  };
+  const askToReset = () => {
+    cy.contains("summary", "Details").click();
+    cy.contains("button", "Reset word").click();
+    cy.get("dialog[open]").should("contain", "Reset this word?");
+  };
+
+  it("deletes the card, goes back to the list and gives the word back as not started", () => {
+    editByMistake(205);
+    cy.location("pathname").then((card) => {
+      askToReset();
+      cy.get("dialog[open]").should("contain", "Not started").contains("button", "Reset").click();
+      cy.location("pathname").should("eq", "/");
+      cy.visit(`/?q=${encodeURIComponent("rank:205")}`);
+      cy.wordRow(205).should("not.contain", "in progress");
+      cy.wordRow(205).find("a").should("have.attr", "href").and("include", "/open?rank=205");
+      cy.request({ url: card, failOnStatusCode: false }).its("status").should("eq", 404);
+    });
+  });
+
+  it("keeps the card when you change your mind", () => {
+    editByMistake(206);
+    cy.location("pathname").then((card) => {
+      askToReset();
+      cy.get("dialog[open]").contains("button", "Cancel").click();
+      cy.get("dialog[open]").should("not.exist");
+      cy.location("pathname").should("eq", card);
+      cy.get(by("Hint")).should("have.value", "by mistake");
+    });
+  });
+
+  it("goes back to the list the card was opened from", () => {
+    const query = "rank:207-208";
+    cy.visit(`/?q=${encodeURIComponent(query)}`);
+    cy.wordRow(207).click();
+    cy.hydrated(by("Hint"));
+    askToReset();
+    cy.get("dialog[open]").contains("button", "Reset").click();
+    cy.location("search").should("eq", `?q=${encodeURIComponent(query)}`);
+    cy.wordRow(207).should("exist");
+  });
+});

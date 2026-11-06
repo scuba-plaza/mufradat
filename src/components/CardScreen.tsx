@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { listPath } from "@/lib/paging";
 import type { Note } from "@/lib/types";
 import { plainExample } from "@/lib/validate";
 import ActionBar from "./ActionBar";
@@ -10,6 +11,7 @@ import ExampleText from "./ExampleText";
 import FormsDialog from "./FormsDialog";
 import InlineText from "./InlineText";
 import { keyPressed } from "./keys";
+import ResetDialog from "./ResetDialog";
 
 const SAVE_TEXT = { idle: "", saving: "Saving…", saved: "Saved", failed: "Not saved" };
 
@@ -21,6 +23,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
   const [exampleBusy, setExampleBusy] = useState(false);
   const [exampleProblem, setExampleProblem] = useState("");
   const [formsOpen, setFormsOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const queue = useRef<Promise<void>>(Promise.resolve());
 
@@ -71,6 +74,20 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
       } catch (e) {
         setLeaving(false);
         setProblems((e as Error & { errors?: string[] }).errors ?? [(e as Error).message]);
+      }
+    });
+  }
+
+  function reset() {
+    setLeaving(true);
+    later(async () => {
+      try {
+        await api(`/api/notes/${note.id}`, { method: "DELETE" });
+        window.location.assign(listPath(q));
+      } catch (e) {
+        setLeaving(false);
+        setResetOpen(false);
+        setProblems([(e as Error).message]);
       }
     });
   }
@@ -153,8 +170,9 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
         {(exampleProblem || note.exampleError) && <p className="mt-1 text-sm text-danger">{exampleProblem || note.exampleError}</p>}
       </div>
 
-      <Details note={note} save={save} />
+      <Details note={note} save={save} onReset={() => setResetOpen(true)} />
       <FormsDialog note={note} open={formsOpen} onClose={() => setFormsOpen(false)} save={save} onNote={setNote} />
+      <ResetDialog note={note} open={resetOpen} busy={leaving} onClose={() => setResetOpen(false)} onReset={reset} />
       <ActionBar note={note} problems={problems} leaving={leaving} onApprove={approve} />
     </div>
   );

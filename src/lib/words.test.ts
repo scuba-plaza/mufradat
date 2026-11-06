@@ -72,6 +72,27 @@ describe("the list of words", () => {
   });
 });
 
+describe("a word whose card was deleted", () => {
+  it("is not started again, as if its card had never been made", () => {
+    const s = openStore(":memory:");
+    const id = openCard(s, { rank: 1 })!;
+    finish(s, id);
+    expect(wordRows(s)[0].status).toBe("ready");
+    s.deleteNote(id);
+    expect(wordRows(s)[0]).toEqual({ ...blank, rank: 1, lemma: "فِي", english: "in, within", pos: "prep" });
+    expect(continueTarget(s)).toMatchObject({ id: null, rank: 1 });
+  });
+
+  it("leaves your list when it was added from outside the frequency list", () => {
+    const s = openStore(":memory:");
+    const id = openCard(s, { lemma: "عَلَى", pos: "verb" })!;
+    expect(wordRows(s)).toHaveLength(5001);
+    s.deleteNote(id);
+    expect(wordRows(s)).toHaveLength(5000);
+    expect(view(s, "على rank:none", new Date()).rows.some((r) => r.english === "to climb" && r.id === null)).toBe(true);
+  });
+});
+
 describe("what a row says about a word", () => {
   it("tells a frequency word that has no card by the part of speech its card will have, root and verb form, and says it still lacks everything", () => {
     const rows = wordRows(openStore(":memory:"));

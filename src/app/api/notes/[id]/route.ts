@@ -25,3 +25,9 @@ export const PUT = (req: Request, { params }: Ctx) =>
     }
     return NextResponse.json({ note: context().store.updateNote((await params).id, edit) });
   });
+
+export const DELETE = (_req: Request, { params }: Ctx) =>
+  handle(async () => {
+    context().store.deleteNote((await params).id);
+    return new Response(null, { status: 204 });
+  });

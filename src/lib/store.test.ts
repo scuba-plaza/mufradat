@@ -1,4 +1,7 @@
+import Database from "better-sqlite3";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { audioPath } from "./audio";
 import { missingParts } from "./missing";
@@ -247,5 +250,57 @@ describe("audio", () => {
     const written = s.updateNote(n.id, { example: "هٰذَا [كِتَابٌ] جَدِيدٌ" });
     expect(written.exampleError).toBeNull();
     expect(written.exampleSource).toBe("user");
+  });
+});
+
+describe("deleting a card", () => {
+  it("removes the card and leaves the other cards as they were", () => {
+    const s = openStore(":memory:");
+    const gone = s.createNote(kitab);
+    const kept = s.createNote({ ...kitab, lemma: "قَلَم", english: "pen", rank: 121 });
+    s.setAudio(gone.id, "word", mp3, "tts");
+    s.setAudio(kept.id, "word", mp3, "tts");
+    s.deleteNote(gone.id);
+    expect(s.getNote(gone.id)).toBeNull();
+    expect(s.findNote(kitab.lemma, kitab.pos)).toBeNull();
+    expect(s.allNotes().map((n) => n.id)).toEqual([kept.id]);
+    expect(s.getNote(kept.id)!.audio.word.key).not.toBeNull();
+  });
+
+  it("leaves no form or clip of the card behind in the workspace", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-delete-"));
+    try {
+      const s = openStore(dir);
+      const n = s.createNote(kitab);
+      s.setAudio(n.id, "word", mp3, "tts");
+      s.setAudioError(n.id, n.forms[0].id, "Google rejected the credentials (401).");
+      s.deleteNote(n.id);
+      s.close();
+      const db = new Database(path.join(dir, "vocabulary.db"), { readonly: true });
+      const count = (table: string) => (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
+      expect([count("notes"), count("forms"), count("audio")]).toEqual([0, 0, 0]);
+      db.close();
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("lets the same word be started again from nothing", () => {
+    const s = openStore(":memory:");
+    const first = s.createNote(kitab);
+    s.updateNote(first.id, { hint: "paper", example: "هٰذَا [كِتَابٌ]", exampleEn: "this is a book" });
+    s.setAudio(first.id, "word", mp3, "tts");
+    s.deleteNote(first.id);
+    const again = s.createNote(kitab);
+    expect(again.id).not.toBe(first.id);
+    expect(again).toMatchObject({ hint: "", example: "", exampleEn: "", status: "draft", audio: {} });
+  });
+
+  it("does nothing for a card that is already gone", () => {
+    const s = openStore(":memory:");
+    const n = s.createNote(kitab);
+    s.deleteNote(n.id);
+    expect(() => s.deleteNote(n.id)).not.toThrow();
+    expect(() => s.deleteNote("no-such-card")).not.toThrow();
   });
 });

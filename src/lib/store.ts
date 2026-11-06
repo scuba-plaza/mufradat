@@ -253,6 +253,10 @@ export function openStore(dir: string) {
     return { ok: true, note: getNote(id)! };
   }
 
+  function deleteNote(id: string): void {
+    db.prepare("DELETE FROM notes WHERE id = ?").run(id);
+  }
+
   function findNote(lemma: string, pos: POS): string | null {
     const row = db.prepare("SELECT id FROM notes WHERE lemma = ? AND pos = ?").get(lemma, pos) as { id: string } | undefined;
     return row?.id ?? null;
@@ -264,7 +268,7 @@ export function openStore(dir: string) {
   }
 
   return {
-    root, findNote, approvedNotes, allNotes, close: () => db.close(), getNote, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
+    root, findNote, approvedNotes, allNotes, close: () => db.close(), getNote, deleteNote, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
     applyGeneratedExample, approve,
   };
 }
