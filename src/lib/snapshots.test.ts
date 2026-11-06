@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { audioPath } from "./audio";
+import { audioKey, audioPath } from "./audio";
 import { createSnapshot, listSnapshots, restoreSnapshot, snapshotAudioPath } from "./snapshots";
 import { openStore } from "./store";
 
@@ -133,5 +133,91 @@ describe("refusing a restore", () => {
     store.createNote(kitab);
     const snapshot = createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
     expect(() => restoreSnapshot(store, `../snapshots/${snapshot.id}`)).toThrow("There is no such backup.");
+  });
+});
+
+describe("taking a snapshot of an imperfect workspace", () => {
+  it("still takes the snapshot when clips are missing or damaged, and counts them", () => {
+    const { root, store } = workspace();
+    const card = store.createNote(kitab);
+    const other = Buffer.from([0xff, 0xfb, 0x90, 0x00, 9, 9, 9, 9]);
+    store.setAudio(card.id, "word", mp3, "tts");
+    store.setAudio(card.id, card.forms[0].id, other, "tts");
+    fs.rmSync(audioPath(root, audioKey(mp3)));
+    fs.writeFileSync(audioPath(root, audioKey(other)), Buffer.from("damaged"));
+    const snapshot = createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
+    expect(snapshot).toMatchObject({ clips: 0, unavailable: 2 });
+    store.deleteNote(card.id);
+    restoreSnapshot(store, snapshot.id);
+    expect(openStore(root).getNote(card.id)?.lemma).toBe("كِتَاب");
+  });
+});
+
+describe("listing snapshots", () => {
+  it("lists nothing when there is no snapshot folder, or a file in its place", () => {
+    const { root } = workspace();
+    expect(listSnapshots(root)).toEqual([]);
+    fs.writeFileSync(path.join(root, "snapshots"), "in the way");
+    expect(listSnapshots(root)).toEqual([]);
+  });
+
+  it("ignores folders that are not finished snapshots", () => {
+    const { root, store } = workspace();
+    store.createNote(kitab);
+    const real = createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
+    const base = path.join(root, "snapshots");
+    fs.mkdirSync(path.join(base, ".partial-20261106T110000Z-manual"));
+    fs.mkdirSync(path.join(base, "20261106T120000Z-manual"));
+    fs.mkdirSync(path.join(base, "20261106T130000Z-manual"));
+    fs.writeFileSync(path.join(base, "20261106T130000Z-manual", "manifest.json"), "{");
+    fs.mkdirSync(path.join(base, "20261106T140000Z-manual"));
+    fs.copyFileSync(path.join(base, real.id, "manifest.json"), path.join(base, "20261106T140000Z-manual", "manifest.json"));
+    expect(listSnapshots(root).map((s) => s.id)).toEqual([real.id]);
+  });
+
+  it("lists the newest snapshot first", () => {
+    const { root, store } = workspace();
+    store.createNote(kitab);
+    for (const time of ["10:00", "11:00", "09:00"]) createSnapshot(store, "manual", at(`2026-11-06T${time}:00Z`));
+    expect(listSnapshots(root).map((s) => s.id)).toEqual([
+      "20261106T110000Z-manual",
+      "20261106T100000Z-manual",
+      "20261106T090000Z-manual",
+    ]);
+  });
+});
+
+describe("snapshots made within the same second", () => {
+  it("keeps both and lists the later one first", () => {
+    const { root, store } = workspace();
+    store.createNote(kitab);
+    const first = createSnapshot(store, "manual", at("2026-11-06T14:03:22Z"));
+    const second = createSnapshot(store, "manual", at("2026-11-06T14:03:22Z"));
+    expect([first.id, second.id]).toEqual(["20261106T140322Z-manual", "20261106T140322Z-manual-2"]);
+    expect(listSnapshots(root).map((s) => s.id)).toEqual([second.id, first.id]);
+    restoreSnapshot(store, first.id, at("2026-11-06T15:00:00Z"));
+    expect(openStore(root).allNotes()).toHaveLength(1);
+  });
+
+  it("lets a restore be undone within the same second", () => {
+    const { root, store } = workspace();
+    const first = store.createNote(kitab);
+    const snapshot = createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
+    const second = store.createNote({ ...kitab, lemma: "قَلَم", english: "pen", forms: [] });
+    restoreSnapshot(store, snapshot.id, at("2026-11-06T11:00:00Z"));
+    const afterRestore = openStore(root);
+    const saved = listSnapshots(root).find((s) => s.reason === "before-restore")!;
+    restoreSnapshot(afterRestore, saved.id, at("2026-11-06T11:00:00Z"));
+    const undone = openStore(root);
+    expect([first.id, second.id].map((id) => undone.getNote(id)?.lemma)).toEqual(["كِتَاب", "قَلَم"]);
+  });
+
+  it("leaves nothing behind when a snapshot cannot be taken", () => {
+    const { root, store } = workspace();
+    store.createNote(kitab);
+    store.close();
+    expect(() => createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"))).toThrow();
+    const retry = createSnapshot(openStore(root), "manual", at("2026-11-06T10:00:00Z"));
+    expect(retry.id).toBe("20261106T100000Z-manual");
   });
 });

@@ -23,10 +23,16 @@ const snapshotsDir = (root: string) => path.join(root, "snapshots");
 
 export const snapshotAudioPath = (root: string, key: string) => audioPath(snapshotsDir(root), key);
 
-function copyClip(from: string, to: string): void {
-  if (fs.existsSync(to)) return;
+function copyClip(from: string, to: string, key: string): boolean {
+  if (fs.existsSync(to)) return true;
+  if (!fs.existsSync(from)) return false;
+  const bytes = fs.readFileSync(from);
+  if (audioKey(bytes) !== key) return false;
   fs.mkdirSync(path.dirname(to), { recursive: true });
-  fs.copyFileSync(from, to);
+  const staged = `${to}.tmp`;
+  fs.writeFileSync(staged, bytes);
+  fs.renameSync(staged, to);
+  return true;
 }
 
 const ID_PATTERN = new RegExp(`^\\d{8}T\\d{6}Z-(${SNAPSHOT_REASONS.join("|")})(-\\d+)?$`);
@@ -55,26 +61,40 @@ function infoOf(id: string, manifest: Manifest, dbBytes: number): SnapshotInfo {
   };
 }
 
+function freeId(root: string, now: Date, reason: SnapshotReason): string {
+  const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const taken = (id: string) =>
+    fs.existsSync(path.join(snapshotsDir(root), id)) || fs.existsSync(path.join(snapshotsDir(root), `.partial-${id}`));
+  let id = `${stamp}-${reason}`;
+  for (let n = 2; taken(id); n++) id = `${stamp}-${reason}-${n}`;
+  return id;
+}
+
 export function createSnapshot(store: Store, reason: SnapshotReason, options: SnapshotOptions = {}): SnapshotInfo {
   const now = options.now ?? new Date();
-  const id = `${now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z")}-${reason}`;
+  const id = freeId(store.root, now, reason);
   const dir = path.join(snapshotsDir(store.root), id);
   const partial = path.join(snapshotsDir(store.root), `.partial-${id}`);
   fs.mkdirSync(partial, { recursive: true });
-  store.exportDatabase(path.join(partial, "vocabulary.db"));
-  const keys = store.audioKeys();
-  for (const key of keys) copyClip(audioPath(store.root, key), snapshotAudioPath(store.root, key));
-  const manifest: Manifest = {
-    schema: SCHEMA_VERSION,
-    createdAt: now.toISOString(),
-    reason,
-    ...store.counts(),
-    audioKeys: keys,
-    unavailable: 0,
-  };
-  fs.writeFileSync(path.join(partial, "manifest.json"), JSON.stringify(manifest));
-  fs.renameSync(partial, dir);
-  return infoOf(id, manifest, fs.statSync(path.join(dir, "vocabulary.db")).size);
+  try {
+    store.exportDatabase(path.join(partial, "vocabulary.db"));
+    const keys = store.audioKeys();
+    const present = keys.filter((key) => copyClip(audioPath(store.root, key), snapshotAudioPath(store.root, key), key));
+    const manifest: Manifest = {
+      schema: SCHEMA_VERSION,
+      createdAt: now.toISOString(),
+      reason,
+      ...store.counts(),
+      audioKeys: present,
+      unavailable: keys.length - present.length,
+    };
+    fs.writeFileSync(path.join(partial, "manifest.json"), JSON.stringify(manifest));
+    fs.renameSync(partial, dir);
+    return infoOf(id, manifest, fs.statSync(path.join(dir, "vocabulary.db")).size);
+  } catch (error) {
+    fs.rmSync(partial, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 function databaseIsSound(file: string): boolean {
@@ -105,14 +125,27 @@ function verifiedManifest(root: string, id: string): Manifest {
   return manifest;
 }
 
+function fileBytes(file: string): number | null {
+  try {
+    return fs.statSync(file).size;
+  } catch {
+    return null;
+  }
+}
+
 export function listSnapshots(root: string): SnapshotInfo[] {
-  return fs
-    .readdirSync(snapshotsDir(root), { withFileTypes: true })
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(snapshotsDir(root), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
     .filter((entry) => entry.isDirectory() && isSnapshotId(entry.name))
     .flatMap((entry) => {
       const manifest = readManifest(root, entry.name);
-      if (!manifest) return [];
-      return [infoOf(entry.name, manifest, fs.statSync(path.join(snapshotsDir(root), entry.name, "vocabulary.db")).size)];
+      const dbBytes = fileBytes(path.join(snapshotsDir(root), entry.name, "vocabulary.db"));
+      return manifest && dbBytes !== null ? [infoOf(entry.name, manifest, dbBytes)] : [];
     })
     .sort((a, b) => (a.id < b.id ? 1 : -1));
 }
@@ -121,7 +154,7 @@ export function restoreSnapshot(store: Store, id: string, options: SnapshotOptio
   const manifest = verifiedManifest(store.root, id);
   createSnapshot(store, "before-restore", options);
   for (const key of manifest.audioKeys) {
-    copyClip(snapshotAudioPath(store.root, key), audioPath(store.root, key));
+    copyClip(snapshotAudioPath(store.root, key), audioPath(store.root, key), key);
   }
   const staged = path.join(store.root, "vocabulary.db.restoring");
   fs.copyFileSync(path.join(snapshotsDir(store.root), id, "vocabulary.db"), staged);
