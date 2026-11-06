@@ -1,6 +1,6 @@
 # Workspace safety and long-term management: plan and design
 
-Status: the owner has confirmed the seams and supplied measurements. One decision is still open: how a downloaded backup gets back into the app (see Questions). Nothing here is implemented.
+Status: the owner has confirmed the seams, supplied measurements and chosen upload-based import. No question is open. Nothing here is implemented.
 
 ## How this plan is to be used
 
@@ -116,15 +116,15 @@ Step 2 always runs, so a restore is itself undone by restoring the `before-resto
 ### 4. One file out, one file in
 
 - Download: `GET /api/backups/<id>` serves a zip of `manifest.json`, `vocabulary.db` and the snapshot's clips, built file by file from the snapshot folder with a streaming writer (data descriptors), not in memory. It never contains the config or the exports. The dialog shows when a snapshot was last downloaded, quietly and only as information: this is the one protection that survives losing the laptop, and automatic snapshots cannot give it.
+- Import: the owner presses "Import backup…" in the dialog and picks the zip in the browser's file picker. The browser sends it to `POST /api/backups/import`. The route streams the body into a temporary file under `snapshots/`, refusing more than 3 GiB, checks it, turns it into an `imported` snapshot, and deletes the temporary file whether or not that worked. The same Restore button then switches to it, so there is one restore path, and the list row shows the manifest counts as the preview.
 - Restoring from a file only matters after a disk loss or on a fresh install. Undoing a mistake on the same machine is the Restore button and involves no file.
-- Import reads from a folder, not from an upload: the owner puts the zip in `<workspace>/imports/`, the dialog lists the zips it finds there, and Import turns one into an `imported` snapshot. The same Restore button then switches to it, so there is one restore path, and the list row shows the manifest counts as the preview. `POST /api/backups/import` takes the file name, which must match `^[\w.-]+\.zip$` and is resolved only inside `imports/`.
-- The zip reader reads from a file with positional reads, so memory stays flat. It accepts only what the writer produces: stored entries, no zip64, no encryption, no duplicates. Entry names must match an allowlist (`manifest.json`, `vocabulary.db`, `audio/xx/<16 hex>.mp3`) and are rebuilt from the matched groups, never used as paths. Each entry's CRC is checked, a clip's hash must equal the key in its name, and the database must pass `integrity_check` before the snapshot appears.
-- Why not an upload button: the Next version in use (15.5.29) clones request bodies for middleware with a default cap of 10 MiB (see Evidence). At the measured 32 KB of audio per word a backup passes that at around 300 words, so an upload button would work today and stop working soon. Raising the cap or moving the route out from under the cross-site guard would change how the whole app is protected, to save the owner from copying one file into one folder, once, after a disaster.
+- The 10 MiB problem and how it is handled. In the Next version in use (15.5.29), a request that passes through middleware has its body copied into memory and cut off at 10 MiB (see Evidence), and a backup passes that at around 300 words. The import route is therefore the one path left out of the middleware matcher, and it does the cross-site check itself. That check moves out of `middleware.ts` into one shared function, `refuseCrossSite(request)`, which the middleware and the import route both call. Every other route stays behind the middleware. The exclusion and the route's own check are each tested (Phase 3 slices 3, 5 and 7). If the source reading turns out wrong, the fallbacks in order are: raise `experimental.middlewareClientMaxBodySize` (every upload would then be held in memory, at most the size of a backup), or upload in chunks.
+- The zip reader reads from the temporary file with positional reads, so memory stays flat. It accepts only what the writer produces: stored entries, no zip64, no encryption, no duplicates. Entry names must match an allowlist (`manifest.json`, `vocabulary.db`, `audio/xx/<16 hex>.mp3`) and are rebuilt from the matched groups, never used as paths. Each entry's CRC is checked, a clip's hash must equal the key in its name, and the database must pass `integrity_check` before the snapshot appears.
 - Not merged: importing never combines two workspaces. That needs a rule for `UNIQUE (lemma, pos)` and for edits on both sides, and a single-machine owner has no use for it.
 
 ### 5. Workspace check
 
-`GET /api/backups` returns the snapshot list, the zips waiting in `imports/`, the sizes, and a check: card and approved counts, the `integrity_check` result, and the clips whose audio file is missing (note id, slot, key). The dialog shows the check only when something is wrong, with a link to each affected card, since regenerating a clip is already a card action. Export is changed to name the card and slot it cannot read.
+`GET /api/backups` returns the snapshot list, the sizes, and a check: card and approved counts, the `integrity_check` result, and the clips whose audio file is missing (note id, slot, key). The dialog shows the check only when something is wrong, with a link to each affected card, since regenerating a clip is already a card action. Export is changed to name the card and slot it cannot read.
 
 ### 6. Interface
 
@@ -132,12 +132,12 @@ One new quiet button, "Backups…", in the home footer beside Export and Delete 
 
 - A line saying what the list is: "These backups are on this computer. Download one to keep a copy somewhere else." and, beside it, when one was last downloaded.
 - Usage: what the automatic snapshots use of the 1 GiB, and the total, with a plain sentence when the newest snapshots alone exceed the budget.
-- Back up now, and the zips found in `imports/` with an Import button each.
+- Back up now, and Import backup…, which opens the browser's file picker and shows that it is busy while the file is imported.
 - The list, newest first: time, reason in words, "412 cards · 230 approved", and per row Download, Restore…, Delete.
 - Restore asks once, showing that row's counts beside the current ones and saying the current state is saved first.
 - No nagging, no notification for automatic snapshots, no settings.
 
-Routes, in the existing `handle` / `fail` / `context` style: `GET` and `POST` on `/api/backups`, `POST` on `/api/backups/import`, `GET` and `DELETE` on `/api/backups/[id]`, `POST` on `/api/backups/[id]/restore`. Everything that changes anything is POST or DELETE, so the existing cross-site guard covers it.
+Routes, in the existing `handle` / `fail` / `context` style: `GET` and `POST` on `/api/backups`, `POST` on `/api/backups/import`, `GET` and `DELETE` on `/api/backups/[id]`, `POST` on `/api/backups/[id]/restore`. Everything that changes anything is POST or DELETE, so the cross-site check covers it, in the middleware for every route but the import route and in the route itself for that one.
 
 ## How big is a snapshot
 
@@ -146,13 +146,15 @@ Measured on the owner's workspace, which has about 30 words: `audio/` is 976 KB 
 - Audio: 976 KB over 30 words is about 32 KB per word. If some of the 30 cards have no audio yet, the real figure per voiced card is higher, so the upper figures below use a margin of two (about 65 KB).
 - Database: an empty schema already takes about 48 KB (twelve pages of 4 KB: the tables and their indexes), which leaves about 1.5 to 3 KB per card. Scaling 88 KB straight up gives the upper end.
 
-| Words | Database copy | Audio, stored once | One more daily snapshot adds | Everything the automatic snapshots hold, at most |
+| Words | Database copy | Audio (one shared copy) | One more daily snapshot adds | Everything the automatic snapshots hold, at most |
 |---|---|---|---|---|
 | 30 (today) | 88 KB | 1 MB | 88 KB, plus new clips | about 3.5 MB |
 | 1,000 | 1.5 to 3 MB | 33 to 65 MB | 1.5 to 3 MB, plus new clips | about 75 to 150 MB |
 | 5,000 | 8 to 15 MB | 160 to 325 MB | 8 to 15 MB, plus new clips | about 390 to 750 MB |
 
 "At most" is the audio once plus 28 database copies, the full count of 14 daily and 14 `before-*`. In practice there are fewer.
+
+"One shared copy" in plain terms: the clips of all snapshots live in one folder, one file per clip, and each snapshot only lists which clips it uses. A new snapshot copies just the clips that are not in the folder yet. At 1,000 words the first snapshot copies about 33 MB of audio; a day later, 20 new words add about 0.65 MB; so ten snapshots hold about 33 MB of audio plus ten small database copies, not ten times 33 MB.
 
 - A snapshot contains the whole workspace, about 35 MB at 1,000 words and 170 to 340 MB at 5,000. Because clips are stored once, a new snapshot only costs a database copy plus the clips made since the last one.
 - Audio is on disk twice once snapshots exist: live and in the snapshot folder.
@@ -209,11 +211,16 @@ README gets a Backups section and a corrected Files list. Moving the size and pl
 
 ### Phase 3: download and import
 
-1. (5) The zip reader reads back what the writer writes.
+1. (5) The zip reader reads back what the writer writes, from a file.
 2. (5) It rejects: a compressed entry, a duplicate name, a name such as `../x`, a wrong CRC, a truncated file, an unexpected entry, a clip whose hash is not its name.
-3. (2, 4) Download a snapshot, put it in a fresh workspace's `imports/`, import it: the list shows an `imported` snapshot, and restoring it gives the cards, the approvals and playing audio. This is the "new laptop" case.
-4. (4) A zip that is garbage leaves the workspace untouched and says why.
-5. (6) Download starts a file; a file placed in `imports/` shows an Import button.
+3. (4) Download a snapshot, post it to the import route in a fresh workspace: the list shows an `imported` snapshot, and restoring it gives the cards, the approvals and playing audio. This is the "new laptop" case.
+4. (4) A body that is garbage or truncated gets a 400, leaves the workspace untouched and leaves no temporary file behind.
+5. (4) A request to the import route from another origin is refused by the route itself, and nothing is written.
+6. (6) Import backup… with the file picker takes in a backup larger than 10 MiB whole, made by downloading a snapshot of a workspace with an 11 MiB clip, and shows it as `imported`. This proves the matcher exclusion.
+7. (6) The running server refuses a cross-site request to the import route and to another route that changes data, so leaving one route out of the middleware dropped no other guard.
+8. (6) Download starts a file.
+
+If slice 6 fails, the fallbacks in "One file out, one file in" are tried in order.
 
 ### Phase 4: restore one card (decide after using 0 to 3)
 
@@ -221,7 +228,7 @@ Only if restoring a whole workspace to bring back one card has actually cost oth
 
 ## Not in this plan
 
-Per-edit history, merging imported workspaces, syncing between machines, upload-based import, scheduled or cloud off-machine backups, encryption, backing up the config, a retention setting, notifications about backups, a migration framework.
+Per-edit history, merging imported workspaces, syncing between machines, scheduled or cloud off-machine backups, encryption, backing up the config, a retention setting, notifications about backups, a migration framework.
 
 ## Laws of simplicity ledger
 
@@ -235,8 +242,10 @@ Scored at design time with the skill's scale (-5 to +5) and its keep rule: keep 
 | A full copy of the audio per snapshot | Reduce | -3 | Discard: fourteen times the audio breaks the budget |
 | Hard links instead of copies | Reduce | 0 | Discard: not an independent copy, differs by file system |
 | One restore path; import adds a snapshot, then Restore | Organize, Learn | +2 | Keep |
-| Import from a folder, not an upload | Reduce, Trust | +2: removes the body-limit and guard questions | Keep |
-| Upload-based import | Time | -3 | Discard |
+| Upload import through its own route, left out of the middleware matcher, with the cross-site check in a shared function | Emotion, Trust | -2: one matcher exception and one shared function | Keep: the owner's choice, and it is the better experience |
+| Import from a folder | Reduce | +2 | Discard: the owner judged the experience poor |
+| Raise the body cap for the whole app | Reduce | -3: every upload held in memory | Discard, unless the matcher exception fails its test |
+| Chunked upload | Reduce | -3 | Discard, unless both of the above fail |
 | No settings; limits are constants | Reduce | +1 | Keep |
 | A `before-restore` snapshot as the only undo | Trust, Emotion | 0 | Keep |
 | Daily check inside `context()` | Time, Context | -1: a side effect in a shared function | Keep, with `dailyDue` pure and tested |
@@ -255,13 +264,14 @@ Traced in the code:
 - Reset word: the route calls `store.deleteNote`, which is one `DELETE` that cascades.
 - The cross-site guard in `src/middleware.ts` refuses only non-GET requests whose `Origin` differs; that is why everything that changes data in this plan is POST or DELETE.
 - `zip.ts` can write a stored zip and cannot read one.
-- Next 15.5.29, read from the package source: `experimental.middlewareClientMaxBodySize` defaults to 10485760 bytes; the body-cloning code ends the stream after that many bytes and logs a warning, so only the first 10 MiB would be available. Not traced: whether a route handler is affected when its path is outside the middleware matcher. The design does not depend on the answer.
+- Next 15.5.29, read from the package source: `experimental.middlewareClientMaxBodySize` defaults to 10485760 bytes. When middleware runs for a request, `cloneBodyStream` copies the body into two streams (`sandbox.js`) and ends both after that many bytes with a warning; afterwards `finalize` swaps the request's body for the buffered copy. So a request behind middleware is held in memory whole and cut at 10 MiB. `cloneBodyStream` is called only on those paths (middleware and edge-function execution, and proxying), and `getCloneableBody` itself only attaches end and error listeners, so a route outside the matcher should read the raw stream. That last step is inferred from the source, not run.
 - The word list has 5,000 entries (`data/ranking.tsv`), which bounds the deck.
 - Measured on the owner's workspace (about 30 words): `audio/` 976 KB, `vocabulary.db` 88 KB. The size table is derived from these.
 
 Open, to be settled by the first slices:
 
 - Whether the bundled SQLite supports `VACUUM INTO` (Phase 1, slice 1).
+- Whether a route left out of the middleware matcher really escapes the 10 MiB cap (Phase 3, slice 6).
 - The average size of one clip: the clip count of the owner's workspace was not supplied, so the per-card audio figure assumes all 30 cards are voiced.
 - How long the first snapshot takes. At 5,000 words that is roughly 160 to 325 MB to read, hash and write, probably a few seconds on an SSD, unmeasured. It is synchronous; if it is noticeable, the first one moves out of the request.
 - Whether the daily check in `context()` is measurable on a real database.
@@ -269,8 +279,8 @@ Open, to be settled by the first slices:
 
 ## Questions
 
-1. Restoring on a fresh install, for example a new laptop after a disk loss: how should the downloaded backup file get back into the app? The plan says to copy the file into the `imports/` folder inside the data folder and press Import in the dialog. The alternative is an "Import backup…" button with a file picker, which stops working above 10 MiB (around 300 words) unless the app's cross-site protection is reworked. Undoing a mistake on the same machine never involves a file: that is the Restore button.
+None open.
 
 ## Next step
 
-Once the import question is answered, the `writing-plans` skill turns each phase into task-sized steps; `tdd` and `laws-of-simplicity` guide those steps as described at the top.
+The `writing-plans` skill turns each phase into task-sized steps; `tdd` and `laws-of-simplicity` guide those steps as described at the top.
