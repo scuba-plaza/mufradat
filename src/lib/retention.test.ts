@@ -43,6 +43,7 @@ describe("choosing which automatic snapshots to drop", () => {
 
   it("counts a clip shared by two snapshots once against the budget", () => {
     const entries = [daily("s1", 10, { A: 100 }), daily("s2", 10, { A: 100 }), daily("s3", 10, { B: 50 })];
+    expect(selectRemovals(entries, { ...DEFAULT_LIMITS, budgetBytes: 180 })).toEqual([]);
     expect(selectRemovals(entries, { ...DEFAULT_LIMITS, budgetBytes: 175 })).toEqual(["s1"]);
     expect(selectRemovals(entries, { ...DEFAULT_LIMITS, budgetBytes: 100 })).toEqual(["s1", "s2"]);
   });
@@ -55,6 +56,7 @@ describe("choosing which automatic snapshots to drop", () => {
   it("does not count manual snapshots against the budget", () => {
     const entries: RetentionEntry[] = [
       { id: "m1", reason: "manual", dbBytes: 10, clips: { A: 1000 } },
+      daily("d0", 10),
       daily("d1", 10),
     ];
     expect(selectRemovals(entries, { ...DEFAULT_LIMITS, budgetBytes: 100 })).toEqual([]);

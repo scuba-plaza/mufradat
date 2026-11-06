@@ -28,21 +28,19 @@ function sizeOf(entries: RetentionEntry[]): number {
 }
 
 export function selectRemovals(entries: RetentionEntry[], limits: Limits): string[] {
-  const automatic = entries.filter((e) => AUTOMATIC.includes(e.reason));
+  const automatic = entries.filter((e) => AUTOMATIC.includes(e.reason)).sort(byId);
   const keeps = { daily: limits.dailyKeep, before: limits.beforeKeep };
-  const removed: string[] = [];
+  const removed = new Set<string>();
   const newest = new Set<string>();
   for (const group of ["daily", "before"] as const) {
-    const members = automatic.filter((e) => groupOf(e) === group).sort(byId);
-    removed.push(...members.slice(0, Math.max(0, members.length - keeps[group])).map((e) => e.id));
+    const members = automatic.filter((e) => groupOf(e) === group);
+    for (const old of members.slice(0, Math.max(0, members.length - keeps[group]))) removed.add(old.id);
     if (members.length > 0) newest.add(members[members.length - 1].id);
   }
-  let remaining = automatic.filter((e) => !removed.includes(e.id)).sort(byId);
-  while (sizeOf(remaining) > limits.budgetBytes) {
-    const next = remaining.find((e) => !newest.has(e.id));
+  while (sizeOf(automatic.filter((e) => !removed.has(e.id))) > limits.budgetBytes) {
+    const next = automatic.find((e) => !removed.has(e.id) && !newest.has(e.id));
     if (!next) break;
-    removed.push(next.id);
-    remaining = remaining.filter((e) => e !== next);
+    removed.add(next.id);
   }
-  return removed.sort();
+  return automatic.filter((e) => removed.has(e.id)).map((e) => e.id);
 }
