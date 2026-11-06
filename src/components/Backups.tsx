@@ -19,6 +19,13 @@ const REASONS: Record<SnapshotReason, string> = {
 
 const noun = (count: number) => (count === 1 ? "card" : "cards");
 
+const when = (s: SnapshotInfo) => new Date(s.createdAt).toLocaleString();
+
+interface Confirming {
+  snapshot: SnapshotInfo;
+  action: "restore" | "delete";
+}
+
 const MEGABYTE = 1024 * 1024;
 const GIGABYTE = 1024 * MEGABYTE;
 
@@ -35,7 +42,7 @@ export default function Backups() {
   const dialog = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<BackupsData | null>(null);
-  const [confirming, setConfirming] = useState<SnapshotInfo | null>(null);
+  const [confirming, setConfirming] = useState<Confirming | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -80,6 +87,7 @@ export default function Backups() {
 
   const remove = (s: SnapshotInfo) =>
     run(async () => {
+      setConfirming(null);
       await api(`/api/backups/${s.id}`, { method: "DELETE" });
       await load();
     });
@@ -109,11 +117,11 @@ export default function Backups() {
             <>
               <p className="mt-2 text-sm text-quiet">
                 Automatic backups use {size(data.usage.automaticBytes)} of {size(data.usage.budgetBytes)}; all backups use {size(data.usage.totalBytes)}.
-                {data.usage.automaticBytes > data.usage.budgetBytes && " The newest automatic backups alone are over that limit."}
+                {data.usage.automaticBytes > data.usage.budgetBytes && " The newest automatic backups alone are over that limit, and they are still kept."}
               </p>
               {(data.check.integrity !== "ok" || data.check.missingAudio.length > 0) && (
-                <ul role="status" className="mt-3 space-y-1 text-danger">
-                  {data.check.integrity !== "ok" && <li className="break-words">The database reports a problem: {data.check.integrity}</li>}
+                <ul className="mt-3 space-y-1 text-danger">
+                  {data.check.integrity !== "ok" && <li className="break-words">The database reports a problem: {data.check.integrity} Restore a backup from before this appeared.</li>}
                   {data.check.missingAudio.map((m) => (
                     <li key={`${m.noteId}-${m.slot}`}>
                       No audio file for the {m.slotName} of <a className="underline" href={`/cards/${m.noteId}`}>{m.lemma}</a>. Open the card to generate or upload it again.
@@ -124,12 +132,19 @@ export default function Backups() {
               {confirming ? (
                 <div className="mt-4">
                   <p role="status">
-                    Restore the backup from {new Date(confirming.createdAt).toLocaleString()}? It has {confirming.cards} {noun(confirming.cards)} ({confirming.approved} approved);
-                    the workspace has {data.check.cards} ({data.check.approved} approved) now. Your current state is saved first.
+                    {confirming.action === "restore"
+                      ? `Restore the backup from ${when(confirming.snapshot)}? It has ${confirming.snapshot.cards} ${noun(confirming.snapshot.cards)} (${confirming.snapshot.approved} approved); the workspace has ${data.check.cards} (${data.check.approved} approved) now. Your current state is saved first.`
+                      : `Delete the backup from ${when(confirming.snapshot)}? It cannot be brought back.`}
                   </p>
                   <div className="mt-4 flex justify-end gap-3">
-                    <button className="action" onClick={() => setConfirming(null)}>Cancel</button>
-                    <button className="action-main" disabled={busy} onClick={() => restore(confirming)}>Restore</button>
+                    <button className="action" autoFocus onClick={() => setConfirming(null)}>Cancel</button>
+                    <button
+                      className="action-main"
+                      disabled={busy}
+                      onClick={() => (confirming.action === "restore" ? restore(confirming.snapshot) : remove(confirming.snapshot))}
+                    >
+                      {confirming.action === "restore" ? "Restore" : "Delete"}
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -143,11 +158,25 @@ export default function Backups() {
                     <ol aria-label="Backups" className="mt-4">
                       {data.snapshots.map((s) => (
                         <li key={s.id} className="border-t border-rule py-3">
-                          <p>{REASONS[s.reason]} · {new Date(s.createdAt).toLocaleString()}</p>
+                          <p>{REASONS[s.reason]} · {when(s)}</p>
                           <p className="text-quiet">{s.cards} {noun(s.cards)} · {s.approved} approved</p>
                           <div className="mt-1 flex flex-wrap gap-1">
-                            <button className="action-quiet" disabled={busy} onClick={() => setConfirming(s)}>Restore…</button>
-                            <button className="action-quiet" disabled={busy} onClick={() => remove(s)}>Delete</button>
+                            <button
+                              className="action-quiet"
+                              aria-label={`Restore the backup from ${when(s)}`}
+                              disabled={busy}
+                              onClick={() => setConfirming({ snapshot: s, action: "restore" })}
+                            >
+                              Restore…
+                            </button>
+                            <button
+                              className="action-quiet"
+                              aria-label={`Delete the backup from ${when(s)}`}
+                              disabled={busy}
+                              onClick={() => setConfirming({ snapshot: s, action: "delete" })}
+                            >
+                              Delete…
+                            </button>
                           </div>
                         </li>
                       ))}
