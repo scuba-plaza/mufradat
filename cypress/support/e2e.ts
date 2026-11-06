@@ -1,4 +1,4 @@
-import type { AxeResults } from "axe-core";
+import type axe from "axe-core";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -8,6 +8,7 @@ declare global {
       hydrated(selector: string): Chainable<JQuery<HTMLElement>>;
       wordRow(rank: number): Chainable<JQuery<HTMLElement>>;
       pressEscape(): Chainable<void>;
+      pressEnter(): Chainable<void>;
       axe(context?: string): Chainable<void>;
       menuItem(name: string): Chainable<void>;
     }
@@ -22,16 +23,19 @@ Cypress.Commands.add("wordRow", (rank: number) =>
   cy.get('[aria-label="Word list"] > li').filter((_, row) => row.querySelector(".num")?.textContent === String(rank)),
 );
 
-Cypress.Commands.add("pressEscape", () => {
+function pressKey(key: string, code: string, windowsVirtualKeyCode: number, text?: string) {
   for (const type of ["keyDown", "keyUp"]) {
     cy.then(() => Cypress.automation("remote:debugger:protocol", {
       command: "Input.dispatchKeyEvent",
-      params: { type, key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 },
+      params: { type, key, code, windowsVirtualKeyCode, ...(type === "keyDown" && text ? { text } : {}) },
     }));
   }
-});
+}
 
-type AxeWindow = Window & { axe: { run: (context: string | Document, options: { runOnly: string[] }) => Promise<AxeResults> } };
+Cypress.Commands.add("pressEscape", () => pressKey("Escape", "Escape", 27));
+Cypress.Commands.add("pressEnter", () => pressKey("Enter", "Enter", 13, "\r"));
+
+type AxeWindow = Window & { axe: Pick<typeof axe, "run"> };
 
 const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
@@ -48,7 +52,8 @@ Cypress.Commands.add("axe", (context?: string) =>
 
 Cypress.Commands.add("menuItem", (name: string) => {
   cy.hydrated('button[aria-label="Menu"]').click();
-  cy.contains("header [popover] .options-item", name).click();
+  cy.contains("header [popover] .options-item", name).focus();
+  cy.pressEnter();
 });
 
 export {};

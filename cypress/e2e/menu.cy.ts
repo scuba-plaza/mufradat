@@ -58,4 +58,12 @@ describe("the menu", () => {
     cy.get("dialog[open]").should("not.exist");
     cy.focused().should("have.attr", "aria-label", "Menu");
   });
+
+  it("gives the focus back to the menu button when a click outside the dialog closes it", () => {
+    cy.visit("/");
+    cy.menuItem("Keyboard shortcuts");
+    cy.get("dialog[open]").click("topLeft");
+    cy.get("dialog[open]").should("not.exist");
+    cy.focused().should("have.attr", "aria-label", "Menu");
+  });
 });
