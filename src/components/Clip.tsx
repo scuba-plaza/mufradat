@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Note } from "@/lib/types";
 import { api, post } from "./api";
 import Spinner from "./Spinner";
@@ -44,6 +44,7 @@ export default function Clip(props: {
   readOnly?: boolean;
   extra?: { label: string; busy: boolean; onSelect: () => void };
   problem?: string;
+  onMessage?: (message: string) => void;
   children?: ReactNode;
 }) {
   const { note, slot, name, text } = props;
@@ -94,6 +95,8 @@ export default function Clip(props: {
   const working = busy || Boolean(props.extra?.busy);
   const canGenerate = Boolean(text.trim());
   const message = problem || clip?.error || props.problem || "";
+  const { onMessage } = props;
+  useEffect(() => onMessage?.(message), [onMessage, message]);
   const tone = message ? "border-danger" : clip?.outdated ? "border-warn" : has ? "border-rule-strong" : "border-dashed border-rule-strong";
 
   return (
@@ -136,7 +139,7 @@ export default function Clip(props: {
         </div>
       </div>
       <span role="status" className="sr-only">{working ? "Working…" : ""}</span>
-      <p className="min-h-[2lh] text-xs text-danger">{message}</p>
+      {!onMessage && <p className="min-h-[2lh] text-xs text-danger">{message}</p>}
     </div>
   );
 }

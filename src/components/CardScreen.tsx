@@ -26,6 +26,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
   const [resetOpen, setResetOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [tagProblem, setTagProblem] = useState("");
+  const [wordMessage, setWordMessage] = useState("");
   const [leaving, setLeaving] = useState(false);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const tags = useRef(initial.tags);
@@ -152,7 +153,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
     <div className="pb-[var(--bar-h)]">
       <h1 className="sr-only">{note.lemma}</h1>
       <div className="flex items-center justify-between gap-4 px-1 py-1 text-sm text-quiet">
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <span>{note.rank > 0 ? `Word ${note.rank} of ${total}` : ""}</span>
           <button className="action-quiet min-w-control-sm px-2" title="Reset word" aria-haspopup="dialog" onClick={() => setResetOpen(true)}>
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -168,11 +169,14 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
             </svg>
           </button>
         </div>
-        <span role="status">{SAVE_TEXT[saved]}</span>
+        <div className="flex min-w-0 items-center gap-3">
+          {wordMessage && <span role="alert" title={wordMessage} className="min-w-0 truncate text-right text-xs text-danger">{wordMessage}</span>}
+          <span role="status" className="shrink-0">{SAVE_TEXT[saved]}</span>
+        </div>
       </div>
 
       <div className="mt-4 text-center">
-        <Clip note={note} slot="word" name="the word" text={note.lemma} onNote={setNote}>
+        <Clip note={note} slot="word" name="the word" text={note.lemma} onNote={setNote} onMessage={setWordMessage}>
           <InlineText label="Arabic headword" value={note.lemma} arabic className="text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
           <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-2 text-center text-quiet" onSave={(hint) => save({ hint })} />
         </Clip>
