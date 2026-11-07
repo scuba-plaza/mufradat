@@ -101,11 +101,33 @@ const edited: Field = {
   },
 };
 
+function matchesGlob(pattern: string, text: string): boolean {
+  let p = 0;
+  let t = 0;
+  let star = -1;
+  let resume = 0;
+  while (t < text.length) {
+    if (pattern[p] === "*") {
+      star = p++;
+      resume = t;
+    } else if (p < pattern.length && pattern[p] === text[t]) {
+      p++;
+      t++;
+    } else if (star >= 0) {
+      p = star + 1;
+      t = ++resume;
+    } else {
+      return false;
+    }
+  }
+  while (pattern[p] === "*") p++;
+  return p === pattern.length;
+}
+
 const tag: Field = {
   parse(part) {
-    const pattern = part.split("*").map((piece) => piece.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*");
-    const matcher = new RegExp(`^${pattern}$`, "i");
-    return (row) => row.tags.some((t) => matcher.test(t));
+    const wanted = part.toLowerCase();
+    return (row) => row.tags.some((t) => matchesGlob(wanted, t.toLowerCase()));
   },
 };
 

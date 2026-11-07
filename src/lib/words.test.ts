@@ -336,6 +336,8 @@ describe("finding words by tag", () => {
 
   it("takes * as a wildcard", () => {
     expect(ranks(tagged(), "tag:lesson_*")).toEqual([1, 2, 3]);
+    expect(ranks(tagged(), "tag:lesson_1*")).toEqual([1, 3]);
+    expect(ranks(tagged(), "tag:*1")).toEqual([1]);
   });
 
   it("ignores case and takes a comma as or", () => {
@@ -346,6 +348,15 @@ describe("finding words by tag", () => {
     const s = tagged();
     expect(ranks(s, "-tag:* status:progress")).toEqual([4]);
     expect(ranks(s, "tag:*")).toEqual([1, 2, 3]);
+  });
+
+  it("answers a query with many * at once, however long the tags are", () => {
+    const s = openStore(":memory:");
+    s.setTags(openCard(s, { rank: 1 })!, ["a".repeat(40)]);
+    const started = performance.now();
+    expect(ranks(s, `tag:${"a*".repeat(14)}b`)).toEqual([]);
+    expect(ranks(s, `tag:${"a*".repeat(14)}`)).toEqual([1]);
+    expect(performance.now() - started).toBeLessThan(500);
   });
 
   it("treats every character but * literally", () => {
