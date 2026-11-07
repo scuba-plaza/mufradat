@@ -5,14 +5,15 @@ export default function Tags(props: {
   tags: string[];
   problem: string;
   inputRef: Ref<HTMLInputElement>;
-  onChange: (change: (tags: string[]) => string[]) => void;
+  onChange: (change: (tags: string[]) => string[]) => Promise<boolean>;
+  onEdit: () => void;
 }) {
   const [text, setText] = useState("");
 
   function add() {
     const tag = text.trim();
-    setText("");
-    if (tag !== "") props.onChange((tags) => [...tags, tag]);
+    if (tag === "") return;
+    props.onChange((tags) => [...tags, tag]).then((saved) => saved && setText((now) => (now.trim() === tag ? "" : now)));
   }
 
   return (
@@ -35,8 +36,11 @@ export default function Tags(props: {
         ref={props.inputRef}
         aria-label="Add tag"
         value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={add}
+        onChange={(e) => {
+          setText(e.target.value);
+          props.onEdit();
+        }}
+        onBlur={() => !props.problem && add()}
         onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && add()}
         className="field mt-3"
       />

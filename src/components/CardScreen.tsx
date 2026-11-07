@@ -52,22 +52,26 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
     });
   }
 
-  function saveTags(change: (tags: string[]) => string[]) {
+  function saveTags(change: (tags: string[]) => string[]): Promise<boolean> {
     setSaved("saving");
-    later(async () => {
-      try {
-        const next = (await api<{ note: Note }>(`/api/notes/${note.id}/tags`, {
-          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tags: change(tags.current) }),
-        })).note;
-        tags.current = next.tags;
-        setNote(next);
-        setTagProblem("");
-        setSaved("saved");
-      } catch (e) {
-        setTagProblem((e as Error).message);
-        setSaved("failed");
-      }
-    });
+    return new Promise((resolve) =>
+      later(async () => {
+        try {
+          const next = (await api<{ note: Note }>(`/api/notes/${note.id}/tags`, {
+            method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tags: change(tags.current) }),
+          })).note;
+          tags.current = next.tags;
+          setNote(next);
+          setTagProblem("");
+          setSaved("saved");
+          resolve(true);
+        } catch (e) {
+          setTagProblem((e as Error).message);
+          setSaved("failed");
+          resolve(false);
+        }
+      }),
+    );
   }
 
   function generateExample() {
@@ -154,7 +158,10 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
               <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" />
             </svg>
           </button>
-          <button className="action-quiet min-w-control-sm px-2" title="Tags and details" aria-haspopup="dialog" onClick={() => setTagsOpen(true)}>
+          <button className="action-quiet min-w-control-sm px-2" title="Tags and details" aria-haspopup="dialog" onClick={() => {
+            setTagProblem("");
+            setTagsOpen(true);
+          }}>
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><path d="M7 7h.01" />
             </svg>
@@ -203,7 +210,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
         {(exampleProblem || note.exampleError) && <p className="mt-1 text-sm text-danger">{exampleProblem || note.exampleError}</p>}
       </div>
 
-      <TagsAndDetailsDialog note={note} open={tagsOpen} onClose={() => setTagsOpen(false)} save={save} saveTags={saveTags} tagProblem={tagProblem} />
+      <TagsAndDetailsDialog note={note} open={tagsOpen} onClose={() => setTagsOpen(false)} save={save} saveTags={saveTags} tagProblem={tagProblem} clearTagProblem={() => setTagProblem("")} problems={problems} />
       <FormsDialog note={note} open={formsOpen} onClose={() => setFormsOpen(false)} save={save} onNote={setNote} />
       <ResetDialog note={note} open={resetOpen} busy={leaving} onClose={() => setResetOpen(false)} onReset={reset} />
       <ActionBar note={note} problems={problems} leaving={leaving} onApprove={approve} />

@@ -5,9 +5,12 @@ const tagsButton = '[title="Tags and details"]';
 const addTag = by("Add tag");
 const chips = "dialog[open] ul li";
 
+const tagged: string[] = [];
+
 function openWord(rank: number) {
   cy.visit(`/open?rank=${rank}`);
   cy.hydrated(by("Hint"));
+  cy.location("pathname").then((path) => tagged.push(path.split("/").pop()!));
 }
 
 function setTags(tags: string[]) {
@@ -21,7 +24,10 @@ function reopen() {
 }
 
 describe("the tags and details of a card", () => {
-  afterEach(() => cy.colorScheme("light"));
+  afterEach(() => {
+    cy.colorScheme("light");
+    tagged.splice(0).forEach((id) => cy.request("PUT", `/api/notes/${id}/tags`, { tags: [] }));
+  });
 
   it("has one icon button for tags and details, right of Reset word", () => {
     openWord(4201);
@@ -55,7 +61,6 @@ describe("the tags and details of a card", () => {
     cy.get(addTag).should("have.value", "");
     reopen();
     cy.get(chips).should("have.length", 1).and("contain", "lesson_1");
-    setTags([]);
   });
 
   it("removes a tag with its button", () => {
@@ -66,7 +71,6 @@ describe("the tags and details of a card", () => {
     cy.get(chips).should("have.length", 1).and("contain", "grammar");
     reopen();
     cy.get(chips).should("have.length", 1).and("contain", "grammar");
-    setTags([]);
   });
 
   it("leaves an approved card approved", () => {
@@ -83,7 +87,6 @@ describe("the tags and details of a card", () => {
     });
     cy.pressEscape();
     cy.get('[role="toolbar"]').contains("a", "Next");
-    setTags([]);
   });
 
   it("says why a tag is refused, inside the dialog, and keeps the tags it had", () => {
@@ -93,7 +96,6 @@ describe("the tags and details of a card", () => {
     cy.get(addTag).type("a,b{enter}");
     cy.get('dialog[open] [role="alert"]').should("contain", "A tag cannot contain commas, quotes or *.");
     cy.get(chips).should("have.length", 1).and("contain", "kept");
-    setTags([]);
   });
 
   it("has no accessibility problems in light and dark with the dialog open", () => {
@@ -104,6 +106,30 @@ describe("the tags and details of a card", () => {
     cy.axe("dialog[open]");
     cy.colorScheme("dark");
     cy.axe("dialog[open]");
-    setTags([]);
+  });
+
+  it("says why a detail was refused, inside the dialog", () => {
+    openWord(4208);
+    cy.intercept("PUT", "/api/notes/*", { statusCode: 500, body: { error: "The disk is full." } });
+    cy.get(tagsButton).click();
+    cy.get("dialog[open]").contains("label", "Gender").find("select").select("masculine");
+    cy.get('dialog[open] [role="alert"]').should("contain", "The disk is full.");
+  });
+
+  it("keeps what was typed when a tag is refused, and drops the refusal when you type again or reopen", () => {
+    openWord(4209);
+    cy.get(tagsButton).click();
+    cy.get(addTag).type("a,b{enter}");
+    cy.get('dialog[open] [role="alert"]').should("contain", "A tag cannot contain commas, quotes or *.");
+    cy.get(addTag).should("have.value", "a,b");
+    cy.get(addTag).type("c");
+    cy.get('dialog[open] [role="alert"]').should("not.exist");
+    cy.get(addTag).type("{enter}");
+    cy.get('dialog[open] [role="alert"]').should("exist");
+    cy.pressEscape();
+    cy.get("dialog[open]").should("not.exist");
+    cy.get(tagsButton).click();
+    cy.get('dialog[open] [role="alert"]').should("not.exist");
+    cy.get(addTag).should("have.value", "");
   });
 });

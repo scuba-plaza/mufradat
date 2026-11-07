@@ -9,8 +9,10 @@ export default function TagsAndDetailsDialog(props: {
   open: boolean;
   onClose: () => void;
   save: (patch: Record<string, unknown>) => void;
-  saveTags: (change: (tags: string[]) => string[]) => void;
+  saveTags: (change: (tags: string[]) => string[]) => Promise<boolean>;
   tagProblem: string;
+  clearTagProblem: () => void;
+  problems: string[];
 }) {
   const { note } = props;
   const dialog = useRef<HTMLDialogElement>(null);
@@ -41,7 +43,7 @@ export default function TagsAndDetailsDialog(props: {
         <section aria-labelledby="tags-heading" className="mt-6">
           <h3 id="tags-heading" className="text-sm font-medium text-quiet">Tags</h3>
           <div className="mt-3">
-            <Tags tags={note.tags} problem={props.tagProblem} inputRef={input} onChange={props.saveTags} />
+            <Tags key={String(props.open)} tags={note.tags} problem={props.tagProblem} inputRef={input} onChange={props.saveTags} onEdit={props.clearTagProblem} />
           </div>
         </section>
         <section aria-labelledby="details-heading" className="mt-6">
@@ -49,6 +51,11 @@ export default function TagsAndDetailsDialog(props: {
           <div className="mt-3">
             <Details note={note} save={props.save} />
           </div>
+          {props.problems.length > 0 && (
+            <ul role="alert" className="mt-3 text-sm text-danger">
+              {props.problems.map((p) => <li key={p}>{p}</li>)}
+            </ul>
+          )}
         </section>
         <div className="mt-6 flex justify-end">
           <button className="action-main" onClick={props.onClose}>Done</button>
