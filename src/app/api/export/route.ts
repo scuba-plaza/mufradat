@@ -15,7 +15,7 @@ export const GET = () =>
       if (!fs.existsSync(file)) throw new MissingClipError(place);
       return fs.readFileSync(file);
     };
-    let apkg: Buffer;
+    let apkg: Buffer<ArrayBuffer>;
     try {
       apkg = buildApkg(notes, read, cfg);
     } catch (e) {
@@ -23,7 +23,7 @@ export const GET = () =>
       throw e;
     }
     const name = `arabic-deck-${new Date().toISOString().slice(0, 10)}.apkg`;
-    return new Response(new Uint8Array(apkg), {
+    return new Response(apkg, {
       headers: {
         "Content-Type": "application/octet-stream",
         "Content-Disposition": `attachment; filename="${name}"`,

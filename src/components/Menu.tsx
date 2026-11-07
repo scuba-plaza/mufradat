@@ -1,5 +1,6 @@
 "use client";
 import { useId, useRef, useState } from "react";
+import { refusal } from "./api";
 import Backups from "./Backups";
 import { plural } from "./format";
 import Shortcuts from "./Shortcuts";
@@ -23,7 +24,7 @@ export default function Menu({ approved }: { approved: number }) {
     setMessage("Preparing the deck…");
     try {
       const res = await fetch("/api/export");
-      if (!res.ok) throw new Error(((await res.json()) as { error: string }).error);
+      if (!res.ok) throw await refusal(res);
       const cards = Number(res.headers.get("X-Card-Count"));
       const link = document.createElement("a");
       link.href = URL.createObjectURL(await res.blob());

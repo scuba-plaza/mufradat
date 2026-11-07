@@ -47,6 +47,10 @@ describe("the icons and the share image", () => {
     });
   });
 
+  it("still answers a crawler that sends a Host header no address can be made from", () => {
+    cy.request({ url: "/", headers: { ...crawler, Host: "a b" }, failOnStatusCode: false }).its("status").should("eq", 200);
+  });
+
   it("gives a link preview its description and a 1200 by 630 image that resolves", () => {
     cy.request({ url: "/", headers: crawler }).then(({ body }) => {
       const html = body as string;

@@ -10,7 +10,7 @@ interface ZipEntry {
 }
 
 /** A zip with every entry stored uncompressed, in the order given. */
-export function zipStored(entries: ZipEntry[]): Buffer {
+export function zipStored(entries: ZipEntry[]): Buffer<ArrayBuffer> {
   const parts: Buffer[] = [];
   const central: Buffer[] = [];
   let offset = 0;

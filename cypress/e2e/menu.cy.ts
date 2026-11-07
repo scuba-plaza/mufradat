@@ -137,7 +137,7 @@ describe("export from the menu", () => {
     cy.contains(`${popover} .options-item`, /^Export$/).should("not.be.disabled");
   });
 
-  it("saves exactly one file, asks the server once and writes nothing to the workspace", () => {
+  it("asks the server once, hands the deck to the browser and writes nothing to the workspace", () => {
     approvedCard();
     cy.visit("/");
     cy.task<string[]>("downloads").then((before) => {
@@ -168,6 +168,22 @@ describe("export from the menu", () => {
       cy.get(status).should("have.text", "The card of the word X has no audio file.");
       cy.task<string[]>("downloads").should("deep.equal", before);
     });
+  });
+
+  it("says Request failed (500). when the server answers with something that is not JSON", () => {
+    approvedCard();
+    cy.visit("/");
+    cy.intercept("GET", "/api/export", { statusCode: 500, headers: { "Content-Type": "text/html" }, body: "<!DOCTYPE html><p>oops</p>" });
+    cy.menuItem("Export");
+    cy.get(status).should("have.text", "Request failed (500).");
+  });
+
+  it("says Request failed (400). when the refusal carries no message", () => {
+    approvedCard();
+    cy.visit("/");
+    cy.intercept("GET", "/api/export", { statusCode: 400, body: {} });
+    cy.menuItem("Export");
+    cy.get(status).should("have.text", "Request failed (400).");
   });
 
   it("puts the message on its own row under the button and does not scroll the page sideways at 390px", () => {

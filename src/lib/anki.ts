@@ -146,7 +146,7 @@ const TEMPLATE_FILES = [
  * Builds an .apkg from approved notes. `readAudio` returns the bytes of a clip by key.
  * The same notes in any order give the same bytes.
  */
-export function buildApkg(notes: Note[], readAudio: (key: string, place: ClipPlace) => Uint8Array, opts: ExportOptions): Buffer {
+export function buildApkg(notes: Note[], readAudio: (key: string, place: ClipPlace) => Uint8Array, opts: ExportOptions): Buffer<ArrayBuffer> {
   if (notes.length === 0) throw new Error("There are no approved cards to export.");
   const resources = opts.resources ?? path.join(process.cwd(), "data");
   const templates = Object.fromEntries(

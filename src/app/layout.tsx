@@ -6,9 +6,9 @@ import { context } from "@/lib/server";
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const host = (await headers()).get("host") ?? "localhost:3000";
+  const origin = `http://${(await headers()).get("host") ?? "localhost:3000"}`;
   return {
-    metadataBase: new URL(`http://${host}`),
+    metadataBase: URL.canParse(origin) ? new URL(origin) : undefined,
     title: { default: "Mufradat", template: "%s · Mufradat" },
     description: "Build one Modern Standard Arabic Anki deck, one card at a time.",
   };
