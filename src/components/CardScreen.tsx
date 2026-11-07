@@ -164,7 +164,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
         <span role="status">{SAVE_TEXT[saved]}</span>
       </div>
 
-      <div className="mt-6 text-center">
+      <div className="mt-4 text-center">
         <Clip note={note} slot="word" name="the word" text={note.lemma} onNote={setNote}>
           <InlineText label="Arabic headword" value={note.lemma} arabic className="text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
           <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-2 text-center text-quiet" onSave={(hint) => save({ hint })} />
@@ -185,10 +185,10 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
         ) : (
           <button className="action mt-4" aria-haspopup="dialog" onClick={() => setFormsOpen(true)}>Add forms</button>
         )}
-        <InlineText label="English meaning" placeholder="Add the English meaning" value={note.english} className="mt-5 text-center text-2xl font-medium tracking-title" onSave={(english) => save({ english })} />
+        <InlineText label="English meaning" placeholder="Add the English meaning" value={note.english} className="mt-3 text-center text-2xl font-medium tracking-title" onSave={(english) => save({ english })} />
       </div>
 
-      <div className="mt-10 text-center">
+      <div className="mt-6 text-center">
         <Clip
           note={note}
           slot="example"
