@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent } from "react";
+import { useEffect, useRef, useState, type FocusEvent } from "react";
 import { autoMark, markSelection, splitExample } from "@/lib/validate";
 
 export default function ExampleText(props: { value: string; words: string[]; onSave: (v: string) => void }) {
@@ -15,58 +15,18 @@ export default function ExampleText(props: { value: string; words: string[]; onS
     el.setSelectionRange(el.value.length, el.value.length);
   }, [editing]);
 
-  const timer = useRef<number | undefined>(undefined);
-  const composing = useRef(false);
-  const keep = useRef<[number, number] | null>(null);
-  const settled = useRef<[number, number] | null>(null);
-
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el || !keep.current) return;
-    el.setSelectionRange(...keep.current);
-    settled.current = keep.current;
-    keep.current = null;
-  }, [draft]);
-
   const hasMark = (text: string) => /[[\]]/.test(text);
 
   function leave(e: FocusEvent<HTMLDivElement>) {
     if (e.currentTarget.contains(e.relatedTarget)) return;
-    window.clearTimeout(timer.current);
     setEditing(false);
-    const typed = draft !== props.value && !hasMark(draft) && !hasMark(props.value);
-    const final = typed ? (autoMark(draft, props.words) ?? draft) : draft;
+    const el = box.current;
+    const selected = el && el.selectionStart !== el.selectionEnd ? markSelection(draft, el.selectionStart, el.selectionEnd) : draft;
+    const typed = draft !== props.value && !hasMark(selected) && !hasMark(props.value);
+    const final = typed ? (autoMark(selected, props.words) ?? selected) : selected;
     setDraft(final);
     if (final !== props.value) props.onSave(final);
   }
-
-  function markSelected() {
-    const el = box.current;
-    if (!el || composing.current) return;
-    const [from, to] = [el.selectionStart, el.selectionEnd];
-    if (from === to || (settled.current?.[0] === from && settled.current[1] === to)) return;
-    const next = markSelection(draft, from, to);
-    if (next === draft) return;
-    const parts = splitExample(next);
-    const before = parts ? parts.before.length + 1 : (splitExample(draft)?.before.length ?? 0);
-    const length = (parts ?? splitExample(draft))?.target.length ?? 0;
-    keep.current = [before, before + length];
-    setDraft(next);
-  }
-
-  const latest = useRef(markSelected);
-  latest.current = markSelected;
-
-  useEffect(() => {
-    const el = box.current;
-    if (!editing || !el) return;
-    const changed = () => {
-      window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(() => latest.current(), 350);
-    };
-    el.addEventListener("selectionchange", changed);
-    return () => el.removeEventListener("selectionchange", changed);
-  }, [editing]);
 
   const unmarked = props.value !== "" && !splitExample(props.value);
   const warning = unmarked && (
@@ -95,7 +55,7 @@ export default function ExampleText(props: { value: string; words: string[]; onS
   return (
     <>
       <div onBlur={leave}>
-        <span id="example-hint" className="sr-only">Select the letters you are teaching to mark them.</span>
+        <span id="example-hint" className="sr-only">Select the letters you are teaching; they are marked when you leave the field.</span>
         <textarea
           ref={box}
           aria-label="Example"
@@ -103,14 +63,10 @@ export default function ExampleText(props: { value: string; words: string[]; onS
           value={draft}
           lang="ar"
           dir="rtl"
-          title="Select the letters you are teaching to mark them"
+          title="Select the letters you are teaching; they are marked when you leave the field"
           aria-describedby="example-hint"
           onChange={(e) => setDraft(e.target.value)}
-          onPointerDown={() => (settled.current = null)}
-          onCompositionStart={() => (composing.current = true)}
-          onCompositionEnd={() => (composing.current = false)}
           onKeyDown={(e) => {
-            settled.current = null;
             if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
             e.preventDefault();
             e.currentTarget.blur();

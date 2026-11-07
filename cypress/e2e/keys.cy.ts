@@ -48,6 +48,7 @@ describe("the keys of a card", () => {
     openWord(94);
     cy.get(`${by("Audio for the word")} input[type="file"]`).selectFile(unplayable, { force: true });
     cy.get('[aria-label="Audio for the word"] [title="Remove"]').should("be.enabled");
+    cy.get('[aria-label="Audio for the word"] [title="Play the word"]').should("be.enabled");
     cy.get("body").type("{ctrl}{uparrow}");
     cy.contains("could not be played");
   });
@@ -58,6 +59,7 @@ describe("the keys of a card", () => {
     cy.get(`textarea${by("Example")}`).type("الْكِتَابُ [فِي] الْحَقِيبَةِ").blur();
     cy.get(`${by("Audio for the example")} input[type="file"]`).selectFile(unplayable, { force: true });
     cy.get('[aria-label="Audio for the example"] [title="Remove"]').should("be.enabled");
+    cy.get('[aria-label="Audio for the example"] [title="Play the example"]').should("be.enabled");
     cy.get("body").type("{ctrl}{downarrow}");
     cy.contains("could not be played");
   });

@@ -107,15 +107,27 @@ describe("a word", () => {
     cy.get(`${by("Example")} mark`).should("have.text", "عَنِ");
   });
 
-  it("marks exactly the letters that are selected, takes the mark away when they are selected again, and keeps it away", () => {
+  it("marks the letters that were selected last when the field is left, and not before", () => {
     openWord(17);
     cy.get(by("Example")).click();
     cy.get(`textarea${by("Example")}`).type("الْكِتَابُ فِي الْحَقِيبَةِ");
+    selectInExample("كِتَاب");
     selectInExample("حَقِيب");
-    cy.get(`textarea${by("Example")}`).should("have.value", "الْكِتَابُ فِي الْ[حَقِيب]َةِ");
-    cy.get(`textarea${by("Example")}`).click();
-    selectInExample("حَقِيب");
+    cy.wait(1500);
     cy.get(`textarea${by("Example")}`).should("have.value", "الْكِتَابُ فِي الْحَقِيبَةِ").blur();
+    cy.get(`${by("Example")} mark`).should("have.text", "حَقِيب");
+  });
+
+  it("takes the mark away when its letters are selected again and the field is left, and keeps it away", () => {
+    openWord(18);
+    cy.get(by("Example")).click();
+    cy.get(`textarea${by("Example")}`).type("الْكِتَابُ فِي الْحَقِيبَةِ");
+    selectInExample("حَقِيب");
+    cy.get(`textarea${by("Example")}`).blur();
+    cy.get(`${by("Example")} mark`).should("have.text", "حَقِيب");
+    cy.get(by("Example")).click();
+    selectInExample("حَقِيب");
+    cy.get(`textarea${by("Example")}`).blur();
     cy.get(`${by("Example")} mark`).should("not.exist");
     cy.contains("It is not clear which word to highlight");
   });
@@ -128,7 +140,7 @@ describe("a word", () => {
     cy.get(bar).should("contain", "the target word marked in the example");
     cy.get(by("Example")).click();
     selectInExample("فِي");
-    cy.get(`textarea${by("Example")}`).should("have.value", "الْكِتَابُ [فِي] الْحَقِيبَةِ").blur();
+    cy.get(`textarea${by("Example")}`).blur();
     cy.get(`${by("Example")} mark`).should("have.text", "فِي");
     cy.contains("It is not clear which word to highlight").should("not.exist");
     cy.get(bar).should("not.contain", "the target word marked in the example");
@@ -203,6 +215,38 @@ describe("a word", () => {
       cy.get(`${word} input[type="file"]`).selectFile(mine, { force: true });
       cy.get(inGroup(word, "Remove")).should("be.enabled");
     }
+
+    it("plays a clip when it is uploaded, shows it playing and disabled, and queues the next clip behind it", () => {
+      cy.visit("/open?rank=60", {
+        onBeforeLoad(win) {
+          const sounds: { src: string; onended: (() => void) | null }[] = [];
+          class Stub {
+            onended: (() => void) | null = null;
+            onerror: (() => void) | null = null;
+            constructor(readonly src: string) {
+              sounds.push(this);
+            }
+            play() {
+              return Promise.resolve();
+            }
+          }
+          Object.assign(win, { Audio: Stub, sounds });
+        },
+      });
+      cy.hydrated(by("Hint"));
+      const sounds = () => cy.window().its("sounds");
+      cy.get(`${word} input[type="file"]`).selectFile(mine, { force: true });
+      sounds().should("have.length", 1);
+      cy.get(inGroup(word, "Playing the word")).should("be.disabled");
+      cy.get(inGroup(word, "Play the word")).should("not.exist");
+      cy.get(`${word} input[type="file"]`).selectFile({ ...mine, contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 8, 8, 8, 8]) }, { force: true });
+      cy.get(inGroup(word, "Upload")).should("be.enabled");
+      sounds().should("have.length", 1);
+      cy.window().then((win) => (win as unknown as { sounds: { onended: () => void }[] }).sounds[0].onended());
+      sounds().should("have.length", 2);
+      cy.window().then((win) => (win as unknown as { sounds: { onended: () => void }[] }).sounds[1].onended());
+      cy.get(inGroup(word, "Play the word")).should("be.enabled");
+    });
 
     it("keeps the audio actions in a capsule beside the field, with no menu", () => {
       openWord(40);

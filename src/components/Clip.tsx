@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { Note } from "@/lib/types";
+import { player } from "@/lib/player";
 import { api, post } from "./api";
 import Spinner from "./Spinner";
 
@@ -11,10 +12,11 @@ const ICONS = {
   upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5" /><path d="M12 3v12" /></>,
   remove: <><path d="M3 6h18" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>,
   removeForm: <><circle cx="12" cy="12" r="9" /><path d="M15 9l-6 6" /><path d="M9 9l6 6" /></>,
+  playing: <><path d="M11 5L6 9H2v6h4l5 4V5z" /><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M19 5a10 10 0 0 1 0 14" /></>,
   newExample: <><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /><path d="M19 3v4" /><path d="M21 5h-4" /></>,
 };
 
-function RailButton(props: { icon: keyof typeof ICONS; title: string; onClick: () => void; disabled?: boolean; busy?: boolean }) {
+function RailButton(props: { icon: keyof typeof ICONS; title: string; onClick: () => void; disabled?: boolean; busy?: boolean; active?: boolean }) {
   return (
     <button
       type="button"
@@ -27,7 +29,7 @@ function RailButton(props: { icon: keyof typeof ICONS; title: string; onClick: (
       {props.busy ? (
         <Spinner size={16} />
       ) : (
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" className={props.active ? "animate-pulse" : undefined} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           {ICONS[props.icon]}
         </svg>
       )}
@@ -56,11 +58,21 @@ export default function Clip(props: {
   const file = useRef<HTMLInputElement>(null);
   const state = !has ? "no audio" : clip.outdated ? "audio is out of date" : "";
 
-  async function run(work: () => Promise<{ note: Note }>) {
+  const id = `${note.id}/${slot}`;
+  const isPlaying = useSyncExternalStore(player.subscribe, () => player.playing() === id, () => false);
+
+  function enqueue(key: string, onError: () => void) {
+    player.enqueue({ id, url: `/api/audio/${note.id}/${slot}?k=${key}`, onError });
+  }
+
+  async function run(work: () => Promise<{ note: Note }>, autoplay = false) {
     setBusy(true);
     setProblem("");
     try {
-      props.onNote((await work()).note);
+      const done = (await work()).note;
+      props.onNote(done);
+      const key = done.audio[slot]?.key;
+      if (autoplay && key) enqueue(key, () => undefined);
     } catch (e) {
       setProblem((e as Error).message);
     } finally {
@@ -70,13 +82,10 @@ export default function Clip(props: {
 
   function play() {
     setProblem("");
-    const cannot = () => setProblem("This clip could not be played.");
-    const audio = new Audio(`/api/audio/${note.id}/${slot}?k=${clip.key}`);
-    audio.onerror = cannot;
-    audio.play().catch(cannot);
+    enqueue(clip.key!, () => setProblem("This clip could not be played."));
   }
 
-  const generateNow = () => run(() => post("/api/tts", { id: note.id, slot }));
+  const generateNow = () => run(() => post("/api/tts", { id: note.id, slot }), true);
 
   const message = problem || clip?.error || props.problem || "";
   const { onMessage } = props;
@@ -86,8 +95,8 @@ export default function Clip(props: {
     return (
       <span role="group" aria-label={`Audio for ${name}`} className="inline-flex min-h-control-sm items-center gap-1">
         {has && (
-          <button className="action-quiet min-w-control-sm px-2" aria-label={`Play ${name}`} onClick={play}>
-            <svg viewBox="0 0 10 10" width="12" height="12" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>
+          <button className="action-quiet min-w-control-sm px-2 disabled:opacity-100" aria-label={isPlaying ? `Playing ${name}` : `Play ${name}`} disabled={isPlaying} onClick={play}>
+            <svg viewBox="0 0 10 10" width="12" height="12" aria-hidden="true" className={isPlaying ? "animate-pulse" : undefined}><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>
           </button>
         )}
         {state && <span className="sr-only">{state}</span>}
@@ -107,7 +116,7 @@ export default function Clip(props: {
       aria-label={`Audio for ${name}`}
       className={`flex items-center rounded-full border bg-paper p-0.5 ${props.inline ? "" : "row-start-1 m-1 justify-self-center sm:col-start-3 sm:flex-col sm:justify-self-end"} ${tone}`}
     >
-      <RailButton icon="play" title={`Play ${name}`} disabled={!has && !working} busy={working} onClick={() => !working && play()} />
+      <RailButton icon={isPlaying ? "playing" : "play"} title={isPlaying ? `Playing ${name}` : `Play ${name}`} disabled={isPlaying || (!has && !working)} busy={working} active={isPlaying} onClick={() => !working && play()} />
       <RailButton
         icon={has ? "regenerate" : "generate"}
         title={clip?.outdated ? "Regenerate (the Arabic changed)" : has ? "Regenerate" : "Generate"}
@@ -133,7 +142,7 @@ export default function Clip(props: {
           const f = e.target.files?.[0];
           e.target.value = "";
           e.target.blur();
-          if (f) run(() => api(`/api/audio/${note.id}/${slot}`, { method: "PUT", body: f }));
+          if (f) run(() => api(`/api/audio/${note.id}/${slot}`, { method: "PUT", body: f }), true);
         }}
       />
     </div>
