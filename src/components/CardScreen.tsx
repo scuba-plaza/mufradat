@@ -180,7 +180,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
           <InlineText label="Arabic headword" value={note.lemma} arabic className="text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
           <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-2 text-center text-quiet" onSave={(hint) => save({ hint })} />
         </Clip>
-        <section aria-label="Forms" className={`panel mx-auto mt-4 flex max-w-2xl items-center border px-2 py-2 ${formsTone}`}>
+        <section aria-label="Forms" className={`panel mx-auto mt-4 flex items-center border px-2 py-2 ${formsTone}`}>
           <div className="flex flex-1 flex-wrap items-center justify-center gap-x-6 gap-y-2 pl-[var(--control-h-sm)]">
             {note.forms.length === 0 && <span className="text-sm text-quiet">No forms</span>}
             {note.forms.map((f) => (
