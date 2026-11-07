@@ -142,7 +142,11 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
       else if (key === "playExample") play("the example");
     }
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.documentElement.dataset.keys = "on";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      delete document.documentElement.dataset.keys;
+    };
   }, [note.id, q]);
 
   const clips = note.forms.map((f) => note.audio[f.id]);

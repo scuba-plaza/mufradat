@@ -6,6 +6,7 @@ const unplayable = { contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2
 function openWord(rank: number) {
   cy.visit(`/open?rank=${rank}`);
   cy.hydrated(by("Hint"));
+  cy.get("html[data-keys]");
 }
 
 describe("the keys of a card", () => {
