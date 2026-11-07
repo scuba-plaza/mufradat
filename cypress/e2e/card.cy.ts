@@ -5,6 +5,7 @@ const alert = '[role="alert"]';
 const bar = '[role="toolbar"]';
 const by = (label: string) => `[aria-label="${label}"]`;
 const resetButton = '[title="Reset word"]';
+const tagsButton = '[title="Tags and details"]';
 /** An MP3 frame header and nothing playable after it: the store accepts it, a browser cannot decode it. */
 const unplayable = { contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]), fileName: "word.mp3", mimeType: "audio/mpeg" };
 
@@ -26,7 +27,7 @@ describe("a word", () => {
     cy.get(by("English meaning")).should("have.value", "on, over");
     cy.contains("Word 3 of 5000");
     cy.contains("p", "preposition").should("not.exist");
-    cy.contains("summary", "Details").click();
+    cy.get(tagsButton).click();
     cy.contains("label", "Part of speech").find("select option:selected").should("have.text", "preposition");
   });
 
@@ -300,12 +301,12 @@ describe("a word", () => {
     });
   });
 
-  it("keeps the lexical fields in Details, closed until you open them", () => {
+  it("keeps the lexical fields in the dialog, out of the card page", () => {
     openWord(21);
-    cy.get("details").should("not.have.attr", "open");
+    cy.get("details").should("not.exist");
     cy.contains("label", "Part of speech").should("not.be.visible");
-    cy.contains("summary", "Details").click();
-    cy.contains("label", "Part of speech").should("be.visible");
+    cy.get(tagsButton).click();
+    cy.get("dialog[open]").contains("label", "Part of speech").should("be.visible");
     cy.contains("label", "Gender");
     cy.contains("label", "Root");
     cy.contains("label", "Verb form");
@@ -411,9 +412,8 @@ describe("resetting a word", () => {
     cy.axe("dialog[open] .action-danger");
   });
 
-  it("puts Reset word right of the word counter, with Details closed", () => {
+  it("puts Reset word right of the word counter", () => {
     openWord(209);
-    cy.get("details").should("not.have.attr", "open");
     cy.get(resetButton).should("not.have.attr", "aria-label");
     cy.contains("span", "Word 209 of 5000").then(($counter) => {
       cy.get(resetButton).should("be.visible").then(($button) => {
@@ -426,11 +426,12 @@ describe("resetting a word", () => {
     cy.axe(resetButton);
   });
 
-  it("no longer has Reset word inside Details", () => {
+  it("has no Reset word in the dialog", () => {
     openWord(210);
-    cy.contains("summary", "Details").click();
-    cy.contains("label", "Verb form").should("be.visible");
-    cy.get("details").should("not.contain", "Reset word");
+    cy.get(tagsButton).click();
+    cy.get("dialog[open]").contains("label", "Verb form").should("be.visible");
+    cy.get("dialog[open]").should("not.contain", "Reset word");
+    cy.get(`dialog[open] ${resetButton}`).should("not.exist");
   });
 
   it("gives the focus back to the Reset word button after Cancel", () => {

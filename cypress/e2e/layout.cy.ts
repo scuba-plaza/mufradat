@@ -33,7 +33,7 @@ describe("the layout of a card", () => {
   describe("the order of a card", () => {
     const cards = [
       { rank: 6, what: "forms", forms: by("Forms") },
-      { rank: 3, what: "no forms", forms: 'button[aria-haspopup="dialog"]:not([title="Reset word"])' },
+      { rank: 3, what: "no forms", forms: 'button[aria-haspopup="dialog"]:not([title])' },
     ];
 
     for (const [width, height] of [[1920, 1100], [390, 844]]) {

@@ -6,12 +6,12 @@ import { plainExample } from "@/lib/validate";
 import ActionBar from "./ActionBar";
 import { api, post } from "./api";
 import Clip from "./Clip";
-import Details from "./Details";
 import ExampleText from "./ExampleText";
 import FormsDialog from "./FormsDialog";
 import InlineText from "./InlineText";
 import { keyPressed } from "./keys";
 import ResetDialog from "./ResetDialog";
+import TagsAndDetailsDialog from "./TagsAndDetailsDialog";
 
 const SAVE_TEXT = { idle: "", saving: "Saving…", saved: "Saved", failed: "Not saved" };
 
@@ -24,8 +24,11 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
   const [exampleProblem, setExampleProblem] = useState("");
   const [formsOpen, setFormsOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [tagProblem, setTagProblem] = useState("");
   const [leaving, setLeaving] = useState(false);
   const queue = useRef<Promise<void>>(Promise.resolve());
+  const tags = useRef(initial.tags);
 
   /** Changes happen one at a time, in the order they were made, so that approving never overtakes a save. */
   const later = (work: () => Promise<void>) => {
@@ -44,6 +47,24 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
         setSaved("saved");
       } catch (e) {
         setProblems([(e as Error).message]);
+        setSaved("failed");
+      }
+    });
+  }
+
+  function saveTags(change: (tags: string[]) => string[]) {
+    setSaved("saving");
+    later(async () => {
+      try {
+        const next = (await api<{ note: Note }>(`/api/notes/${note.id}/tags`, {
+          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tags: change(tags.current) }),
+        })).note;
+        tags.current = next.tags;
+        setNote(next);
+        setTagProblem("");
+        setSaved("saved");
+      } catch (e) {
+        setTagProblem((e as Error).message);
         setSaved("failed");
       }
     });
@@ -133,6 +154,11 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
               <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" />
             </svg>
           </button>
+          <button className="action-quiet min-w-control-sm px-2" title="Tags and details" aria-haspopup="dialog" onClick={() => setTagsOpen(true)}>
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><path d="M7 7h.01" />
+            </svg>
+          </button>
         </div>
         <span role="status">{SAVE_TEXT[saved]}</span>
       </div>
@@ -177,7 +203,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
         {(exampleProblem || note.exampleError) && <p className="mt-1 text-sm text-danger">{exampleProblem || note.exampleError}</p>}
       </div>
 
-      <Details note={note} save={save} />
+      <TagsAndDetailsDialog note={note} open={tagsOpen} onClose={() => setTagsOpen(false)} save={save} saveTags={saveTags} tagProblem={tagProblem} />
       <FormsDialog note={note} open={formsOpen} onClose={() => setFormsOpen(false)} save={save} onNote={setNote} />
       <ResetDialog note={note} open={resetOpen} busy={leaving} onClose={() => setResetOpen(false)} onReset={reset} />
       <ActionBar note={note} problems={problems} leaving={leaving} onApprove={approve} />

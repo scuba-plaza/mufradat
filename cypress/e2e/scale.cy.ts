@@ -53,9 +53,9 @@ describe("the scale of the interface", () => {
 
     it("fits a card with four forms, a marked example and its clips, with room to spare", () => {
       openFullCard(6);
-      cy.get("details").should(($details) => {
-        const content = $details[0].getBoundingClientRect().bottom;
-        const barTop = $details[0].ownerDocument.querySelector(bar)!.getBoundingClientRect().top;
+      cy.contains("button", "New example").should(($button) => {
+        const content = $button[0].getBoundingClientRect().bottom;
+        const barTop = $button[0].ownerDocument.querySelector(bar)!.getBoundingClientRect().top;
         expect(barTop - content, "room between the last content and the bar").to.be.at.least(20);
       });
       cy.document().its("documentElement.scrollHeight").should("be.at.most", 1100);
