@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SnapshotInfo, SnapshotReason, SnapshotUsage, WorkspaceCheck } from "@/lib/types";
 import { api } from "./api";
 import { plural, size } from "./format";
@@ -29,6 +29,8 @@ interface Confirming {
 export default function Backups({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const picker = useRef<HTMLInputElement>(null);
+  const list = useRef<HTMLOListElement>(null);
+  const [floor, setFloor] = useState(0);
   const [data, setData] = useState<BackupsData | null>(null);
   const [confirming, setConfirming] = useState<Confirming | null>(null);
   const [busy, setBusy] = useState(false);
@@ -45,6 +47,16 @@ export default function Backups({ open, onClose }: { open: boolean; onClose: () 
   useEffect(() => {
     if (open) run(load);
   }, [open]);
+
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (!el) return;
+    const measure = () => setFloor(Array.from(el.children).slice(0, 3).reduce((sum, row) => sum + row.getBoundingClientRect().height, 0));
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [data, confirming]);
 
   async function run(call: () => Promise<void>) {
     setBusy(true);
@@ -168,7 +180,7 @@ export default function Backups({ open, onClose }: { open: boolean; onClose: () 
                 {data.snapshots.length === 0 ? (
                   <p className="mt-4">No backups yet.</p>
                 ) : (
-                  <ol aria-label="Backups" className="mt-4 overflow-y-auto">
+                  <ol ref={list} aria-label="Backups" className="mt-4 overflow-y-auto" style={{ minHeight: floor }}>
                     {data.snapshots.map((s) => (
                       <li key={s.id} className="border-t border-rule py-3">
                         <p>{REASONS[s.reason]} · {when(s)}</p>

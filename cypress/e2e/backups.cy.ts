@@ -199,14 +199,17 @@ describe("backups", () => {
 describe("a long list of backups", () => {
   const made: string[] = [];
 
-  afterEach(() => {
+  before(() => {
+    Cypress._.times(30, () => cy.request("POST", "/api/backups").its("body.snapshot.id").then((id: string) => made.push(id)));
+  });
+
+  after(() => {
     made.splice(0).forEach((id) => cy.request({ method: "DELETE", url: `/api/backups/${id}`, failOnStatusCode: false }));
   });
 
-  for (const [width, height] of [[1280, 500], [390, 600]]) {
+  for (const [width, height] of [[1280, 800], [390, 844]]) {
     it(`keeps Close in view with 30 backups, the list scrolling and nothing above it overflowing at ${width}x${height}`, () => {
       cy.viewport(width, height);
-      Cypress._.times(30, () => cy.request("POST", "/api/backups").its("body.snapshot.id").then((id: string) => made.push(id)));
       openDialog();
       cy.get(rows).should("have.length.at.least", 30);
       cy.get(dialog).then(($dialog) => {
@@ -225,5 +228,26 @@ describe("a long list of backups", () => {
       });
     });
   }
-});
 
+  for (const [width, height] of [[1280, 360], [1280, 500], [390, 500], [390, 844], [320, 568]]) {
+    it(`shows at least three backups at ${width}x${height}, and the dialog scrolls itself to Close when the window is too short`, () => {
+      cy.viewport(width, height);
+      openDialog();
+      cy.get(rows).should("have.length.at.least", 30);
+      cy.get(dialog).then(($dialog) => {
+        const list = $dialog[0].querySelector('ol[aria-label="Backups"]')!;
+        const three = Array.from(list.children).slice(0, 3).reduce((sum, row) => sum + row.getBoundingClientRect().height, 0);
+        expect(list.clientHeight, "room for the first three rows").to.be.at.least(three - 1);
+      });
+      cy.get(dialog).then(($dialog) => {
+        $dialog[0].scrollTop = $dialog[0].scrollHeight;
+      });
+      cy.contains(`${dialog} button`, "Close").then(($close) => {
+        const win = $close[0].ownerDocument.defaultView!;
+        const box = $close[0].getBoundingClientRect();
+        expect(box.top).to.be.at.least(0);
+        expect(box.bottom).to.be.at.most(win.innerHeight);
+      });
+    });
+  }
+});
