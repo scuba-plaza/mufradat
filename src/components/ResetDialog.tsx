@@ -30,7 +30,7 @@ export default function ResetDialog(props: { note: Note; open: boolean; busy: bo
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <button className="action" onClick={props.onClose}>Cancel</button>
-          <button className="action-main" disabled={props.busy} onClick={props.onReset}>Reset</button>
+          <button className="action-danger" disabled={props.busy} onClick={props.onReset}>Reset</button>
         </div>
       </div>
     </dialog>

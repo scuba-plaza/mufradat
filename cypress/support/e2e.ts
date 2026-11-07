@@ -10,6 +10,7 @@ declare global {
       pressEscape(): Chainable<void>;
       pressEnter(): Chainable<void>;
       clickBackdrop(): Chainable<void>;
+      colorScheme(scheme: "light" | "dark"): Chainable<void>;
       axe(context?: string): Chainable<void>;
       menuItem(name: string): Chainable<void>;
     }
@@ -35,6 +36,13 @@ function pressKey(key: string, code: string, windowsVirtualKeyCode: number, text
 
 Cypress.Commands.add("pressEscape", () => pressKey("Escape", "Escape", 27));
 Cypress.Commands.add("pressEnter", () => pressKey("Enter", "Enter", 13, "\r"));
+
+Cypress.Commands.add("colorScheme", (scheme: "light" | "dark") => {
+  cy.then(() => Cypress.automation("remote:debugger:protocol", {
+    command: "Emulation.setEmulatedMedia",
+    params: { features: [{ name: "prefers-color-scheme", value: scheme }] },
+  }));
+});
 
 Cypress.Commands.add("clickBackdrop", () => {
   cy.get("dialog[open]").then(($dialog) => {

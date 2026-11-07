@@ -179,7 +179,8 @@
     background: rgb(var(--hover));
   }
 
-  .action-main {
+  .action-main,
+  .action-danger {
     @apply inline-flex items-center justify-center gap-2 whitespace-nowrap px-4 text-sm font-medium text-on-primary;
     min-height: var(--control-h);
     background: rgb(var(--primary));
@@ -187,11 +188,16 @@
     border-radius: var(--radius-control);
     transition: opacity var(--t-fast) var(--ease);
   }
-  .action-main:hover {
+  .action-main:hover,
+  .action-danger:hover {
     opacity: 0.88;
   }
-  .action-main:disabled {
+  .action-main:disabled,
+  .action-danger:disabled {
     @apply cursor-not-allowed opacity-40;
+  }
+  .action-danger {
+    background: rgb(var(--danger));
   }
 
   .options {

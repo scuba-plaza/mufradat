@@ -40,6 +40,8 @@ describe("deleting the audio that no clip uses", () => {
     unused().should("deep.equal", { files: 2, bytes: 16 });
     openDialog();
     cy.get(dialog).should("contain", "Delete 2 unused audio files (16 B)?").and("contain", "Cards keep every clip they use.");
+    cy.get(dialog).contains("button", "Delete").should("have.css", "background-color", "rgb(193, 63, 58)");
+    cy.get(dialog).contains("button", "Cancel").should("not.have.css", "background-color", "rgb(193, 63, 58)");
     cy.get(dialog).contains("button", "Cancel").click();
     cy.get(dialog).should("not.exist");
     unused().should("deep.equal", { files: 2, bytes: 16 });

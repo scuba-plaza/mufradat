@@ -80,7 +80,7 @@ export default function UnusedAudio({ open, onClose }: { open: boolean; onClose:
           {phase?.kind === "ask" ? (
             <>
               <button className="action" onClick={close}>Cancel</button>
-              <button className="action-main" disabled={busy} onClick={remove}>Delete</button>
+              <button className="action-danger" disabled={busy} onClick={remove}>Delete</button>
             </>
           ) : (
             <button className="action" onClick={close}>Close</button>

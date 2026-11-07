@@ -350,6 +350,8 @@ describe("a word", () => {
 });
 
 describe("resetting a word", () => {
+  afterEach(() => cy.colorScheme("light"));
+
   const editByMistake = (rank: number) => {
     openWord(rank);
     cy.get(by("Hint")).type("by mistake").blur();
@@ -364,6 +366,9 @@ describe("resetting a word", () => {
     editByMistake(205);
     cy.location("pathname").then((card) => {
       askToReset();
+      cy.get("dialog[open]").contains("button", "Reset").should("have.css", "background-color", "rgb(193, 63, 58)");
+      cy.get("dialog[open]").contains("button", "Cancel").should("not.have.css", "background-color", "rgb(193, 63, 58)");
+      cy.axe("dialog[open] .action-danger");
       cy.get("dialog[open]").should("contain", "Not started").contains("button", "Reset").click();
       cy.location("pathname").should("eq", "/");
       cy.visit(`/?q=${encodeURIComponent("rank:205")}`);
@@ -393,6 +398,16 @@ describe("resetting a word", () => {
     cy.get("dialog[open]").contains("button", "Reset").click();
     cy.location("search").should("eq", `?q=${encodeURIComponent(query)}`);
     cy.wordRow(207).should("exist");
+  });
+
+  it("shows the red confirmation with readable text in dark mode too", () => {
+    editByMistake(212);
+    cy.colorScheme("dark");
+    askToReset();
+    cy.get("dialog[open]").contains("button", "Reset")
+      .should("have.css", "background-color", "rgb(229, 115, 115)")
+      .and("have.css", "color", "rgb(25, 25, 25)");
+    cy.axe("dialog[open] .action-danger");
   });
 
   it("puts Reset word right of the word counter, with Details closed", () => {
