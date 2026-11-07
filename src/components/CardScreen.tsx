@@ -141,6 +141,10 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
     return () => window.removeEventListener("keydown", onKey);
   }, [note.id, q]);
 
+  const clips = note.forms.map((f) => note.audio[f.id]);
+  const formsState = clips.some((c) => c?.error) ? "a form has an audio error" : clips.some((c) => c?.outdated) ? "audio of a form is out of date" : clips.some((c) => !c?.key) ? "a form has no audio" : "";
+  const formsTone = clips.some((c) => c?.error) ? "border-danger" : clips.some((c) => c?.outdated) ? "border-warn" : clips.some((c) => !c?.key) ? "border-dashed border-rule-strong" : "border-rule-strong";
+
   return (
     <div className="pb-[var(--bar-h)]">
       <h1 className="sr-only">{note.lemma}</h1>
@@ -170,8 +174,8 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
           <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-2 text-center text-quiet" onSave={(hint) => save({ hint })} />
         </Clip>
         {note.forms.length > 0 ? (
-          <section aria-label="Forms" className="panel mx-auto mt-4 max-w-2xl px-3 py-2">
-            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1">
+          <section aria-label="Forms" className={`panel mx-auto mt-4 flex max-w-2xl items-center border px-2 py-2 ${formsTone}`}>
+            <div className="flex flex-1 flex-wrap items-center justify-center gap-x-6 gap-y-2 pl-9">
               {note.forms.map((f) => (
                 <div key={f.id} className="flex items-center gap-2">
                   <span className="text-xs text-quiet">{f.label}</span>
@@ -179,8 +183,13 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
                   <Clip readOnly note={note} slot={f.id} name={f.label} text={f.arabic} onNote={setNote} />
                 </div>
               ))}
-              <button className="action-quiet" aria-haspopup="dialog" onClick={() => setFormsOpen(true)}>Edit forms</button>
             </div>
+            <button className="action-quiet min-w-control-sm px-2" title="Edit forms" aria-haspopup="dialog" onClick={() => setFormsOpen(true)}>
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+              </svg>
+            </button>
+            {formsState && <span className="sr-only">{formsState}</span>}
           </section>
         ) : (
           <button className="action mt-4" aria-haspopup="dialog" onClick={() => setFormsOpen(true)}>Add forms</button>

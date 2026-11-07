@@ -30,6 +30,16 @@ describe("the layout of a card", () => {
     });
   });
 
+  describe("the height of a card", () => {
+    for (const [width, height] of [[1920, 1200], [1280, 800]]) {
+      it(`keeps a word with forms, an example and a translation well under 900px at ${width}px`, () => {
+        cy.viewport(width, height);
+        openWord(6);
+        cy.get("main").should(($main) => expect($main[0].getBoundingClientRect().height).to.be.at.most(880));
+      });
+    }
+  });
+
   describe("the order of a card", () => {
     const cards = [
       { rank: 6, what: "forms", forms: by("Forms") },
@@ -73,7 +83,7 @@ describe("the layout of a card", () => {
       below: (doc: Document) => Element | null;
     }[] = [
       { what: "the hint and Add forms", rank: 7, above: (doc) => doc.querySelector(by("Hint")), below: (doc) => byText(doc, "Add forms") },
-      { what: "the hint and Edit forms", rank: 6, above: (doc) => doc.querySelector(by("Hint")), below: (doc) => byText(doc, "Edit forms") },
+      { what: "the hint and the forms", rank: 6, above: (doc) => doc.querySelector(by("Hint")), below: (doc) => doc.querySelector(by("Forms")) },
       { what: "the English meaning and the example", rank: 7, above: (doc) => doc.querySelector(by("English meaning")), below: (doc) => doc.querySelector(`${example} button`) },
       { what: "an empty example and the English translation", rank: 7, above: (doc) => doc.querySelector(example), below: (doc) => doc.querySelector(by("Example in English")) },
       { what: "the example and its translation", rank: 110, written: true, above: (doc) => doc.querySelector(example), below: (doc) => doc.querySelector(by("Example in English")) },

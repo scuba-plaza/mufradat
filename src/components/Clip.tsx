@@ -49,7 +49,6 @@ export default function Clip(props: {
   const { note, slot, name, text } = props;
   const clip = note.audio[slot];
   const has = Boolean(clip?.key);
-  const needsWork = !has || clip.outdated;
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState("");
   const file = useRef<HTMLInputElement>(null);
@@ -84,7 +83,6 @@ export default function Clip(props: {
             <svg viewBox="0 0 10 10" width="12" height="12" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>
           </button>
         )}
-        {needsWork && <span className="text-xs text-warn">{has ? "outdated" : "no audio"}</span>}
         {problem && <span role="alert" className="text-xs text-danger">{problem}</span>}
       </span>
     );
