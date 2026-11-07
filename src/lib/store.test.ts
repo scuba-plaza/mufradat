@@ -129,6 +129,40 @@ describe("approving a card", () => {
   });
 });
 
+describe("tagging a card", () => {
+  it("keeps a card's tags, ascending, with the card", () => {
+    const s = openStore(":memory:");
+    const n = s.createNote(kitab);
+    expect(n.tags).toEqual([]);
+    expect(s.setTags(n.id, ["b", "a"]).tags).toEqual(["a", "b"]);
+    expect(s.getNote(n.id)!.tags).toEqual(["a", "b"]);
+    expect(s.allNotes()[0].tags).toEqual(["a", "b"]);
+  });
+
+  it("leaves an approved card approved and its edited time alone", () => {
+    const s = openStore(":memory:");
+    const n = s.createNote(kitab);
+    s.updateNote(n.id, { example: "هٰذَا [كِتَابٌ] جَمِيلٌ", exampleEn: "this is a nice book" });
+    s.approve(n.id);
+    const before = s.getNote(n.id)!;
+    const tagged = s.setTags(n.id, ["lesson_1"]);
+    expect(tagged.status).toBe("approved");
+    expect(tagged.updatedAt).toBe(before.updatedAt);
+  });
+
+  it("refuses an unknown card", () => {
+    expect(() => openStore(":memory:").setTags("no-such-card", ["a"])).toThrow("There is no such card.");
+  });
+
+  it("resets a tagged card", () => {
+    const s = openStore(":memory:");
+    const n = s.createNote(kitab);
+    s.setTags(n.id, ["a"]);
+    expect(() => s.deleteNote(n.id)).not.toThrow();
+    expect(s.getNote(n.id)).toBeNull();
+  });
+});
+
 describe("audio", () => {
   const other = Buffer.from([0xff, 0xfb, 0x90, 0x00, 9, 9, 9, 9]);
 
@@ -442,6 +476,22 @@ describe("the workspace version", () => {
       setVersion(dir, 0);
       const again = openStore(dir);
       expect(again.getNote(card.id)?.lemma).toBe("كِتَاب");
+      again.close();
+    });
+  });
+
+  it("opens a database made before tags and gives its cards no tags", () => {
+    inDir((dir) => {
+      const first = openStore(dir);
+      const card = first.createNote(kitab);
+      first.close();
+      const raw = new Database(path.join(dir, "vocabulary.db"));
+      raw.exec("DROP TABLE note_tags");
+      raw.pragma("user_version = 1");
+      raw.close();
+      const again = openStore(dir);
+      expect(again.getNote(card.id)!.tags).toEqual([]);
+      expect(again.setTags(card.id, ["a"]).tags).toEqual(["a"]);
       again.close();
     });
   });

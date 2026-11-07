@@ -51,6 +51,7 @@ export interface Note {
   updatedAt: string;
   forms: Form[];
   audio: Record<Slot, Clip>;
+  tags: string[];
 }
 
 export interface NewNote {

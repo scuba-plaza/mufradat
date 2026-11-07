@@ -7,7 +7,7 @@ const clip = (over: Partial<Clip> = {}): Clip => ({ key: "abc", source: "tts", t
 const bare: Note = {
   id: "1", lemma: "كِتَاب", english: "book", pos: "noun", gender: "", root: "", verbForm: "", hint: "",
   example: "", exampleEn: "", exampleError: null, rank: 120, status: "draft", lemmaSource: "wiktionary",
-  exampleSource: "", createdAt: "", updatedAt: "", forms: [], audio: {},
+  exampleSource: "", createdAt: "", updatedAt: "", forms: [], audio: {}, tags: [],
 };
 
 describe("what a card still lacks", () => {

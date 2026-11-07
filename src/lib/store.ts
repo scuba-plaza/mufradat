@@ -7,7 +7,7 @@ import { audioFiles, audioKey, audioPath, mp3Problem, slotLabel, type AudioFile 
 import { approvalProblems, plainExample } from "./validate";
 import type { AudioSource, Clip, Form, Note, NoteEdit, NewNote, POS, Slot, WorkspaceCheck } from "./types";
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS notes (
@@ -50,6 +50,11 @@ CREATE TABLE IF NOT EXISTS audio (
   error TEXT,
   PRIMARY KEY (note_id, slot)
 );
+CREATE TABLE IF NOT EXISTS note_tags (
+  note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+  tag TEXT NOT NULL,
+  PRIMARY KEY (note_id, tag)
+);
 `;
 
 interface NoteRow {
@@ -79,7 +84,7 @@ export function openStore(dir: string) {
 
   const now = () => new Date().toISOString();
 
-  function build(row: NoteRow, forms: Form[], clips: ClipRow[]): Note {
+  function build(row: NoteRow, forms: Form[], clips: ClipRow[], tags: string[]): Note {
     const text: Record<Slot, string> = { word: row.lemma, example: plainExample(row.example) };
     for (const f of forms) text[f.id] = f.arabic;
     const audio: Record<Slot, Clip> = {};
@@ -92,7 +97,7 @@ export function openStore(dir: string) {
       root: row.root, verbForm: row.verb_form, hint: row.hint, example: row.example,
       exampleEn: row.example_en, exampleError: row.example_error, rank: row.rank,
       status: row.status, lemmaSource: row.lemma_source, exampleSource: row.example_source,
-      createdAt: row.created_at, updatedAt: row.updated_at, forms, audio,
+      createdAt: row.created_at, updatedAt: row.updated_at, forms, audio, tags,
     };
   }
 
@@ -101,7 +106,8 @@ export function openStore(dir: string) {
     if (!row) return null;
     const forms = db.prepare("SELECT id, label, arabic FROM forms WHERE note_id = ? ORDER BY ord").all(id) as Form[];
     const clips = db.prepare("SELECT slot, key, source, text, error FROM audio WHERE note_id = ?").all(id) as ClipRow[];
-    return build(row, forms, clips);
+    const tags = (db.prepare("SELECT tag FROM note_tags WHERE note_id = ? ORDER BY tag").all(id) as { tag: string }[]).map((r) => r.tag);
+    return build(row, forms, clips, tags);
   }
 
   function allNotes(): Note[] {
@@ -116,8 +122,14 @@ export function openStore(dir: string) {
     };
     const forms = group(db.prepare("SELECT note_id, id, label, arabic FROM forms ORDER BY ord").all() as (Form & { note_id: string })[]);
     const clips = group(db.prepare("SELECT note_id, slot, key, source, text, error FROM audio").all() as (ClipRow & { note_id: string })[]);
+    const tags = group(db.prepare("SELECT note_id, tag FROM note_tags ORDER BY tag").all() as { note_id: string; tag: string }[]);
     return (db.prepare("SELECT * FROM notes").all() as NoteRow[]).map((row) =>
-      build(row, (forms.get(row.id) ?? []).map(({ id, label, arabic }) => ({ id, label, arabic })), clips.get(row.id) ?? []),
+      build(
+        row,
+        (forms.get(row.id) ?? []).map(({ id, label, arabic }) => ({ id, label, arabic })),
+        clips.get(row.id) ?? [],
+        (tags.get(row.id) ?? []).map((t) => t.tag),
+      ),
     );
   }
 
@@ -196,6 +208,16 @@ export function openStore(dir: string) {
       }
     })();
     return touch(id);
+  }
+
+  /** Replaces a card's tags. A tag labels a card rather than changing it, so approval and the edited time stay. */
+  function setTags(id: string, tags: readonly string[]): Note {
+    need(id);
+    db.transaction(() => {
+      db.prepare("DELETE FROM note_tags WHERE note_id = ?").run(id);
+      for (const tag of new Set(tags)) db.prepare("INSERT INTO note_tags (note_id, tag) VALUES (?, ?)").run(id, tag);
+    })();
+    return getNote(id)!;
   }
 
   function needSlot(n: Note, slot: Slot): void {
@@ -321,7 +343,7 @@ export function openStore(dir: string) {
   }
 
   return {
-    root, findNote, approvedNotes, allNotes, counts, check, exportDatabase, audioKeys, isOpen: () => db.open, close: () => db.close(), getNote, deleteNote, unusedAudio, deleteUnusedAudio, createNote, updateNote, setAudio, removeAudio, setAudioError, setExampleError,
+    root, findNote, approvedNotes, allNotes, counts, check, exportDatabase, audioKeys, isOpen: () => db.open, close: () => db.close(), getNote, deleteNote, unusedAudio, deleteUnusedAudio, createNote, updateNote, setTags, setAudio, removeAudio, setAudioError, setExampleError,
     applyGeneratedExample, approve,
   };
 }

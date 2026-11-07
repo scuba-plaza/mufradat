@@ -1,3 +1,4 @@
+import Database from "better-sqlite3";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -31,6 +32,26 @@ describe("restoring a backup through the API", () => {
     const res = await restore(snapshot.id);
     expect(res.status).toBe(200);
     expect(context().store.getNote(id)).not.toBeNull();
+  });
+
+  it("restores a backup made before tags existed, with no tags and nothing lost", async () => {
+    const { store } = context();
+    const id = openCard(store, { rank: 10 })!;
+    store.setTags(id, ["lesson_1"]);
+    const { snapshot } = await (await createBackup()).json();
+    const folder = path.join(store.root, "snapshots", snapshot.id);
+    const raw = new Database(path.join(folder, "vocabulary.db"));
+    raw.exec("DROP TABLE note_tags");
+    raw.pragma("user_version = 1");
+    raw.close();
+    const manifest = path.join(folder, "manifest.json");
+    fs.writeFileSync(manifest, JSON.stringify({ ...JSON.parse(fs.readFileSync(manifest, "utf8")), schema: 1 }));
+    store.deleteNote(id);
+    const res = await restore(snapshot.id);
+    expect(res.status).toBe(200);
+    const card = context().store.getNote(id);
+    expect(card).not.toBeNull();
+    expect(card!.tags).toEqual([]);
   });
 
   it("answers 404 for a backup that does not exist", async () => {
