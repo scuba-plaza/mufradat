@@ -10,8 +10,7 @@ export const GET = (req: Request) =>
   handle(() => {
     const { cfg, store } = context();
     const q = new URL(req.url).searchParams.get("q") ?? "";
-    const deck = store.allNotes().filter((n) => n.status === "approved");
-    let notes = deck;
+    let notes = store.allNotes().filter((n) => n.status === "approved");
     if (q.trim() !== "") {
       const found = view(store, q);
       if (found.error) return fail(found.error);
@@ -26,7 +25,7 @@ export const GET = (req: Request) =>
     };
     let apkg: Buffer<ArrayBuffer>;
     try {
-      apkg = buildApkg(notes, read, cfg, deck);
+      apkg = buildApkg(notes, read, cfg);
     } catch (e) {
       if (e instanceof MissingClipError) return fail(e.message);
       throw e;

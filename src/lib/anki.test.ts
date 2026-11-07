@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApkg } from "./anki";
 import { audioKey } from "./audio";
 import { openStore } from "./store";
@@ -20,8 +20,8 @@ function collection(apkg: Buffer) {
   const cards = db.prepare("SELECT c.ord, c.due, n.guid FROM cards c JOIN notes n ON n.id = c.nid ORDER BY n.guid, c.ord").all() as
     { ord: number; due: number; guid: string }[];
   const col = db.prepare("SELECT models, decks FROM col").get() as { models: string; decks: string };
-  const model = Object.values(JSON.parse(col.models))[0] as any;
-  const decks = Object.values(JSON.parse(col.decks)) as any[];
+  const model = Object.values(JSON.parse(col.models))[0] as { name: string; flds: { name: string }[]; tmpls: { name: string; qfmt: string; afmt: string }[]; css: string };
+  const decks = Object.values(JSON.parse(col.decks)) as { name: string; id: number }[];
   const media = JSON.parse(files.get("media")!.toString()) as Record<string, string>;
   return { files, notes, cards, model, decks, media, fieldsOf: (i: number) => Object.fromEntries(notes[i].flds.split("\x1f").map((v, j) => [FIELDS[j], v])) };
 }
@@ -50,7 +50,7 @@ describe("exporting approved cards", () => {
     const apkg = buildApkg([s.getNote(id)!], read(s), options);
     const c = collection(apkg);
     expect(c.model.name).toBe("Arabic MSA Word");
-    expect(c.model.flds.map((f: any) => f.name)).toEqual(FIELDS);
+    expect(c.model.flds.map((f) => f.name)).toEqual(FIELDS);
     const f = c.fieldsOf(0);
     const k = (n: number) => audioKey(clip(n));
     expect(f).toEqual({
@@ -99,7 +99,7 @@ describe("exporting approved cards", () => {
     const c = collection(buildApkg([s.getNote(id)!], read(s), options));
     const dir = "data/template/";
     const file = (n: string) => fs.readFileSync(dir + n, "utf8");
-    expect(c.model.tmpls.map((t: any) => t.name)).toEqual(["Recognition", "Production"]);
+    expect(c.model.tmpls.map((t) => t.name)).toEqual(["Recognition", "Production"]);
     expect(c.model.tmpls[0].qfmt).toBe(file("recognition_front.html"));
     expect(c.model.tmpls[0].afmt).toBe(file("recognition_back.html") + file("panels.html"));
     expect(c.model.tmpls[1].qfmt).toBe(file("production_front.html"));
@@ -120,22 +120,30 @@ describe("exporting approved cards", () => {
     const due = (lemma: string) => c.cards.filter((x) => x.guid === notes.find((n) => n.lemma === lemma)!.id).map((x) => [x.ord, x.due]);
     expect(due("أَ")).toEqual([[0, 1000], [1, 1020]]);
     expect(due("بَ")).toEqual([[0, 1001]]);
-    expect([due("جَ")[0][1], due("دَ")[0][1]].sort()).toEqual([10001, 10002]);
+    for (const lemma of ["جَ", "دَ"]) expect(due(lemma)[0][1]).toBeLessThan(1_000_000);
   });
 
-  it("gives a card without a rank the same due in an export of part of the deck as in the whole", () => {
-    const s = openStore(":memory:");
-    const make = (lemma: string) => {
-      const n = s.createNote({ lemma, english: "x", pos: "noun", rank: 0 });
-      s.approve(n.id);
-      return s.getNote(n.id)!;
-    };
-    const deck = [make("جَ"), make("دَ"), make("هَ")];
-    const whole = collection(buildApkg(deck, read(s), options));
-    const part = collection(buildApkg([deck[2]], read(s), options, deck));
-    const dueOf = (c: ReturnType<typeof collection>, n: Note) => c.cards.filter((x) => x.guid === n.id).map((x) => x.due);
-    expect(dueOf(part, deck[2])).toEqual(dueOf(whole, deck[2]));
-    expect(dueOf(whole, deck[2])[0]).toBeLessThan(1_000_000);
+  describe("a card without a rank", () => {
+    afterEach(() => vi.useRealTimers());
+
+    it("is due by the hour it was made, so that it is the same in any export and below 1,000,000", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      const s = openStore(":memory:");
+      const make = (lemma: string, at: string) => {
+        vi.setSystemTime(new Date(at));
+        const n = s.createNote({ lemma, english: "x", pos: "noun", rank: 0 });
+        s.approve(n.id);
+        return s.getNote(n.id)!;
+      };
+      const first = make("جَ", "2026-11-07T12:30:00Z");
+      const second = make("دَ", "2026-11-07T14:10:00Z");
+      const dueOf = (c: ReturnType<typeof collection>, n: Note) => c.cards.filter((x) => x.guid === n.id).map((x) => x.due);
+      const whole = collection(buildApkg([first, second], read(s), options));
+      const part = collection(buildApkg([second], read(s), options));
+      expect(dueOf(whole, first)).toEqual([26212]);
+      expect(dueOf(whole, second)).toEqual([26214]);
+      expect(dueOf(part, second)).toEqual([26214]);
+    });
   });
 
   it("writes the review log in the table layout Anki reads, so that learning progress can be imported", () => {
@@ -143,6 +151,10 @@ describe("exporting approved cards", () => {
     const files = unzip(buildApkg([s.getNote(id)!], read(s), options));
     const db = new Database(files.get("collection.anki2")!);
     expect(db.prepare("SELECT id, cid, usn, ease, cast(ivl AS integer), cast(lastIvl AS integer), factor, time, type FROM revlog").all()).toEqual([]);
+    expect(db.pragma("table_info(revlog)")).toMatchObject([
+      { name: "id" }, { name: "cid" }, { name: "usn" }, { name: "ease" }, { name: "ivl" },
+      { name: "lastIvl" }, { name: "factor" }, { name: "time" }, { name: "type" },
+    ]);
   });
 
   it("packs the font and exactly the audio the cards use", () => {
