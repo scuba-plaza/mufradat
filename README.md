@@ -14,12 +14,12 @@ With Nix: `nix build`; the flake's `overlays.default` adds `mufradat` to nixpkgs
 ## The flow
 
 1. Press Continue on the home page to pick up where you left off: the card you edited last that is not approved, or, when none is left, the most frequent word you have not started. You can also pick a word from the list or find it with the search bar. Opening a word creates its bare card from Wiktionary.
-2. Edit the card where it is shown. Text saves when you leave it or press Enter. Regenerating never overwrites what you typed. The lexical fields (part of speech, gender, root, verb form) are under Details, closed until you open them. The forms are edited in a dialog: Edit forms. Reset word, the ↺ button right of the word counter at the top of the card, asks first, takes a backup (and does nothing if that backup cannot be made), and then deletes the card with its example, forms and audio clip rows, so that the word is back to Not started (an approved card leaves the export, a word you added outside the frequency list leaves the list and is found again by searching for it); the audio files stay in the workspace until Delete unused audio (step 6) removes them.
-3. Optionally generate an example (Mistral), and generate or upload audio per clip (Google TTS, MP3 upload). A clip that has audio shows a play button and an options button with Generate again, Upload MP3… and Remove audio; removing a clip takes the card's approval back and leaves the audio file in place until Delete unused audio (step 6). A failure is shown under its text and changes nothing else. The bar at the bottom says what the card still needs.
+2. Edit the card where it is shown. Text saves when you leave it or press Enter. Regenerating never overwrites what you typed. The lexical fields (part of speech, gender, root, verb form) are under Details, closed until you open them. The forms are edited in a dialog: Edit forms. Reset word, the ↺ button right of the word counter at the top of the card, asks first, takes a backup (and does nothing if that backup cannot be made), and then deletes the card with its example, forms and audio clip rows, so that the word is back to Not started (an approved card leaves the export, a word you added outside the frequency list leaves the list and is found again by searching for it); the audio files stay in the workspace until Prune audio (step 6) removes them.
+3. Optionally generate an example (Mistral), and generate or upload audio per clip (Google TTS, MP3 upload). A clip that has audio shows a play button and an options button with Generate again, Upload MP3… and Remove audio; removing a clip takes the card's approval back and leaves the audio file in place until Prune audio (step 6). A failure is shown under its text and changes nothing else. The bar at the bottom says what the card still needs.
    Mistral names the word of the card in its sentence and the app marks it, also when it is attached to another word (بِالْقَلَمِ) or has another ending. When the word cannot be told for certain the sentence is kept unmarked and the card says so: select the word and choose Mark target.
 4. Approve and next. Editing an approved card takes the approval back.
 5. Export, from the menu (the ⋯ button at the right of the top bar): every approved card as one Anki package, handed to your browser to save where you choose. Nothing is written to the workspace. The same cards always give the same bytes.
-6. Now and then, Delete unused audio…, in the menu (the ⋯ button at the right of the top bar). Audio files are named by the hash of their bytes and are never deleted when a clip is removed or replaced, a form is removed or a word is reset, so they pile up. It counts the files that no clip refers to, asks, and deletes only those; a clip whose text changed since it was made still refers to its file, so that file is kept.
+6. Now and then, Prune audio, in the menu (the ⋯ button at the right of the top bar). Audio files are named by the hash of their bytes and are never deleted when a clip is removed or replaced, a form is removed or a word is reset, so they pile up. It counts the files that no clip refers to, asks, and deletes only those; a clip whose text changed since it was made still refers to its file, so that file is kept.
 
 ## The search bar
 
@@ -45,7 +45,7 @@ A term the bar cannot read, or a quote that is not closed, is named under the ba
 
 ## Backups
 
-Backups… in the menu (the ⋯ button at the right of the top bar) opens the list of backups. A backup is the whole workspace at one moment: the database and every audio clip it needs, so a restore never needs audio generated again.
+Backups in the menu (the ⋯ button at the right of the top bar) opens the list of backups. A backup is the whole workspace at one moment: the database and every audio clip it needs, so a restore never needs audio generated again.
 
 - Taken automatically, with no setting: once a day, on the first visit of the day that finds cards; and just before Reset word and just before a restore. Back up now takes one when you want it.
 - Kept: the newest 14 daily backups, the newest 14 of those taken before a reset or a restore, and at most 1 GiB for all of these together; a clip that several backups share counts once. The newest backup of each of those kinds is kept even when it alone is over the limit. Backups made with Back up now, and imported ones, are never removed on their own and do not count toward the limit.
@@ -53,7 +53,7 @@ Backups… in the menu (the ⋯ button at the right of the top bar) opens the li
 - The dialog also names any clip whose audio file is missing from the workspace, with a link to its card, and any problem the database reports about itself.
 - Download saves a backup as one zip file with the database, a manifest and every clip, so a copy can live somewhere other than this computer. The dialog says when you last downloaded one; a download that is cancelled part way does not count.
 - Import backup… takes such a zip, checks it (it must be a whole, consistent backup of this app, from this or an older version) and adds it to the list as an Imported backup; it changes nothing by itself. Restore then brings the workspace to it, which is how a new computer or an empty workspace gets the cards and the audio back. A backup can be hundreds of megabytes; the limit is 3 GiB.
-- Delete unused audio never touches a backup's own copies of the audio.
+- Prune audio never touches a backup's own copies of the audio.
 - These backups are on this computer. Copying the workspace folder copies them too.
 
 ## Layout

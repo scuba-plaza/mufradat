@@ -54,7 +54,7 @@ describe("the menu", () => {
       cy.get(trigger).then(($button) => {
         cy.get("header .topbar-inner").then(($bar) => {
           const bar = $bar[0].getBoundingClientRect();
-          const inside = bar.right - parseFloat(getComputedStyle($bar[0]).paddingRight);
+          const inside = bar.right - parseFloat(getComputedStyle($bar[0]).paddingRight) - parseFloat(getComputedStyle($button[0]).marginRight);
           expect(Math.abs($button[0].getBoundingClientRect().right - inside)).to.be.at.most(1);
         });
       });
@@ -82,11 +82,32 @@ describe("the menu", () => {
     cy.focused().should("have.attr", "aria-label", "Menu");
   });
 
-  it("has Backups… and Delete unused audio… in the menu and nothing of them on the page", () => {
+  it("has Backups and Prune audio in the menu and nothing of them on the page", () => {
     openMenu();
-    cy.get(popover).should("contain", "Backups…").and("contain", "Delete unused audio…");
-    cy.get("main").should("not.contain", "Backups").and("not.contain", "Delete unused audio");
+    cy.get(popover).should("contain", "Backups").and("contain", "Prune audio");
+    cy.get("main").should("not.contain", "Backups").and("not.contain", "Prune audio");
   });
+
+  it("lists Export, Backups, Prune audio and Keyboard shortcuts in that order", () => {
+    openMenu();
+    cy.get(`${popover} .options-item`).then(($items) => {
+      expect([...$items].map((item) => item.textContent)).to.deep.equal(["Export", "Backups", "Prune audio", "Keyboard shortcuts"]);
+    });
+  });
+
+  for (const [width, height] of [[1280, 800], [390, 844]]) {
+    it(`puts a small margin around the button at ${width}px`, () => {
+      cy.viewport(width, height);
+      cy.visit("/");
+      cy.hydrated(trigger);
+      cy.get(trigger).then(($button) => {
+        const style = getComputedStyle($button[0]);
+        for (const side of [style.marginTop, style.marginRight, style.marginBottom, style.marginLeft]) {
+          expect(parseFloat(side)).to.be.within(3, 6);
+        }
+      });
+    });
+  }
 });
 
 const status = "header .topbar-inner > [role=\"status\"]";

@@ -40,7 +40,7 @@ describe("restoring a snapshot", () => {
     expect(back.getNote(card.id)?.forms.map((f) => [f.label, f.arabic])).toEqual([["pl.", "كُتُب"]]);
   });
 
-  it("plays the card's clip after a restore, also after Delete unused audio", () => {
+  it("plays the card's clip after a restore, also after Prune audio", () => {
     const { root, store } = workspace();
     const card = store.createNote(kitab);
     store.setAudio(card.id, "word", mp3, "tts");

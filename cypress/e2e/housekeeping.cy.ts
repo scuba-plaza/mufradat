@@ -25,7 +25,7 @@ function withClip(rank: number, keep: boolean, length = 8) {
 
 function openDialog() {
   cy.visit("/");
-  cy.menuItem("Delete unused audio");
+  cy.menuItem("Prune audio");
   cy.get(dialog);
 }
 
@@ -45,13 +45,13 @@ describe("deleting the audio that no clip uses", () => {
     cy.get(dialog).contains("button", "Cancel").click();
     cy.get(dialog).should("not.exist");
     unused().should("deep.equal", { files: 2, bytes: 16 });
-    cy.menuItem("Delete unused audio");
+    cy.menuItem("Prune audio");
     cy.get(dialog).contains("button", "Delete").click();
     cy.get(dialog).should("contain", "Deleted 2 audio files (16 B).");
     unused().should("deep.equal", { files: 0, bytes: 0 });
     cy.get(dialog).contains("button", "Close").click();
     cy.get(dialog).should("not.exist");
-    cy.menuItem("Delete unused audio");
+    cy.menuItem("Prune audio");
     cy.get(dialog).should("contain", "No unused audio files.");
   });
 
@@ -94,7 +94,7 @@ describe("deleting the audio that no clip uses", () => {
       withClip(306, false);
       cy.visit("/");
       cy.document().should((doc) => expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth));
-      cy.menuItem("Delete unused audio");
+      cy.menuItem("Prune audio");
       cy.get(dialog).should(($dialog) => {
         const box = $dialog[0].getBoundingClientRect();
         expect(box.left).to.be.at.least(0);
@@ -112,19 +112,19 @@ describe("deleting the audio that no clip uses", () => {
     openDialog();
     cy.get(dialog).contains("button", "Cancel").click();
     closedWithFocusOnMenu();
-    cy.menuItem("Delete unused audio");
+    cy.menuItem("Prune audio");
     cy.get(dialog).contains("button", "Delete").click();
     cy.get(dialog).contains("button", "Close").click();
     closedWithFocusOnMenu();
-    cy.menuItem("Delete unused audio");
+    cy.menuItem("Prune audio");
     cy.get(dialog).should("contain", "No unused audio files.");
     cy.pressEscape();
     closedWithFocusOnMenu();
-    cy.menuItem("Delete unused audio");
+    cy.menuItem("Prune audio");
     cy.get(dialog).should("contain", "No unused audio files.");
     cy.clickBackdrop();
     closedWithFocusOnMenu();
-    cy.menuItem("Delete unused audio");
+    cy.menuItem("Prune audio");
     cy.get(dialog);
   });
 });
