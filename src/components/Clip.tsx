@@ -61,6 +61,8 @@ export default function Clip(props: {
   const id = `${note.id}/${slot}`;
   const isPlaying = useSyncExternalStore(player.subscribe, () => player.playing() === id, () => false);
 
+  const playLabel = isPlaying ? `Playing ${name}` : `Play ${name}`;
+
   function enqueue(key: string, onError: () => void) {
     player.enqueue({ id, url: `/api/audio/${note.id}/${slot}?k=${key}`, onError });
   }
@@ -95,7 +97,7 @@ export default function Clip(props: {
     return (
       <span role="group" aria-label={`Audio for ${name}`} className="inline-flex min-h-control-sm items-center gap-1">
         {has && (
-          <button className="action-quiet min-w-control-sm px-2 disabled:opacity-100" aria-label={isPlaying ? `Playing ${name}` : `Play ${name}`} disabled={isPlaying} onClick={play}>
+          <button className="action-quiet min-w-control-sm px-2 disabled:opacity-100" aria-label={playLabel} disabled={isPlaying} onClick={play}>
             <svg viewBox="0 0 10 10" width="12" height="12" aria-hidden="true" className={isPlaying ? "animate-pulse" : undefined}><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>
           </button>
         )}
@@ -116,7 +118,7 @@ export default function Clip(props: {
       aria-label={`Audio for ${name}`}
       className={`flex items-center rounded-full border bg-paper p-0.5 ${props.inline ? "" : "row-start-1 m-1 justify-self-center sm:col-start-3 sm:flex-col sm:justify-self-end"} ${tone}`}
     >
-      <RailButton icon={isPlaying ? "playing" : "play"} title={isPlaying ? `Playing ${name}` : `Play ${name}`} disabled={isPlaying || (!has && !working)} busy={working} active={isPlaying} onClick={() => !working && play()} />
+      <RailButton icon={isPlaying ? "playing" : "play"} title={playLabel} disabled={isPlaying || (!has && !working)} busy={working} active={isPlaying} onClick={() => !working && play()} />
       <RailButton
         icon={has ? "regenerate" : "generate"}
         title={clip?.outdated ? "Regenerate (the Arabic changed)" : has ? "Regenerate" : "Generate"}
@@ -124,7 +126,10 @@ export default function Clip(props: {
         onClick={generateNow}
       />
       <RailButton icon="upload" title="Upload" disabled={working || !canGenerate} onClick={() => file.current?.click()} />
-      <RailButton icon="remove" title="Remove" disabled={working || !has} onClick={() => run(() => api(`/api/audio/${note.id}/${slot}`, { method: "DELETE" }))} />
+      <RailButton icon="remove" title="Remove" disabled={working || !has} onClick={() => {
+            player.forget(id);
+            run(() => api(`/api/audio/${note.id}/${slot}`, { method: "DELETE" }));
+          }} />
       {props.extra && (
         <>
           <span aria-hidden="true" className={`mx-px h-4 w-px bg-rule-strong/60 ${props.inline ? "" : "sm:mx-0 sm:my-px sm:h-px sm:w-4"}`} />
@@ -132,7 +137,7 @@ export default function Clip(props: {
         </>
       )}
       {state && <span className="sr-only">{state}</span>}
-      <span role="status" className="sr-only">{working ? "Working…" : ""}</span>
+      <span role="status" className="sr-only">{working ? "Working…" : isPlaying ? "Playing" : ""}</span>
       <input
         ref={file}
         type="file"

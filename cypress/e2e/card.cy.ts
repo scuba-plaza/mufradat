@@ -113,12 +113,11 @@ describe("a word", () => {
     cy.get(`textarea${by("Example")}`).type("الْكِتَابُ فِي الْحَقِيبَةِ");
     selectInExample("كِتَاب");
     selectInExample("حَقِيب");
-    cy.wait(1500);
     cy.get(`textarea${by("Example")}`).should("have.value", "الْكِتَابُ فِي الْحَقِيبَةِ").blur();
     cy.get(`${by("Example")} mark`).should("have.text", "حَقِيب");
   });
 
-  it("takes the mark away when its letters are selected again and the field is left, and keeps it away", () => {
+  it("keeps the mark when its own letters are selected and the field is left", () => {
     openWord(18);
     cy.get(by("Example")).click();
     cy.get(`textarea${by("Example")}`).type("الْكِتَابُ فِي الْحَقِيبَةِ");
@@ -128,8 +127,7 @@ describe("a word", () => {
     cy.get(by("Example")).click();
     selectInExample("حَقِيب");
     cy.get(`textarea${by("Example")}`).blur();
-    cy.get(`${by("Example")} mark`).should("not.exist");
-    cy.contains("It is not clear which word to highlight");
+    cy.get(`${by("Example")} mark`).should("have.text", "حَقِيب");
   });
 
   it("says when it is not clear which word of the example to highlight, until you mark it", () => {

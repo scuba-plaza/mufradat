@@ -48,8 +48,8 @@ describe("marking the letters that are selected", () => {
     expect(marked("لَدَيْهِ [كِتَابٌ] جَمِيلٌ", "جَمِيلٌ")).toBe("لَدَيْهِ كِتَابٌ [جَمِيلٌ]");
   });
 
-  it("takes the mark away when its letters are selected again", () => {
-    expect(marked("لَدَيْهِ [كِتَابٌ] جَمِيلٌ", "كِتَابٌ")).toBe("لَدَيْهِ كِتَابٌ جَمِيلٌ");
+  it("keeps the mark when its own letters are selected", () => {
+    expect(marked("لَدَيْهِ [كِتَابٌ] جَمِيلٌ", "كِتَابٌ")).toBe("لَدَيْهِ [كِتَابٌ] جَمِيلٌ");
   });
 
   it("leaves out the spaces around the selection", () => {

@@ -122,7 +122,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
   }
 
   useEffect(() => {
-    const play = (name: string) => document.querySelector<HTMLButtonElement>(`button[title="Play ${name}"]`)?.click();
+    const play = (name: string) => document.querySelector<HTMLButtonElement>(`button[title="Play ${name}"], button[title="Playing ${name}"]`)?.click();
     const go = (direction: "previous" | "next") =>
       later(async () => {
         try {

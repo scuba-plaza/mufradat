@@ -133,7 +133,7 @@ export function markSelection(draft: string, start: number, end: number): string
   while (to > from && /\s/.test(plain[to - 1])) to--;
   if (from === to || (from === 0 && to === plain.length)) return draft;
   const parts = splitExample(draft);
-  if (parts && from === parts.before.length && to === from + parts.target.length) return plain;
+  if (parts && from === parts.before.length && to === from + parts.target.length) return draft;
   return wrap(plain, from, to);
 }
 

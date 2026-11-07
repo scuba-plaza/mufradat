@@ -7,12 +7,13 @@ export interface Clip {
 interface Sound {
   onended: ((event: Event) => unknown) | null;
   onerror: ((event: Event | string) => unknown) | null;
+  onpause?: ((event: Event) => unknown) | null;
   play(): Promise<void>;
 }
 
 export function createPlayer(make: (url: string) => Sound) {
   let current: Clip | null = null;
-  const waiting: Clip[] = [];
+  let waiting: Clip[] = [];
   const listeners = new Set<() => void>();
   const tell = () => listeners.forEach((listen) => listen());
 
@@ -23,22 +24,33 @@ export function createPlayer(make: (url: string) => Sound) {
     const finish = (failed: boolean) => {
       if (over) return;
       over = true;
-      if (failed) clip.onError();
       current = null;
-      const next = waiting.shift();
-      if (next) start(next);
-      else tell();
+      try {
+        if (failed) clip.onError();
+      } finally {
+        const next = waiting.shift();
+        if (next) start(next);
+        else tell();
+      }
     };
-    const sound = make(clip.url);
-    sound.onended = () => finish(false);
-    sound.onerror = () => finish(true);
-    sound.play().catch(() => finish(true));
+    try {
+      const sound = make(clip.url);
+      sound.onended = () => finish(false);
+      sound.onpause = () => finish(false);
+      sound.onerror = () => finish(true);
+      sound.play().catch(() => finish(true));
+    } catch {
+      finish(true);
+    }
   }
 
   return {
     enqueue(clip: Clip) {
-      if (current) waiting.push(clip);
-      else start(clip);
+      if (!current) return start(clip);
+      waiting = [...waiting.filter((w) => w.id !== clip.id), clip];
+    },
+    forget(id: string) {
+      waiting = waiting.filter((w) => w.id !== id);
     },
     playing: () => current?.id ?? null,
     subscribe(listen: () => void) {
