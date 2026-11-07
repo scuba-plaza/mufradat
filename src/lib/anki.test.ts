@@ -91,6 +91,26 @@ describe("exporting approved cards", () => {
     });
   });
 
+  it("writes a card's tags after its pos and rank tags", () => {
+    const { s, id } = approvedStore();
+    s.setTags(id, ["lesson_1", "grammar"]);
+    expect(collection(buildApkg([s.getNote(id)!], read(s), options)).notes[0].tags).toBe(" pos::noun rank::0001-0500 grammar lesson_1 ");
+  });
+
+  it("does not repeat a tag the deck already has", () => {
+    const { s, id } = approvedStore();
+    s.setTags(id, ["pos::noun"]);
+    expect(collection(buildApkg([s.getNote(id)!], read(s), options)).notes[0].tags).toBe(" pos::noun rank::0001-0500 ");
+  });
+
+  it("gives the same bytes whatever order the tags were set in", () => {
+    const { s, id } = approvedStore();
+    s.setTags(id, ["lesson_1", "grammar"]);
+    const first = buildApkg([s.getNote(id)!], read(s), options);
+    s.setTags(id, ["grammar", "lesson_1"]);
+    expect(buildApkg([s.getNote(id)!], read(s), options).equals(first)).toBe(true);
+  });
+
   it("keeps the card templates and styling of the existing note type", () => {
     const { s, id } = approvedStore();
     const c = collection(buildApkg([s.getNote(id)!], read(s), options));

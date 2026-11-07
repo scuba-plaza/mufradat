@@ -186,7 +186,7 @@ export function buildApkg(notes: Note[], readAudio: (key: string, place: ClipPla
       v.Production = "y";
       cards.push({ ord: 1, due: due + PRODUCTION_DELAY });
     }
-    return { n, v, cards, mod: Math.floor(Date.parse(n.updatedAt) / 1000), tags: ["pos::" + n.pos, rankBucket(n.rank)] };
+    return { n, v, cards, mod: Math.floor(Date.parse(n.updatedAt) / 1000), tags: [...new Set(["pos::" + n.pos, rankBucket(n.rank), ...n.tags])] };
   });
 
   const created = opts.deckId;
