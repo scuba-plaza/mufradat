@@ -98,12 +98,12 @@ export default function Clip(props: {
 
   return (
     <div>
-      <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center lg:grid-cols-[3.2rem_minmax(0,1fr)_3.2rem]">
-        <div className={`col-start-2 row-start-1 flex flex-col justify-center ${props.extra ? "min-h-[137px] lg:min-h-[181px]" : "min-h-[110px] lg:min-h-[146px]"}`}>{props.children}</div>
+      <div className="grid grid-cols-1 items-center sm:grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] lg:grid-cols-[3.2rem_minmax(0,1fr)_3.2rem]">
+        <div className={`row-start-2 flex flex-col justify-center sm:col-start-2 sm:row-start-1 ${props.extra ? "sm:min-h-[137px] lg:min-h-[181px]" : "sm:min-h-[110px] lg:min-h-[146px]"}`}>{props.children}</div>
         <div
           role="group"
           aria-label={`Audio for ${name}`}
-          className={`col-start-3 row-start-1 flex flex-col items-center m-1 justify-self-end rounded-full border bg-paper p-0.5 ${tone}`}
+          className={`row-start-1 m-1 flex items-center justify-self-center sm:col-start-3 sm:flex-col sm:justify-self-end rounded-full border bg-paper p-0.5 ${tone}`}
         >
           <RailButton icon="play" title={`Play ${name}`} disabled={!has && !working} busy={working} onClick={() => !working && play()} />
           <RailButton
@@ -116,7 +116,7 @@ export default function Clip(props: {
           <RailButton icon="remove" title="Remove" disabled={working || !has} onClick={() => run(() => api(`/api/audio/${note.id}/${slot}`, { method: "DELETE" }))} />
           {props.extra && (
             <>
-              <span role="separator" aria-orientation="horizontal" className="my-px h-px w-4 bg-rule-strong/60" />
+              <span role="separator" className="mx-px h-4 w-px bg-rule-strong/60 sm:mx-0 sm:my-px sm:h-px sm:w-4" />
               <RailButton icon="newExample" title={props.extra.label} disabled={working} onClick={props.extra.onSelect} />
             </>
           )}

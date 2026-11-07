@@ -248,7 +248,7 @@ describe("a word", () => {
     });
 
     for (const [width, height] of [[1280, 800], [390, 844]]) {
-      it(`keeps the text centred, the capsule in one column of 24px buttons and no taller than its field at ${width}px`, () => {
+      it(`keeps the text centred and the pills of 24px buttons, as ${width > 640 ? "a column at the right of" : "a row above"} the field, at ${width}px`, () => {
         cy.viewport(width, height);
         openWord(42);
         cy.location("pathname").then((path) => {
@@ -263,18 +263,17 @@ describe("a word", () => {
           for (const field of [by("Arabic headword"), by("Hint"), by("Example in English")]) {
             expect(Math.abs(middle(field) - meaning), `${field} against the meaning`).to.be.at.most(1);
           }
-          for (const group of [word, example]) {
+          const fields = [[word, by("Arabic headword")], [example, `div${by("Example")}`]];
+          for (const [group, field] of fields) {
             const buttons = Array.from(doc.querySelectorAll(`${group} button`)).map((button) => button.getBoundingClientRect());
-            expect(new Set(buttons.map((box) => Math.round(box.left))).size, `${group} is one column`).to.equal(1);
+            const axis = width > 640 ? "left" : "top";
+            expect(new Set(buttons.map((box) => Math.round(box[axis]))).size, `${group} shares one ${axis}`).to.equal(1);
             buttons.forEach((box) => {
               expect(box.height, `${group} button height`).to.be.at.least(24);
               expect(box.width, `${group} button width`).to.be.at.least(24);
             });
-          }
-          for (const group of [word, example]) {
-            const capsule = rect(group).height;
-            const field = doc.querySelector(group)!.previousElementSibling!.getBoundingClientRect().height;
-            expect(capsule, `the capsule of ${group} against its field`).to.be.at.most(field);
+            if (width > 640) expect(rect(group).left, `${group} right of its field`).to.be.at.least(rect(field).right - 1);
+            else expect(rect(group).bottom, `${group} above its field`).to.be.at.most(rect(field).top);
           }
         });
       });
