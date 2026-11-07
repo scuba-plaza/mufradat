@@ -17,8 +17,8 @@ function fontLoaded($el: JQuery<HTMLElement>) {
 describe("the look of the pages", () => {
   it("keeps list rows compact, so a page of words is quick to scan", () => {
     cy.visit("/");
-    cy.get(`${list} > li`).should("have.length", 100);
-    cy.get(list).invoke("outerHeight").should("be.lessThan", 4800);
+    cy.get(`${list} > li`).should("have.length", 30);
+    cy.get(list).invoke("outerHeight").should("be.lessThan", 1440);
   });
 
   it("keeps the card's actions at the bottom of the window while the page scrolls", () => {

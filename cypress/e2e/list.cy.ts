@@ -37,9 +37,9 @@ describe("the words page", () => {
     cy.contains(/\d+ approved · \d+ in progress · \d+ ready/);
   });
 
-  it("shows one page of 100 words", () => {
+  it("shows one page of 30 words", () => {
     cy.visit("/");
-    cy.get(rows).should("have.length", 100);
+    cy.get(rows).should("have.length", 30);
     cy.contains(/Page 1 of \d+/);
   });
 
@@ -56,7 +56,7 @@ describe("the words page", () => {
       cy.get(pager).first().contains("a", "Next").click();
       cy.location("search").should("eq", "?page=2");
       cy.contains(/Page 2 of \d+/);
-      cy.get(rows).should("have.length", 100);
+      cy.get(rows).should("have.length", 30);
       cy.get(rows).first().invoke("text").should("not.eq", first);
       cy.get(pager).first().contains("a", "Previous").click();
       cy.contains(/Page 1 of \d+/);
@@ -269,7 +269,7 @@ describe("the search bar", () => {
     cy.visit(typed("pos:noun"));
     cy.get(pager).first().contains("a", "Next").click();
     cy.location("search").should("eq", "?q=pos%3Anoun&page=2");
-    cy.get(rows).should("have.length", 100);
+    cy.get(rows).should("have.length", 30);
     cy.get(pager).first().contains("a", "First").click();
     cy.location("search").should("eq", "?q=pos%3Anoun");
   });

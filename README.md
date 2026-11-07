@@ -66,7 +66,7 @@ On a word, while no field has focus and no dialog is open: Ctrl+← and Ctrl+→
 
 ## Pages
 
-- `/` every word, 100 a page, found with the search bar. With nothing typed: the cards you are working on first (latest edit on top, "in progress" or "ready"), then the words you have not started by frequency, then the approved ones. The tabs above the list show how many words are in each state and filter by it. A card made outside the frequency list shows a dash for its rank. `/?q=…&page=N` is a query and a page
+- `/` every word, 30 a page, found with the search bar. With nothing typed: the cards you are working on first (latest edit on top, "in progress" or "ready"), then the words you have not started by frequency, then the approved ones. The tabs above the list show how many words are in each state and filter by it. A card made outside the frequency list shows a dash for its rank. `/?q=…&page=N` is a query and a page
 - `/next` goes to the card Continue opens, creating it the first time
 - `/cards/<id>` one card
 - `/open?rank=N` and `/open?lemma=…&pos=…` go to a word's card, creating it the first time

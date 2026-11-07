@@ -9,7 +9,7 @@ import { context } from "@/lib/server";
 import type { WordStatus } from "@/lib/types";
 import { continueFrom, rowHref, view, wordRows } from "@/lib/words";
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 30;
 
 const TABS = [
   { label: "All", query: "", status: null },
