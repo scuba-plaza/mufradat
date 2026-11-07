@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase: URL.canParse(origin) ? new URL(origin) : undefined,
     title: { default: "Mufradat", template: "%s · Mufradat" },
-    description: "Build one Modern Standard Arabic Anki deck, one card at a time.",
+    description: "Build your Modern Standard Arabic Anki deck, one card at a time.",
   };
 }
 export const viewport: Viewport = {

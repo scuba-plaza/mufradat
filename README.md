@@ -1,6 +1,6 @@
 # Mufradat
 
-A local web app for building one Modern Standard Arabic Anki deck, one card at a time.
+A local web app for building your Modern Standard Arabic Anki deck, one card at a time.
 Nothing is generated or paid for unless you press the button for it.
 
 ## Run

@@ -1,1 +1,1 @@
-Mufradat: build one Arabic Anki deck, one card at a time.
+Mufradat: build your Arabic Anki deck, one card at a time.

@@ -38,7 +38,7 @@ Mine (overrule any of them):
 - `pnpm typecheck` and `pnpm test` green before every commit; the specs named in the task green; read exit statuses. README updated in the commit that changes behaviour.
 - Copy, exact: menu items in this order `Export`, `Backups`, `Prune audio`, `Keyboard shortcuts`; status `Preparing the deck…`, `Exported 3 cards.` (`Exported 1 card.`); refusal text is the server's.
 - The download is named `arabic-deck-YYYY-MM-DD.apkg`; the export route writes nothing under the workspace.
-- Icons: files under `src/app/` only; no new dependency; the share image alt text is "Mufradat: build one Arabic Anki deck, one card at a time."
+- Icons: files under `src/app/` only; no new dependency; the share image alt text is "Mufradat: build your Arabic Anki deck, one card at a time."
 
 ## Review Focus
 
@@ -104,7 +104,7 @@ Create: `src/app/favicon.ico`, `icon.svg`, `apple-icon.png`, `opengraph-image.pn
 
 **Interfaces:**
 - Produces: `src/app/favicon.ico` (16, 32, 48px), `icon.svg` (the vector favicon), `apple-icon.png` (180×180, square), `opengraph-image.png` and `twitter-image.png` (1200×630), `opengraph-image.alt.txt`.
-- Produces: `layout.tsx` gains `export const viewport` with `theme-color` `#ffffff` (light) and `#191919` (dark), the page backgrounds; its metadata gains `description: "Build one Modern Standard Arabic Anki deck, one card at a time."` and an asynchronous `generateMetadata` whose `metadataBase` is the request's origin (from `headers()`).
+- Produces: `layout.tsx` gains `export const viewport` with `theme-color` `#ffffff` (light) and `#191919` (dark), the page backgrounds; its metadata gains `description: "Build your Modern Standard Arabic Anki deck, one card at a time."` and an asynchronous `generateMetadata` whose `metadataBase` is the request's origin (from `headers()`).
 
 - [ ] **Step 1: Write the failing test** in `icons.cy.ts`: visiting `/`, the document has `link[rel="icon"]` for `/favicon.ico` and `/icon.svg`, a `link[rel="apple-touch-icon"]` (180×180), `meta[property="og:image"]` (with `og:image:width` 1200 and `height` 630) and `meta[name="twitter:card"]` with `summary_large_image`; each `href` or `content` URL answers 200 with the expected type (`image/png`, `image/x-icon`), and the PNG header (IHDR) of the share image says 1200×630 and of `icon.png` 512×512.
 - [ ] **Step 2: Run `icons.cy.ts`.** Expected: red (no tags yet).

@@ -54,10 +54,10 @@ describe("the icons and the share image", () => {
   it("gives a link preview its description and a 1200 by 630 image that resolves", () => {
     cy.request({ url: "/", headers: crawler }).then(({ body }) => {
       const html = body as string;
-      expect(tag(html, /<meta property="og:description" content="([^"]*)"/)).to.equal("Build one Modern Standard Arabic Anki deck, one card at a time.");
+      expect(tag(html, /<meta property="og:description" content="([^"]*)"/)).to.equal("Build your Modern Standard Arabic Anki deck, one card at a time.");
       expect(tag(html, /<meta property="og:image:width" content="([^"]*)"/)).to.equal("1200");
       expect(tag(html, /<meta property="og:image:height" content="([^"]*)"/)).to.equal("630");
-      expect(tag(html, /<meta property="og:image:alt" content="([^"]*)"/)).to.equal("Mufradat: build one Arabic Anki deck, one card at a time.");
+      expect(tag(html, /<meta property="og:image:alt" content="([^"]*)"/)).to.equal("Mufradat: build your Arabic Anki deck, one card at a time.");
       expect(tag(html, /<meta name="twitter:card" content="([^"]*)"/)).to.equal("summary_large_image");
       for (const pattern of [/<meta property="og:image" content="([^"]*)"/, /<meta name="twitter:image" content="([^"]*)"/]) {
         const url = tag(html, pattern)!;
