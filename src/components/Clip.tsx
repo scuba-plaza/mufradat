@@ -6,7 +6,7 @@ import Spinner from "./Spinner";
 
 const ICONS = {
   play: <path d="M7 4l13 8-13 8z" fill="currentColor" stroke="none" />,
-  generate: <><path d="M11 5L6 9H2v6h4l5 4V5z" /><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M19 5a10 10 0 0 1 0 14" /></>,
+  generate: <><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /><path d="M8 9v2" /><path d="M12 7v6" /><path d="M16 9v2" /></>,
   regenerate: <><path d="M21 4v6h-6" /><path d="M3 20v-6h6" /><path d="M3.5 9a9 9 0 0 1 14.9-3.4L21 10" /><path d="M3 14l2.6 4.4A9 9 0 0 0 20.5 15" /></>,
   upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5" /><path d="M12 3v12" /></>,
   remove: <><path d="M3 6h18" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>,
