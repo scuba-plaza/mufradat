@@ -159,7 +159,7 @@ describe("a card made outside the list", () => {
     cy.visit(`/open?lemma=${encodeURIComponent("آجَرَ")}&pos=verb`);
     cy.hydrated('[aria-label="Hint"]');
     cy.contains("Word ").should("not.exist");
-    cy.get('[aria-label="Reset word"]').click();
+    cy.get('[title="Reset word"]').click();
     cy.get("dialog[open]").should("contain", "The word leaves your list; search for it to add it again.");
     cy.get("dialog[open]").contains("button", "Reset").click();
     cy.location("pathname").should("eq", "/");

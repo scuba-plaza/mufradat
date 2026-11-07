@@ -4,6 +4,7 @@ const status = '[role="status"]';
 const alert = '[role="alert"]';
 const bar = '[role="toolbar"]';
 const by = (label: string) => `[aria-label="${label}"]`;
+const resetButton = '[title="Reset word"]';
 /** An MP3 frame header and nothing playable after it: the store accepts it, a browser cannot decode it. */
 const unplayable = { contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]), fileName: "word.mp3", mimeType: "audio/mpeg" };
 
@@ -358,7 +359,7 @@ describe("resetting a word", () => {
     cy.contains(status, "Saved");
   };
   const askToReset = () => {
-    cy.get(by("Reset word")).click();
+    cy.get(resetButton).click();
     cy.get("dialog[open]").should("contain", "Reset this word?");
   };
 
@@ -413,15 +414,16 @@ describe("resetting a word", () => {
   it("puts Reset word right of the word counter, with Details closed", () => {
     openWord(209);
     cy.get("details").should("not.have.attr", "open");
+    cy.get(resetButton).should("not.have.attr", "aria-label");
     cy.contains("span", "Word 209 of 5000").then(($counter) => {
-      cy.get(by("Reset word")).should("be.visible").then(($button) => {
+      cy.get(resetButton).should("be.visible").then(($button) => {
         const counter = $counter[0].getBoundingClientRect();
         const button = $button[0].getBoundingClientRect();
         expect(button.left).to.be.at.least(counter.right);
         expect(Math.abs((button.top + button.bottom) / 2 - (counter.top + counter.bottom) / 2)).to.be.at.most(8);
       });
     });
-    cy.axe(by("Reset word"));
+    cy.axe(resetButton);
   });
 
   it("no longer has Reset word inside Details", () => {
@@ -436,6 +438,6 @@ describe("resetting a word", () => {
     askToReset();
     cy.get("dialog[open]").contains("button", "Cancel").click();
     cy.get("dialog[open]").should("not.exist");
-    cy.focused().should("have.attr", "aria-label", "Reset word");
+    cy.focused().should("have.attr", "title", "Reset word");
   });
 });
