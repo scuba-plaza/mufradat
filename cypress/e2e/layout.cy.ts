@@ -32,9 +32,14 @@ describe("the layout of a card", () => {
 
   describe("the height of a card", () => {
     for (const [width, height] of [[1920, 1200], [1280, 800]]) {
-      it(`keeps a word with forms, an example and a translation well under 900px at ${width}px`, () => {
+      it(`is no taller than 880px for a word with forms, an example and a translation at ${width}px`, () => {
         cy.viewport(width, height);
         openWord(6);
+        cy.location("pathname").then((path) => {
+          cy.request("PUT", `/api/notes/${path.split("/").pop()}`, { example: "لَدَيْهِ سَيَّارَةٌ [خَاصَّةٌ]", exampleEn: "He has a private car." });
+          cy.visit(path);
+          cy.hydrated(by("Hint"));
+        });
         cy.get("main").should(($main) => expect($main[0].getBoundingClientRect().height).to.be.at.most(880));
       });
     }
@@ -42,16 +47,16 @@ describe("the layout of a card", () => {
 
   describe("the order of a card", () => {
     const cards = [
-      { rank: 6, what: "forms", forms: by("Forms") },
-      { rank: 3, what: "no forms", forms: by("Forms") },
+      { rank: 6, what: "forms" },
+      { rank: 3, what: "no forms" },
     ];
 
     for (const [width, height] of [[1920, 1100], [390, 844]]) {
-      for (const { rank, what, forms } of cards) {
+      for (const { rank, what } of cards) {
         it(`shows the headword, the hint, the forms, the English meaning and the example in that order at ${width}px with ${what}`, () => {
           cy.viewport(width, height);
           openWord(rank);
-          const order = [by("Arabic headword"), by("Hint"), forms, by("English meaning"), `div${by("Example")}`];
+          const order = [by("Arabic headword"), by("Hint"), by("Forms"), by("English meaning"), `div${by("Example")}`];
           cy.document().should((doc) => {
             const boxes = order.map((selector) => {
               const element = doc.querySelector(selector);

@@ -52,6 +52,7 @@ export default function Clip(props: {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState("");
   const file = useRef<HTMLInputElement>(null);
+  const state = !has ? "no audio" : clip.outdated ? "audio is out of date" : "";
 
   async function run(work: () => Promise<{ note: Note }>) {
     setBusy(true);
@@ -83,6 +84,8 @@ export default function Clip(props: {
             <svg viewBox="0 0 10 10" width="12" height="12" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>
           </button>
         )}
+        {state && <span className="sr-only">{state}</span>}
+        {clip?.error && <span className="text-xs text-danger">{clip.error}</span>}
         {problem && <span role="alert" className="text-xs text-danger">{problem}</span>}
       </span>
     );
@@ -91,7 +94,6 @@ export default function Clip(props: {
   const working = busy || Boolean(props.extra?.busy);
   const canGenerate = Boolean(text.trim());
   const message = problem || clip?.error || props.problem || "";
-  const state = !has ? "no audio" : clip.outdated ? "audio is out of date" : "";
   const tone = message ? "border-danger" : clip?.outdated ? "border-warn" : has ? "border-rule-strong" : "border-dashed border-rule-strong";
 
   return (
@@ -114,7 +116,7 @@ export default function Clip(props: {
           <RailButton icon="remove" title="Remove" disabled={working || !has} onClick={() => run(() => api(`/api/audio/${note.id}/${slot}`, { method: "DELETE" }))} />
           {props.extra && (
             <>
-              <span role="separator" className="mx-px h-4 w-px bg-rule-strong/60 sm:mx-0 sm:my-px sm:h-px sm:w-4" />
+              <span aria-hidden="true" className="mx-px h-4 w-px bg-rule-strong/60 sm:mx-0 sm:my-px sm:h-px sm:w-4" />
               <RailButton icon="newExample" title={props.extra.label} disabled={working} onClick={props.extra.onSelect} />
             </>
           )}

@@ -248,7 +248,7 @@ describe("a word", () => {
     });
 
     for (const [width, height] of [[1280, 800], [390, 844]]) {
-      it(`keeps the text centred and the pills of 24px buttons, as ${width > 640 ? "a column at the right of" : "a row above"} the field, at ${width}px`, () => {
+      it(`keeps the text centred and the pills of 24px buttons, as ${width >= 640 ? "a column at the right of" : "a row above"} the field, at ${width}px`, () => {
         cy.viewport(width, height);
         openWord(42);
         cy.location("pathname").then((path) => {
@@ -266,13 +266,13 @@ describe("a word", () => {
           const fields = [[word, by("Arabic headword")], [example, `div${by("Example")}`]];
           for (const [group, field] of fields) {
             const buttons = Array.from(doc.querySelectorAll(`${group} button`)).map((button) => button.getBoundingClientRect());
-            const axis = width > 640 ? "left" : "top";
+            const axis = width >= 640 ? "left" : "top";
             expect(new Set(buttons.map((box) => Math.round(box[axis]))).size, `${group} shares one ${axis}`).to.equal(1);
             buttons.forEach((box) => {
               expect(box.height, `${group} button height`).to.be.at.least(24);
-              expect(box.width, `${group} button width`).to.be.at.least(24);
+              expect(box.width, `${group} button width`).to.be.at.least(width >= 1024 ? 32 : 24);
             });
-            if (width > 640) expect(rect(group).left, `${group} right of its field`).to.be.at.least(rect(field).right - 1);
+            if (width >= 640) expect(rect(group).left, `${group} right of its field`).to.be.at.least(rect(field).right - 1);
             else expect(rect(group).bottom, `${group} above its field`).to.be.at.most(rect(field).top);
           }
         });
@@ -281,12 +281,12 @@ describe("a word", () => {
 
     it("separates the audio actions from New example with a divider", () => {
       openWord(46);
-      cy.get(`${example} [role="separator"]`).then(($line) => {
+      cy.get(`${example} span[aria-hidden="true"]`).then(($line) => {
         const line = $line[0].getBoundingClientRect();
         cy.get(inGroup(example, "Remove")).then(($remove) => expect($remove[0].getBoundingClientRect().bottom).to.be.at.most(line.top));
         cy.get(inGroup(example, "New example")).then(($next) => expect($next[0].getBoundingClientRect().top).to.be.at.least(line.bottom));
       });
-      cy.get(`${word} [role="separator"]`).should("not.exist");
+      cy.get(`${word} span[aria-hidden="true"]`).should("not.exist");
     });
 
     it("uploads, regenerates and removes", () => {
