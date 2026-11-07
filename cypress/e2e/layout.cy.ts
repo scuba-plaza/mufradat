@@ -127,7 +127,7 @@ describe("the layout of a card", () => {
       it(`gives Approve and Next the same size at ${width}px`, () => {
         cy.viewport(width, height);
         openWord(rank++);
-        cy.contains(`${bar} button`, "Approve and next").then(($approve) => {
+        cy.contains(`${bar} button`, "Approve").then(($approve) => {
           const approve = sizeOf($approve[0]);
           if (width < 640) {
             const text = $approve[0].ownerDocument.querySelector(`${bar} p`)!;

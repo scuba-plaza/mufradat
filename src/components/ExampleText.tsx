@@ -32,12 +32,17 @@ export default function ExampleText(props: { value: string; onSave: (v: string) 
     setDraft(`${plain.slice(0, from)}[${plain.slice(from, to)}]${plain.slice(to)}`);
   }
 
+  const unmarked = props.value !== "" && !splitExample(props.value);
+  const warning = unmarked && (
+    <p className="mt-1 text-sm text-warn">It is not clear which word to highlight. Click the sentence, select the word and choose Mark target.</p>
+  );
+
   if (!editing) {
     const parts = splitExample(draft);
     return (
       <>
         <div role="group" aria-label="Example">
-          <button type="button" onClick={() => setEditing(true)} onFocus={() => setEditing(true)} className="block min-h-[calc(var(--ar-lg)*1.8)] w-full rounded-control px-1 text-center hover:bg-hover">
+          <button type="button" onClick={() => setEditing(true)} onFocus={() => setEditing(true)} className="block min-h-[calc(var(--ar-lg)*1.8+2px)] w-full rounded-control border border-transparent px-2 text-center hover:bg-hover">
             {draft === "" ? (
               <span className="text-sm text-quiet">Add an example, or generate one</span>
             ) : (
@@ -47,34 +52,34 @@ export default function ExampleText(props: { value: string; onSave: (v: string) 
             )}
           </button>
         </div>
-        {draft !== "" && !parts && (
-          <p className="mt-1 text-sm text-warn">It is not clear which word to highlight. Click the sentence, select the word and choose Mark target.</p>
-        )}
+        {warning}
       </>
     );
   }
   return (
-    <div onBlur={leave}>
-      <textarea
-        ref={box}
-        aria-label="Example"
-        rows={2}
-        value={draft}
-        lang="ar"
-        dir="rtl"
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
-          e.preventDefault();
-          e.currentTarget.blur();
-        }}
-        className="edit ar resize-none text-center text-ar-lg"
-      />
-      <p className="mt-1 flex flex-wrap items-center justify-center gap-x-3 text-sm text-quiet">
-        <span>Select the word you are teaching, or put it in [square brackets].</span>
-        {/* Pressing the button must not take the focus, or the selection it works on is lost. */}
-        <button type="button" className="action" onMouseDown={(e) => e.preventDefault()} onClick={mark}>Mark target</button>
-      </p>
-    </div>
+    <>
+      <div className="relative" onBlur={leave}>
+        <textarea
+          ref={box}
+          aria-label="Example"
+          rows={1}
+          value={draft}
+          lang="ar"
+          dir="rtl"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            e.currentTarget.blur();
+          }}
+          className="edit ar block min-h-[calc(var(--ar-lg)*1.8+2px)] resize-none text-center text-ar-lg [field-sizing:content]"
+        />
+        <p className="absolute inset-x-0 top-full z-10 mt-1 flex flex-wrap items-center justify-center gap-x-3 rounded-control border border-rule-strong bg-surface px-3 py-1 text-sm text-quiet shadow-modal">
+          <span>Select the word you are teaching, or put it in [square brackets].</span>
+          <button type="button" className="action" onMouseDown={(e) => e.preventDefault()} onClick={mark}>Mark target</button>
+        </p>
+      </div>
+      {warning}
+    </>
   );
 }

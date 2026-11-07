@@ -183,7 +183,7 @@ describe("a word", () => {
       cy.get(by("Example")).click();
       cy.get(`textarea${by("Example")}`).type("الْكِتَابُ [فِي] الْحَقِيبَةِ").blur();
       cy.get(status).should("contain", "Saved");
-      cy.contains("button", "Approve and next").click();
+      cy.contains("button", "Approve").click();
       cy.get(alert).should("contain", "The example has no English translation.");
       cy.request("PUT", `/api/notes/${path.split("/").pop()}`, { exampleEn: "The book is in the bag." }).then((response) => {
         cy.intercept("POST", "/api/mistral", { body: { note: response.body.note } });
@@ -395,11 +395,11 @@ describe("a word", () => {
     cy.visit("/open?rank=60");
     cy.hydrated(by("Hint"));
     cy.location("pathname").then((card) => {
-      cy.contains("button", "Approve and next").click();
+      cy.contains("button", "Approve").click();
       cy.location("pathname").should("not.eq", card).and("match", /^\/cards\/[0-9a-f-]{36}$/);
       cy.visit(card);
       cy.get(bar).should("contain", "approved");
-      cy.contains("button", "Approve and next").should("not.exist");
+      cy.contains("button", "Approve").should("not.exist");
       cy.contains("a", "Next").should("have.attr", "href", "/next");
     });
   });
@@ -408,7 +408,7 @@ describe("a word", () => {
     openWord(61);
     cy.location("pathname").then((card) => {
       cy.get(by("English meaning")).clear().blur();
-      cy.contains("button", "Approve and next").click();
+      cy.contains("button", "Approve").click();
       cy.get(alert).should("contain", "The English meaning is empty.");
       cy.location("pathname").should("eq", card);
     });

@@ -50,7 +50,7 @@ export default function ActionBar(props: {
             {approved ? (
               <a href="/next" className="action-main col-start-2 w-full sm:w-44">Next</a>
             ) : (
-              <button className="action-main col-start-2 w-full sm:w-44" disabled={props.leaving} onClick={props.onApprove}>Approve and next</button>
+              <button className="action-main col-start-2 w-full sm:w-44" disabled={props.leaving} onClick={props.onApprove}>Approve</button>
             )}
           </div>
         </div>
