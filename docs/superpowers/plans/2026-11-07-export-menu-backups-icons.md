@@ -28,7 +28,7 @@ Mine (overrule any of them):
 - `GET /api/export` replaces the `POST` that wrote `exports/` and the `GET ?file=` that served it. A deck download changes nothing, so it is a GET, as the backup download is. The `exports/` folder is no longer made or mentioned; one that already exists in a workspace is left alone.
 - The menu uses `fetch`, then a Blob and a download link. A plain link would navigate to the JSON of a refusal instead of showing it.
 - The card count travels in an `X-Card-Count` response header.
-- Icons: a white Arabic letter **م** (first letter of مفردات) in Scheherazade New on the palette's accent blue `#2B7099` (white on it is 5.4:1), as a rounded square for the favicon and a plain square for the Apple icon. The share image is 1200×630: **مفردات** large, "Mufradat" and "Build one Arabic Anki deck, one card at a time." below it. Rendered with Chromium so the Arabic is shaped correctly (Next's `ImageResponse` does not shape Arabic reliably) and committed as PNG and ICO files.
+- Icons (revised twice after the owner's feedback; the first, a white letter on blue, and the second, a copy of the Mafatih favicon's idea, were rejected): a dark stone tile `#1c1917` with a stack of two flashcards, the front one paper-white with the isolated letter **م** in Scheherazade New Bold (the app's own font, OFL) centred on a yellow highlighter band (the app's own target-word highlight), the back one in the app's blue `#2B7099`. The favicon is an SVG with the glyph outline (extracted with fontTools) plus a 16/32/48px ICO, and a square 180px Apple icon. The share image is 1200×630 on the same dark ground: **مفردات** large, "Mufradat", the tagline, and a flashcard showing كِتَابٌ / book and an example sentence with its target word highlighted, in front of the blue card. Everything is rendered with Chromium so the Arabic is shaped correctly (Next's `ImageResponse` does not shape Arabic reliably) and committed as static files; the page also gets `theme-color` tags for light and dark.
 - The page title gets a description for the share preview, and `metadataBase` is taken from the request's host, so the image URLs are right on any port.
 - The 4px margin makes the header 4px taller on phones (48px to 52px), because the touch button is 44px high.
 
@@ -54,7 +54,7 @@ Failure modes the main slices do not reach. Each has its test in the task named.
 
 Modify: `src/app/api/export/route.ts`, `route.test.ts`; `src/components/Menu.tsx`; `src/components/Backups.tsx`; `src/app/layout.tsx`; `src/app/globals.css` (only if the margin needs it); `cypress/e2e/menu.cy.ts`, `backups.cy.ts`, `housekeeping.cy.ts`, `keys.cy.ts`; `cypress.config.mjs`; `README.md`.
 
-Create: `src/app/favicon.ico`, `icon.png`, `apple-icon.png`, `opengraph-image.png`, `opengraph-image.alt.txt`, `twitter-image.png`; `cypress/e2e/icons.cy.ts`.
+Create: `src/app/favicon.ico`, `icon.svg`, `apple-icon.png`, `opengraph-image.png`, `opengraph-image.alt.txt`, `twitter-image.png`; `cypress/e2e/icons.cy.ts`.
 
 ---
 
@@ -103,12 +103,12 @@ Create: `src/app/favicon.ico`, `icon.png`, `apple-icon.png`, `opengraph-image.pn
 **Files:** Create the icon files listed above and `cypress/e2e/icons.cy.ts`; modify `src/app/layout.tsx`, `README.md`.
 
 **Interfaces:**
-- Produces: `src/app/favicon.ico` (16, 32, 48px), `icon.png` (512×512), `apple-icon.png` (180×180, square), `opengraph-image.png` and `twitter-image.png` (1200×630), `opengraph-image.alt.txt`.
-- Produces: `layout.tsx` metadata gains `description: "Build one Modern Standard Arabic Anki deck, one card at a time."` and an asynchronous `generateMetadata` whose `metadataBase` is the request's origin (from `headers()`).
+- Produces: `src/app/favicon.ico` (16, 32, 48px), `icon.svg` (the vector favicon), `apple-icon.png` (180×180, square), `opengraph-image.png` and `twitter-image.png` (1200×630), `opengraph-image.alt.txt`.
+- Produces: `layout.tsx` gains `export const viewport` with `theme-color` `#ffffff` (light) and `#191919` (dark), the page backgrounds; its metadata gains `description: "Build one Modern Standard Arabic Anki deck, one card at a time."` and an asynchronous `generateMetadata` whose `metadataBase` is the request's origin (from `headers()`).
 
-- [ ] **Step 1: Write the failing test** in `icons.cy.ts`: visiting `/`, the head has a `link[rel="icon"]`, a `link[rel="apple-touch-icon"]`, `meta[property="og:image"]` (with `og:image:width` 1200 and `height` 630) and `meta[name="twitter:card"]` with `summary_large_image`; each `href` or `content` URL answers 200 with the expected type (`image/png`, `image/x-icon`), and the PNG header (IHDR) of the share image says 1200×630 and of `icon.png` 512×512.
+- [ ] **Step 1: Write the failing test** in `icons.cy.ts`: visiting `/`, the document has `link[rel="icon"]` for `/favicon.ico` and `/icon.svg`, a `link[rel="apple-touch-icon"]` (180×180), `meta[property="og:image"]` (with `og:image:width` 1200 and `height` 630) and `meta[name="twitter:card"]` with `summary_large_image`; each `href` or `content` URL answers 200 with the expected type (`image/png`, `image/x-icon`), and the PNG header (IHDR) of the share image says 1200×630 and of `icon.png` 512×512.
 - [ ] **Step 2: Run `icons.cy.ts`.** Expected: red (no tags yet).
-- [ ] **Step 3: Make the images** with a Chromium page (Scheherazade New from `public/`), the ICO by writing the three PNGs into an ICO container; place them in `src/app/`. Look at each file to check the Arabic is joined and centred.
+- [ ] **Step 3: Make the images** with a Chromium page (Scheherazade New and Scheherazade New Bold, both OFL; the Bold glyph outline for the SVG is extracted with fontTools), the ICO by writing the three PNGs into an ICO container; place them in `src/app/`. Look at each file to check the Arabic is joined and centred.
 - [ ] **Step 4: Implement the metadata** in `layout.tsx` and run `icons.cy.ts`; README (a line about the icons).
 - [ ] **Step 5: Run the spec, `pnpm typecheck`, `pnpm build` (no metadataBase warning); mutation-prove (remove one file, change the size) and commit.**
 

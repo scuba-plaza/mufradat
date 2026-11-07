@@ -74,6 +74,7 @@ On a word, while no field has focus and no dialog is open: Ctrl+← and Ctrl+→
 ## Files
 
 - Workspace (`~/.local/share/mufradat`, or `MUFRADAT_WORKSPACE`): `vocabulary.db`, `audio/` (named by the hash of the audio), `snapshots/` (the backups, with their own copy of the audio).
+- Icons and share image: `src/app/icon.svg`, `favicon.ico`, `apple-icon.png`, `opengraph-image.png` (also served as `twitter-image.png`): a stack of flashcards, the letter م in Scheherazade New Bold on a highlighter stripe, on a dark tile. They are static files; Next adds their tags to every page.
 - Config `~/.config/mufradat/config.toml`, readable only by you (`chmod 600`); the app refuses to read it otherwise:
 
       mistral_api_key = "..."

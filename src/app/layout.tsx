@@ -1,10 +1,25 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import localFont from "next/font/local";
 import Menu from "@/components/Menu";
 import { context } from "@/lib/server";
 import "./globals.css";
 
-export const metadata: Metadata = { title: { default: "Mufradat", template: "%s · Mufradat" } };
+export async function generateMetadata(): Promise<Metadata> {
+  const host = (await headers()).get("host") ?? "localhost:3000";
+  return {
+    metadataBase: new URL(`http://${host}`),
+    title: { default: "Mufradat", template: "%s · Mufradat" },
+    description: "Build one Modern Standard Arabic Anki deck, one card at a time.",
+  };
+}
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#191919" },
+  ],
+};
+
 export const dynamic = "force-dynamic";
 
 // The Anki export reads the Arabic font from public/ too, so it stays there.
