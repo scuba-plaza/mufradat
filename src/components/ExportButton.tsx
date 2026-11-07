@@ -1,11 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { refusal } from "./api";
 
 export default function ExportButton({ q, count }: { q: string; count: number }) {
   const [message, setMessage] = useState("");
+  const building = useRef(false);
 
   async function exportDeck() {
+    if (building.current) return;
+    building.current = true;
     setMessage("Preparing the deck…");
     try {
       const res = await fetch(q.trim() === "" ? "/api/export" : `/api/export?q=${encodeURIComponent(q)}`);
@@ -18,6 +21,8 @@ export default function ExportButton({ q, count }: { q: string; count: number })
       setMessage("");
     } catch (e) {
       setMessage((e as Error).message);
+    } finally {
+      building.current = false;
     }
   }
 

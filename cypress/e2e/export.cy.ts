@@ -101,6 +101,16 @@ describe("the export icon", () => {
     cy.get(status).should("have.text", "");
   });
 
+  it("asks for the deck once however often it is clicked while it is built", () => {
+    approvedCard(4403);
+    visit("/");
+    cy.intercept("GET", "/api/export*", { delay: 600, headers: deckHeaders, body: "x" }).as("export");
+    cy.get(exportButton).dblclick();
+    cy.get(status).should("have.text", "Preparing the deck…");
+    cy.get(status).should("have.text", "");
+    cy.get("@export.all").should("have.length", 1);
+  });
+
   it("says why when the export is refused and saves nothing", () => {
     approvedCard(4403);
     visit("/");
