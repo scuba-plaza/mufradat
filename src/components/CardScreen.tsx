@@ -170,19 +170,16 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
           <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-2 text-center text-quiet" onSave={(hint) => save({ hint })} />
         </Clip>
         {note.forms.length > 0 ? (
-          <section aria-label="Forms" className="panel mx-auto mt-5 max-w-lg px-4 py-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-medium text-quiet">Forms</h2>
-              <button className="action-quiet" aria-haspopup="dialog" onClick={() => setFormsOpen(true)}>Edit forms</button>
-            </div>
-            <div className="mt-2 flex flex-wrap items-start justify-center gap-x-8 gap-y-3">
+          <section aria-label="Forms" className="panel mx-auto mt-4 max-w-2xl px-3 py-2">
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1">
               {note.forms.map((f) => (
-                <div key={f.id} className="flex flex-col items-center">
+                <div key={f.id} className="flex items-center gap-2">
                   <span className="text-xs text-quiet">{f.label}</span>
-                  <span className="ar mt-1 text-ar-stacked" lang="ar" dir="rtl">{f.arabic}</span>
+                  <span className="ar text-ar-stacked" lang="ar" dir="rtl">{f.arabic}</span>
                   <Clip readOnly note={note} slot={f.id} name={f.label} text={f.arabic} onNote={setNote} />
                 </div>
               ))}
+              <button className="action-quiet" aria-haspopup="dialog" onClick={() => setFormsOpen(true)}>Edit forms</button>
             </div>
           </section>
         ) : (

@@ -140,7 +140,7 @@ describe("the layout of a card", () => {
           expect($forms.length).to.be.at.least(2);
           $forms.each((_, form) => {
             const label = form.previousElementSibling!;
-            const gap = form.getBoundingClientRect().top - label.getBoundingClientRect().bottom;
+            const gap = form.getBoundingClientRect().left - label.getBoundingClientRect().right;
             expect(gap, `gap between the label ${label.textContent} and its Arabic`).to.be.at.least(minimumGap);
           });
         });
