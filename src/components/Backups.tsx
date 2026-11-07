@@ -139,7 +139,7 @@ export default function Backups({ open, onClose }: { open: boolean; onClose: () 
                 <div className="mt-4 flex justify-end gap-3">
                   <button className="action" autoFocus onClick={() => setConfirming(null)}>Cancel</button>
                   <button
-                    className={confirming.action === "delete" ? "action-danger" : "action-main"}
+                    className="action-danger"
                     disabled={busy}
                     onClick={() => (confirming.action === "restore" ? restore(confirming.snapshot) : remove(confirming.snapshot))}
                   >

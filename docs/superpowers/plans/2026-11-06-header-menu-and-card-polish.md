@@ -31,7 +31,7 @@ Mine (overrule any of them at plan review):
 - **Export goes in the menu, not the header.** It is used now and then, not while editing a card; a header button would show on every card screen where a stray click starts a download; on a phone the header has room for "Export" but not the count or the reason it is disabled; in the menu it keeps the old full text and is one click from the top instead of the bottom of a 100-row list.
 - **Menu pattern: popover disclosure**, not `role="menu"`. Tab moves through the items, Escape and a click outside close it and return the focus. `role="menu"` would promise arrow-key navigation and typeahead that the app does not have.
 - The red is the existing `--danger` token (`193 63 58` light, `229 115 115` dark) as the background with `--on-primary` text (white, and `25 25 25` in dark): about 5.2:1 and 5.9:1, both above 4.5:1. No new colour token.
-- **Red:** Reset, Delete unused audio's Delete, and the Delete of a backup. **Not red:** Restore. It asks first but can be undone, because the current state is saved as a "Before a restore" backup, so it keeps the dark primary button.
+- **Red:** Reset, Delete unused audio's Delete, the Delete of a backup and Restore. Restore was first kept dark because it can be undone from the "Before a restore" backup; the Task 5 reviewer pointed out that Reset is undone the same way and is red, and that Restore replaces the whole workspace, so it is red too (a one-class change if the owner disagrees).
 - The unlabeled `<nav>` around the old `?` button is dropped; a lone menu button is not navigation.
 - The export message "Exported 1 cards" gets its plural fixed with `plural()`.
 - The explanatory line under Reset word in Details ("Deletes this card, so that the word starts over.") is dropped; the dialog already says it.
@@ -160,9 +160,9 @@ Delete: `src/components/ExportButton.tsx`.
 - Produces: `.action-danger`, the `.action-main` rules with `background: rgb(var(--danger))`; implement by listing both selectors in the shared rules, not by copying them.
 - Produces: `cy.colorScheme(scheme: "light" | "dark")`, which sets `prefers-color-scheme` through the Chrome DevTools command `Emulation.setEmulatedMedia`, as `pressEscape` uses `Input.dispatchKeyEvent`.
 
-- [ ] **Step 1: Write the failing tests** where each dialog is already opened: in card.cy.ts's "deletes the card…" test, the Reset confirm button's `background-color` is `rgb(193, 63, 58)` and Cancel's is not; in housekeeping's "says how many files…" test, the Delete button's is; in backups' "deletes a backup only after asking…" test the Delete is red while Restore's confirm is not (`rgb(25, 25, 25)`). One extra card.cy.ts test under `cy.colorScheme("dark")`: Reset's background is `rgb(229, 115, 115)`, its text `rgb(25, 25, 25)`, and `cy.axe("dialog[open] .action-danger")` passes in both schemes; reset the scheme to light in `afterEach`.
+- [ ] **Step 1: Write the failing tests** where each dialog is already opened: in card.cy.ts's "deletes the card…" test, the Reset confirm button's `background-color` is `rgb(193, 63, 58)` and Cancel's is not; in housekeeping's "says how many files…" test, the Delete button's is; in backups' "deletes a backup only after asking…" test the Delete and the Restore confirmations are red. One extra card.cy.ts test under `cy.colorScheme("dark")`: Reset's background is `rgb(229, 115, 115)`, its text `rgb(25, 25, 25)`, and `cy.axe("dialog[open] .action-danger")` passes in both schemes; reset the scheme to light in `afterEach`.
 - [ ] **Step 2: Run the three specs.** Expected: red.
-- [ ] **Step 3: Implement** the class and use it on the three confirm buttons; Restore keeps `action-main`.
+- [ ] **Step 3: Implement** the class and use it on the three confirm buttons; Restore uses it too (after review).
 - [ ] **Step 4: Run the three specs and `pnpm typecheck`.** Expected: green. README: no change (colour only). Commit.
 
 ### Task 6: The home list shows 30 rows a page

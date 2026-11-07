@@ -38,7 +38,7 @@ describe("backups", () => {
       cy.focused().should("contain.text", "Cancel");
       cy.get(dialog).should("contain", "Your current state is saved first");
       cy.get(dialog).invoke("text").should("match", /It has \d+ cards? \(\d+ approved\); the workspace has \d+ \(\d+ approved\) now/);
-      cy.contains(`${dialog} button`, "Restore").should("have.css", "background-color", "rgb(25, 25, 25)");
+      cy.contains(`${dialog} button`, "Restore").should("have.css", "background-color", "rgb(193, 63, 58)");
       cy.contains(`${dialog} button`, "Cancel").click();
       cy.request({ url: `/cards/${id}`, failOnStatusCode: false }).its("status").should("eq", 404);
       cy.contains(rows, "Backed up by you").contains("button", "Restore…").click();

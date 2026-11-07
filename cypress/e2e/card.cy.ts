@@ -367,7 +367,7 @@ describe("resetting a word", () => {
     cy.location("pathname").then((card) => {
       askToReset();
       cy.get("dialog[open]").contains("button", "Reset").should("have.css", "background-color", "rgb(193, 63, 58)");
-      cy.get("dialog[open]").contains("button", "Cancel").should("not.have.css", "background-color", "rgb(193, 63, 58)");
+      cy.get("dialog[open]").contains("button", "Cancel").should("have.css", "background-color", "rgba(0, 0, 0, 0)");
       cy.axe("dialog[open] .action-danger");
       cy.get("dialog[open]").should("contain", "Not started").contains("button", "Reset").click();
       cy.location("pathname").should("eq", "/");
