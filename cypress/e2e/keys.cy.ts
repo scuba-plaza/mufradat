@@ -78,7 +78,7 @@ describe("the keys of a card", () => {
     cy.intercept("/api/step*").as("step");
     openWord(97);
     cy.location("pathname").then((card) => {
-      cy.get(`button[title="Edit forms"], button:contains("Add forms")`).click();
+      cy.get(`${by("Forms")} button`).click();
       cy.get("dialog[open]");
       cy.get("body").type("{ctrl}{rightarrow}");
       cy.wait(300);
