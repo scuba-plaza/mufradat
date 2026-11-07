@@ -224,7 +224,7 @@ If slice 6 fails, the fallbacks in "One file out, one file in" are tried in orde
 
 ### Phase 4: restore one card (decide after using 0 to 3)
 
-Only if restoring a whole workspace to bring back one card has actually cost other work. Sketch: attach a snapshot read-only, copy that card's rows back by id, refuse with a clear message on a `(lemma, pos)` clash; its clips are already in the snapshot folder. It would sit in Details beside Reset word.
+Only if restoring a whole workspace to bring back one card has actually cost other work. Sketch: attach a snapshot read-only, copy that card's rows back by id, refuse with a clear message on a `(lemma, pos)` clash; its clips are already in the snapshot folder. It would sit near Reset word, the button beside the word counter at the top of a card.
 
 ## Not in this plan
 

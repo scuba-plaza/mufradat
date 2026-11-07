@@ -154,15 +154,16 @@ describe("a card made outside the list", () => {
       cy.location("pathname").should("eq", card);
     });
   });
-});
 
-describe("resetting a card made outside the list", () => {
-  it("has the button without a word counter, and says the word leaves the list", () => {
+  it("has Reset word without a word counter, says the word leaves the list, and resets it", () => {
     cy.visit(`/open?lemma=${encodeURIComponent("آجَرَ")}&pos=verb`);
     cy.hydrated('[aria-label="Hint"]');
     cy.contains("Word ").should("not.exist");
     cy.get('[aria-label="Reset word"]').click();
     cy.get("dialog[open]").should("contain", "The word leaves your list; search for it to add it again.");
+    cy.get("dialog[open]").contains("button", "Reset").click();
+    cy.location("pathname").should("eq", "/");
+    cy.get(rows).should("not.contain", "آجَرَ");
   });
 });
 
