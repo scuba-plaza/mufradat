@@ -124,6 +124,7 @@ export default function Clip(props: {
             </>
           )}
           {state && <span className="sr-only">{state}</span>}
+          <span role="status" className="sr-only">{working ? "Working…" : ""}</span>
           <input
             ref={file}
             type="file"
@@ -138,7 +139,6 @@ export default function Clip(props: {
           />
         </div>
       </div>
-      <span role="status" className="sr-only">{working ? "Working…" : ""}</span>
       {!onMessage && <p className="min-h-[2lh] text-xs text-danger">{message}</p>}
     </div>
   );
