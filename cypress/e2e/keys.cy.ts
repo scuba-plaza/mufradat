@@ -121,15 +121,6 @@ describe("the keys of a card opened from a list", () => {
     cy.contains("Word 184 of 5000");
   });
 
-  it("keeps moving forward through a list when every step creates the card of the next word", () => {
-    openFrom("rank:186-190", 186);
-    for (const rank of [187, 188, 189, 190]) {
-      cy.get("body").type("{ctrl}{rightarrow}");
-      cy.contains(`Word ${rank} of 5000`);
-      cy.hydrated(by("Hint"));
-    }
-  });
-
   it("goes on to the next word from a word that was just started in the list of the words not started", () => {
     openFrom("status:todo rank:195-199", 197);
     cy.contains("Word 197 of 5000");

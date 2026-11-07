@@ -43,7 +43,7 @@ Severity: **Serious** = a person cannot tell or cannot do something; **Minor** =
 ## Not accessibility, but worth knowing
 
 - **Five dialogs repeat the same open and close effect** (`FormsDialog`, `ResetDialog`, `Backups`, `UnusedAudio`, `Shortcuts`), and the three-dot icon is drawn in both `Clip.tsx` and `Menu.tsx`. A `useModal(open)` hook would remove the copies. (S)
-- **`keys.cy.ts` fails sometimes**, always the test "keeps moving forward through a list when every step creates the card of the next word", which times out on word 190. It failed 2 of 8 single-spec runs on `294fa48` (before this plan) and 1 of 6 on this branch, so it is old and not made worse. It looks like a hydration race: the test types Ctrl+→ right after `hydrated(Hint)`. I can fix it if you want. (S to M)
+- **`keys.cy.ts` had a flaky test**, "keeps moving forward through a list when every step creates the card of the next word" (a hydration race that timed out on word 190 and failed 2 of 8 runs even before this plan). It was removed at the owner's request.
 - **`scale.cy.ts` "ten rows… without scrolling"** depends on which card was edited last: run after `list`, `look` and `layout` it fails (1133.67px against 1100px), also without any of this work. It passes alone and in the normal full order. (S)
 
 ## Checked and found fine
