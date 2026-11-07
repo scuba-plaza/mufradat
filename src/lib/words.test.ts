@@ -14,7 +14,7 @@ function finish(s: Store, id: string) {
 
 const blank: WordRow = {
   id: null, rank: null, lemma: "", english: "", pos: "noun", gender: "", root: "", verbForm: "", status: "todo",
-  missing: [...MISSING_KINDS], error: false, exampleBy: "", edited: null,
+  missing: [...MISSING_KINDS], error: false, exampleBy: "", edited: null, tags: [],
 };
 
 afterEach(() => vi.useRealTimers());
@@ -315,6 +315,44 @@ describe("the words a query asks for", () => {
     const verbs = view(s, "على verbform:I rank:none", now).rows;
     expect(verbs.map((r) => r.english)).toContain("to climb");
     expect(verbs.every((r) => r.verbForm === "I" && r.rank === null && r.status === "todo")).toBe(true);
+  });
+});
+
+describe("finding words by tag", () => {
+  const tagged = () => {
+    const s = openStore(":memory:");
+    const tag = (rank: number, tags: string[]) => s.setTags(openCard(s, { rank })!, tags);
+    tag(1, ["lesson_1"]);
+    tag(2, ["grammar", "lesson_2"]);
+    tag(3, ["lesson_10"]);
+    tag(4, []);
+    return s;
+  };
+  const ranks = (s: Store, text: string) => view(s, text).rows.map((r) => r.rank);
+
+  it("finds cards by tag, a whole tag at a time", () => {
+    expect(ranks(tagged(), "tag:lesson_1")).toEqual([1]);
+  });
+
+  it("takes * as a wildcard", () => {
+    expect(ranks(tagged(), "tag:lesson_*")).toEqual([1, 2, 3]);
+  });
+
+  it("ignores case and takes a comma as or", () => {
+    expect(ranks(tagged(), "tag:LESSON_1,grammar")).toEqual([1, 2]);
+  });
+
+  it("finds the cards without a tag, and never lists a word without a card for tag:*", () => {
+    const s = tagged();
+    expect(ranks(s, "-tag:* status:progress")).toEqual([4]);
+    expect(ranks(s, "tag:*")).toEqual([1, 2, 3]);
+  });
+
+  it("treats every character but * literally", () => {
+    const s = openStore(":memory:");
+    s.setTags(openCard(s, { rank: 1 })!, ["abc"]);
+    expect(ranks(s, "tag:a.c")).toEqual([]);
+    expect(ranks(s, "tag:a*c")).toEqual([1]);
   });
 });
 

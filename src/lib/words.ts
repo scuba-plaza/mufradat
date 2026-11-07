@@ -19,6 +19,7 @@ const fromCard = (n: Note): WordRow => ({
   error: n.exampleError !== null || Object.values(n.audio).some((clip) => clip.error !== null),
   exampleBy: n.exampleSource,
   edited: n.updatedAt,
+  tags: n.tags,
 });
 
 const notStarted = (row: Pick<WordRow, "rank" | "lemma" | "english" | "pos" | "gender" | "root" | "verbForm">): WordRow => ({
@@ -29,6 +30,7 @@ const notStarted = (row: Pick<WordRow, "rank" | "lemma" | "english" | "pos" | "g
   error: false,
   exampleBy: "",
   edited: null,
+  tags: [],
 });
 
 const entryKey = (lemma: string, pos: POS) => `${lemma}|${pos}`;

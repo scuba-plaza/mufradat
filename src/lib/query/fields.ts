@@ -101,6 +101,14 @@ const edited: Field = {
   },
 };
 
+const tag: Field = {
+  parse(part) {
+    const pattern = part.split("*").map((piece) => piece.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*");
+    const matcher = new RegExp(`^${pattern}$`, "i");
+    return (row) => row.tags.some((t) => matcher.test(t));
+  },
+};
+
 export const FIELDS: Record<string, Field> = {
   status: choice(STATUSES, (row) => row.status),
   pos: choice(POS_VALUES, (row) => row.pos),
@@ -112,4 +120,5 @@ export const FIELDS: Record<string, Field> = {
   has: choice(["error"], (row) => (row.error ? "error" : [])),
   example: choice(["mistral", "mine"], (row) => (row.exampleBy === "user" ? "mine" : row.exampleBy)),
   edited,
+  tag,
 };

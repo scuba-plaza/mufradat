@@ -36,6 +36,7 @@ The bar on the home page searches, filters and sorts the one list. Words you typ
 | `has:error` | a failed example or audio generation is still shown |
 | `example:mistral`, `example:mine` | who wrote the example |
 | `edited:7d`, `edited:12h`, `edited:2w`, `edited:2026-11-01`, `edited:2026-11-01..`, `edited:..2026-11-01`, `edited:none` | last edit within that time (`h`, `d`, `w`), on a day, since or until a day, or never |
+| `tag:lesson_1`, `tag:lesson_*`, `-tag:*` | cards with that tag, ignoring case; `*` stands for any run of characters (every other character is taken as typed), so `lesson_*` finds `lesson_1` and `lesson_10`; `-tag:*` finds the words with no tag |
 | `-pos:verb` | a minus in front of a field term takes the words out; to find text that starts with a minus, quote it |
 | `sort:-edited` | order by `rank`, `edited`, `arabic` or `english`; a minus is descending, words without a value come last |
 

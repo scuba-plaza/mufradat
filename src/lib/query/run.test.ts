@@ -8,7 +8,7 @@ const at = (day: number, hour = 12) => new Date(2026, 10, day, hour, 0, 0).toISO
 
 const row = (over: Partial<WordRow>): WordRow => ({
   id: null, rank: null, lemma: "", english: "", pos: "noun", gender: "", root: "", verbForm: "", status: "todo",
-  missing: ["example", "translation", "target", "audio"], error: false, exampleBy: "", edited: null, ...over,
+  missing: ["example", "translation", "target", "audio"], error: false, exampleBy: "", edited: null, tags: [], ...over,
 });
 
 const rows: WordRow[] = [

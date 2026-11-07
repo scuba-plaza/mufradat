@@ -35,7 +35,7 @@ describe("reading what was typed in the bar", () => {
 describe("what the bar says about a term it cannot use", () => {
   it("names a field that does not exist and lists the ones that do", () => {
     expect(failure("colour:red")).toBe(
-      'Unknown field "colour". Fields: status, pos, rank, root, gender, verbform, missing, has, example, edited, sort.',
+      'Unknown field "colour". Fields: status, pos, rank, root, gender, verbform, missing, has, example, edited, tag, sort.',
     );
   });
 

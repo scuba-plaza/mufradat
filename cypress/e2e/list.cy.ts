@@ -187,6 +187,33 @@ describe("the status of a word in the list", () => {
 });
 
 describe("the search bar", () => {
+  describe("by tag", () => {
+    const tagged: string[] = [];
+    const tag = (rank: number, tags: string[]) => {
+      cy.visit(`/open?rank=${rank}`);
+      cy.location("pathname").then((path) => {
+        const id = path.split("/").pop()!;
+        tagged.push(id);
+        cy.request("PUT", `/api/notes/${id}/tags`, { tags });
+      });
+    };
+    afterEach(() => {
+      tagged.splice(0).forEach((id) => cy.request("PUT", `/api/notes/${id}/tags`, { tags: [] }));
+    });
+
+    it("filters the list by tag", () => {
+      tag(4301, ["zz_one"]);
+      tag(4302, ["zz_two"]);
+      tag(4303, ["other"]);
+      cy.visit("/");
+      cy.get(bar).type("tag:zz_*{enter}");
+      cy.location("search").should("eq", `?q=${encodeURIComponent("tag:zz_*")}`);
+      cy.get(rows).should("have.length", 2);
+      cy.wordRow(4301).should("exist");
+      cy.wordRow(4302).should("exist");
+    });
+  });
+
   it("searches when you press Enter, keeps what you typed in the box, and counts the words it found", () => {
     cy.visit("/");
     cy.get(bar).type("كتاب{enter}");

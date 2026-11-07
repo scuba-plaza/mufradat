@@ -96,6 +96,7 @@ export interface WordRow {
   error: boolean;
   exampleBy: "mistral" | "user" | "";
   edited: string | null;
+  tags: string[];
 }
 
 export interface MissingAudio {
