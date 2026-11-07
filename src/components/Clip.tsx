@@ -2,6 +2,7 @@
 import { useId, useRef, useState } from "react";
 import type { Note } from "@/lib/types";
 import { api, post } from "./api";
+import Spinner from "./Spinner";
 
 /** The audio of one text: play it, or make it by generating it or uploading an MP3. `name` says what it is for, such as "the word". */
 export default function Clip(props: {
@@ -11,6 +12,7 @@ export default function Clip(props: {
   text: string;
   onNote: (n: Note) => void;
   readOnly?: boolean;
+  extra?: { label: string; busy: boolean; onSelect: () => void };
 }) {
   const { note, slot, name, text } = props;
   const clip = note.audio[slot];
@@ -43,14 +45,6 @@ export default function Clip(props: {
   }
 
   const generateNow = () => run(() => post("/api/tts", { id: note.id, slot }));
-  const generate = (
-    <button className="action" disabled={busy || !text.trim()} onClick={generateNow}>
-      {busy ? "Working…" : has ? "Generate again" : "Generate"}
-    </button>
-  );
-  const upload = (
-    <button className="action" disabled={busy} onClick={() => file.current?.click()}>Upload</button>
-  );
 
   if (props.readOnly) {
     return (
@@ -66,62 +60,57 @@ export default function Clip(props: {
     );
   }
 
-  const options = (
-    <>
-      <button
-        className="action min-w-control-sm px-2"
-        aria-label={`Audio options for ${name}`}
-        disabled={busy}
-        popoverTarget={menu}
-        style={{ anchorName: anchor }}
-      >
-        <svg viewBox="0 0 16 4" width="16" height="4" aria-hidden="true" fill="currentColor">
-          <circle cx="2" cy="2" r="1.6" /><circle cx="8" cy="2" r="1.6" /><circle cx="14" cy="2" r="1.6" />
-        </svg>
-      </button>
-      <div id={menu} popover="auto" className="options" style={{ positionAnchor: anchor }}>
-        <button className="options-item" popoverTarget={menu} popoverTargetAction="hide" disabled={!text.trim()} onClick={generateNow}>
-          Generate again
-        </button>
-        <button className="options-item" popoverTarget={menu} popoverTargetAction="hide" onClick={() => file.current?.click()}>
-          Upload MP3…
-        </button>
-        <button
-          className="options-item"
-          popoverTarget={menu}
-          popoverTargetAction="hide"
-          onClick={() => run(() => api(`/api/audio/${note.id}/${slot}`, { method: "DELETE" }))}
-        >
-          Remove audio
-        </button>
-      </div>
-    </>
+  const working = busy || Boolean(props.extra?.busy);
+  const canGenerate = Boolean(text.trim());
+  const item = (label: string, onClick: () => void, disabled = false) => (
+    <button className="options-item" popoverTarget={menu} popoverTargetAction="hide" disabled={disabled} onClick={onClick}>
+      {label}
+    </button>
   );
 
   return (
     <div role="group" aria-label={`Audio for ${name}`} className="flex flex-col items-center gap-0.5">
       <div className="flex items-center gap-2 text-sm">
         {has && (
-          <button className="action min-w-control-sm px-2" aria-label={`Play ${name}`} onClick={play}>
-            <svg viewBox="0 0 10 10" width="12" height="12" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>
+          <button
+            className={`action min-w-control-sm px-2 ${working ? "cursor-progress" : ""}`}
+            aria-label={`Play ${name}`}
+            aria-busy={working || undefined}
+            onClick={() => !working && play()}
+          >
+            {working ? <Spinner size={12} /> : <svg viewBox="0 0 10 10" width="12" height="12" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>}
           </button>
         )}
-        {has ? (
+        {has && clip.outdated && (
           <>
-            {clip.outdated ? (
-              <>
-                <span className="text-warn">Audio is out of date</span>
-                {generate}
-              </>
-            ) : (
-              busy && <span className="text-quiet">Working…</span>
-            )}
-            {options}
+            <span className="text-warn">Audio is out of date</span>
+            <button className="action" disabled={working || !canGenerate} onClick={generateNow}>Regenerate</button>
           </>
-        ) : (
-          <>{generate}{upload}</>
         )}
+        <button
+          className="action min-w-control-sm px-2"
+          aria-label={`Audio options for ${name}`}
+          aria-busy={(working && !has) || undefined}
+          disabled={working}
+          popoverTarget={menu}
+          style={{ anchorName: anchor }}
+        >
+          {working && !has ? (
+            <Spinner size={16} />
+          ) : (
+            <svg viewBox="0 0 16 4" width="16" height="4" aria-hidden="true" fill="currentColor">
+              <circle cx="2" cy="2" r="1.6" /><circle cx="8" cy="2" r="1.6" /><circle cx="14" cy="2" r="1.6" />
+            </svg>
+          )}
+        </button>
+        <div id={menu} popover="auto" className="options" style={{ positionAnchor: anchor }}>
+          {item(has ? "Regenerate" : "Generate", generateNow, !canGenerate)}
+          {item("Upload", () => file.current?.click())}
+          {has && item("Remove", () => run(() => api(`/api/audio/${note.id}/${slot}`, { method: "DELETE" })))}
+          {props.extra && item(props.extra.label, props.extra.onSelect)}
+        </div>
       </div>
+      <span role="status" className="sr-only">{working ? "Working…" : ""}</span>
       <input
         ref={file}
         type="file"

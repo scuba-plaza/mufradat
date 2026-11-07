@@ -1,15 +1,18 @@
 "use client";
 import { useRef, useState } from "react";
 import { refusal } from "./api";
+import Spinner from "./Spinner";
 
 export default function ExportButton({ q, count }: { q: string; count: number }) {
   const [message, setMessage] = useState("");
+  const [preparing, setPreparing] = useState(false);
   const building = useRef(false);
 
   async function exportDeck() {
     if (building.current) return;
     building.current = true;
-    setMessage("Preparing the deck…");
+    setPreparing(true);
+    setMessage("");
     try {
       const res = await fetch(q.trim() === "" ? "/api/export" : `/api/export?q=${encodeURIComponent(q)}`);
       if (!res.ok) throw await refusal(res);
@@ -23,6 +26,7 @@ export default function ExportButton({ q, count }: { q: string; count: number })
       setMessage((e as Error).message);
     } finally {
       building.current = false;
+      setPreparing(false);
     }
   }
 
@@ -33,13 +37,18 @@ export default function ExportButton({ q, count }: { q: string; count: number })
         className="action min-h-control min-w-control px-0"
         title={`Export ${count} approved ${count === 1 ? "card" : "cards"}`}
         disabled={count === 0}
+        aria-busy={preparing || undefined}
         onClick={exportDeck}
       >
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" />
-        </svg>
+        {preparing ? (
+          <Spinner size={18} />
+        ) : (
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" />
+          </svg>
+        )}
       </button>
-      <p role="status" className="w-full break-words px-1 text-sm text-quiet empty:hidden">{message}</p>
+      <p role="status" className={preparing ? "sr-only" : "w-full break-words px-1 text-sm text-quiet empty:hidden"}>{preparing ? "Preparing the deck…" : message}</p>
     </>
   );
 }

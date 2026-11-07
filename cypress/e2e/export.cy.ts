@@ -92,13 +92,32 @@ describe("the export icon", () => {
     });
   });
 
-  it("says Preparing the deck… while it is built and nothing once it is on its way", () => {
+  it("shows a spinner in place of the icon while the deck is built, and moves nothing", () => {
     approvedCard(4403);
     visit("/");
     cy.intercept("GET", "/api/export*", { delay: 600, headers: deckHeaders, body: "x" });
-    cy.get(exportButton).click();
-    cy.get(status).should("have.text", "Preparing the deck…");
-    cy.get(status).should("have.text", "");
+    cy.get(exportButton).then(($icon) => {
+      cy.get(searchBar).then(($input) => {
+        const page = $icon[0].ownerDocument;
+        const place = (el: Element) => {
+          const box = el.getBoundingClientRect();
+          return [box.left, box.top + page.defaultView!.scrollY, box.width, box.height];
+        };
+        const before = [$icon[0], $input[0], page.querySelector("main")!].map(place);
+        cy.wrap($icon).click();
+        cy.get(exportButton).should("have.attr", "aria-busy", "true");
+        cy.get(`${exportButton} path[d="M12 15V3"]`).should("not.exist");
+        cy.get(exportButton).should(($now) => {
+          const after = [$now[0], page.querySelector(searchBar)!, page.querySelector("main")!].map(place);
+          expect(after).to.deep.equal(before);
+        });
+        cy.get(status).then(($line) => expect($line[0].getBoundingClientRect().height).to.be.at.most(1));
+        cy.get(status).should("have.text", "Preparing the deck…");
+        cy.get(exportButton).should("not.have.attr", "aria-busy");
+        cy.get(`${exportButton} path[d="M12 15V3"]`).should("exist");
+        cy.get(status).should("have.text", "");
+      });
+    });
   });
 
   it("asks for the deck once however often it is clicked while it is built", () => {

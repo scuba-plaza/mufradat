@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SnapshotInfo, SnapshotReason, SnapshotUsage, WorkspaceCheck } from "@/lib/types";
 import { api } from "./api";
 import { plural, size } from "./format";
+import Spinner from "./Spinner";
 
 interface BackupsData {
   snapshots: SnapshotInfo[];
@@ -163,7 +164,10 @@ export default function Backups({ open, onClose }: { open: boolean; onClose: () 
               <>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button className="action" disabled={busy} onClick={backUp}>Back up now</button>
-                  <button className="action" disabled={busy} onClick={() => picker.current?.click()}>Import backup…</button>
+                  <button className="action relative" disabled={busy} aria-busy={importing || undefined} onClick={() => picker.current?.click()}>
+                    <span className={importing ? "invisible" : ""}>Import backup…</span>
+                    {importing && <span className="absolute inset-0 flex items-center justify-center"><Spinner size={16} /></span>}
+                  </button>
                   <input
                     ref={picker}
                     type="file"
@@ -176,7 +180,7 @@ export default function Backups({ open, onClose }: { open: boolean; onClose: () 
                     }}
                   />
                 </div>
-                {importing && <p role="status" className="mt-2">Importing…</p>}
+                <p role="status" className="sr-only">{importing ? "Importing…" : ""}</p>
                 {data.snapshots.length === 0 ? (
                   <p className="mt-4">No backups yet.</p>
                 ) : (

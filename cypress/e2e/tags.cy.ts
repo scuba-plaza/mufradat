@@ -132,4 +132,40 @@ describe("the tags and details of a card", () => {
     cy.get('dialog[open] [role="alert"]').should("not.exist");
     cy.get(addTag).should("have.value", "");
   });
+
+  it("styles Root and Verb form like the Add tag input", () => {
+    openWord(4210);
+    cy.get(tagsButton).click();
+    cy.get(addTag).blur();
+    const look = ($el: JQuery<HTMLElement>) => {
+      const style = getComputedStyle($el[0]);
+      return [style.backgroundColor, style.borderTopWidth, style.borderTopColor, style.borderTopLeftRadius, style.paddingLeft, style.minHeight];
+    };
+    for (const label of ["Root", "Verb form"]) {
+      cy.get(`dialog[open] ${by(label)}`).should(($field) => expect(look($field)).to.deep.equal(look(Cypress.$(addTag))));
+    }
+  });
+
+  for (const height of [720, 800]) {
+    it(`fits the dialog without a scrollbar at 1280x${height}, also with a tag`, () => {
+      cy.viewport(1280, height);
+      openWord(4211);
+      setTags(["lesson_1"]);
+      reopen();
+      cy.get("dialog[open]").should(($dialog) => {
+        expect($dialog[0].scrollHeight).to.be.at.most($dialog[0].clientHeight);
+      });
+    });
+  }
+
+  it("keeps the height of the dialog when the first tag is added", () => {
+    openWord(4212);
+    cy.get(tagsButton).click();
+    cy.get("dialog[open]").then(($dialog) => {
+      const before = $dialog[0].getBoundingClientRect().height;
+      cy.get(addTag).type("lesson_1{enter}");
+      cy.get(chips).should("have.length", 1);
+      cy.get("dialog[open]").should(($now) => expect($now[0].getBoundingClientRect().height).to.equal(before));
+    });
+  });
 });

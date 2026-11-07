@@ -8,7 +8,7 @@ export default function Details(props: {
 }) {
   const { note, save } = props;
   return (
-    <div className="grid max-w-sm gap-4">
+    <div className="grid gap-4 sm:grid-cols-2">
       <label className="grid gap-1">
         <span className="text-sm text-quiet">Part of speech</span>
         <select className="field" value={note.pos} onChange={(e) => save({ pos: e.target.value as POS })}>
@@ -26,11 +26,11 @@ export default function Details(props: {
       </label>
       <label className="grid gap-1">
         <span className="text-sm text-quiet">Root</span>
-        <InlineText label="Root" value={note.root} arabic className="text-ar-sm" onSave={(root) => save({ root })} />
+        <InlineText label="Root" value={note.root} arabic boxed className="text-ar-sm" onSave={(root) => save({ root })} />
       </label>
       <label className="grid gap-1">
         <span className="text-sm text-quiet">Verb form</span>
-        <InlineText label="Verb form" value={note.verbForm} onSave={(verbForm) => save({ verbForm })} />
+        <InlineText label="Verb form" value={note.verbForm} boxed onSave={(verbForm) => save({ verbForm })} />
       </label>
     </div>
   );

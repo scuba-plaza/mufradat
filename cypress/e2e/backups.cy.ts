@@ -250,4 +250,18 @@ describe("a long list of backups", () => {
       });
     });
   }
+
+  it("shows a spinner on Import backup while it imports, and moves nothing", () => {
+    cy.intercept("POST", "/api/backups/import", (req) => req.reply({ delay: 800, statusCode: 400, body: { error: "This is not a backup." } }));
+    openDialog();
+    backUp();
+    cy.get(`${dialog} ol[aria-label="Backups"]`).then(($list) => {
+      const before = $list[0].getBoundingClientRect().top;
+      cy.get(`${dialog} input[type="file"]`).selectFile({ contents: Cypress.Buffer.from("x"), fileName: "backup.zip", mimeType: "application/zip" }, { force: true });
+      cy.contains(`${dialog} button`, "Import backup").should("have.attr", "aria-busy", "true");
+      cy.get(`${dialog} ol[aria-label="Backups"]`).should(($now) => expect($now[0].getBoundingClientRect().top).to.equal(before));
+      cy.get(dialog).should("contain", "This is not a backup.");
+      cy.contains(`${dialog} button`, "Import backup").should("not.have.attr", "aria-busy");
+    });
+  });
 });

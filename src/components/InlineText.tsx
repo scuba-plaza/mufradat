@@ -8,6 +8,7 @@ export default function InlineText(props: {
   onSave: (v: string) => void;
   placeholder?: string;
   arabic?: boolean;
+  boxed?: boolean;
   className?: string;
 }) {
   const [v, setV] = useState(props.value);
@@ -20,7 +21,7 @@ export default function InlineText(props: {
       onChange={(e) => setV(e.target.value)}
       onBlur={() => v !== props.value && props.onSave(v)}
       onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && e.currentTarget.blur()}
-      className={`edit ${props.arabic ? "ar" : ""} ${props.className ?? ""}`}
+      className={`${props.boxed ? "field" : "edit"} ${props.arabic ? "ar" : ""} ${props.className ?? ""}`}
       {...(props.arabic ? { lang: "ar", dir: "rtl" } : {})}
     />
   );

@@ -11,6 +11,7 @@ import FormsDialog from "./FormsDialog";
 import InlineText from "./InlineText";
 import { keyPressed } from "./keys";
 import ResetDialog from "./ResetDialog";
+import Spinner from "./Spinner";
 import TagsAndDetailsDialog from "./TagsAndDetailsDialog";
 
 const SAVE_TEXT = { idle: "", saving: "Saving…", saved: "Saved", failed: "Not saved" };
@@ -141,9 +142,9 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
     return () => window.removeEventListener("keydown", onKey);
   }, [note.id, q]);
 
-  const clip = (slot: string, name: string, text: string) => (
+  const clip = (slot: string, name: string, text: string, extra?: { label: string; busy: boolean; onSelect: () => void }) => (
     <div className="mt-2">
-      <Clip note={note} slot={slot} name={name} text={text} onNote={setNote} />
+      <Clip note={note} slot={slot} name={name} text={text} onNote={setNote} extra={extra} />
     </div>
   );
 
@@ -201,12 +202,15 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
         {note.example.trim() !== "" && (
           <>
             <InlineText label="Example in English" placeholder="Add the English translation" value={note.exampleEn} className="mt-2 text-center text-lg" onSave={(exampleEn) => save({ exampleEn })} />
-            {clip("example", "the example", plainExample(note.example))}
+            {clip("example", "the example", plainExample(note.example), { label: "New example", busy: exampleBusy, onSelect: generateExample })}
           </>
         )}
-        <button className="action mt-5" disabled={exampleBusy} onClick={generateExample}>
-          {exampleBusy ? "Asking Mistral…" : note.example ? "New example" : "Generate example"}
-        </button>
+        {note.example.trim() === "" && (
+          <button className="action relative mt-5" disabled={exampleBusy} aria-busy={exampleBusy || undefined} onClick={generateExample}>
+            <span className={exampleBusy ? "invisible" : ""}>Generate example</span>
+            {exampleBusy && <span className="absolute inset-0 flex items-center justify-center"><Spinner size={16} /></span>}
+          </button>
+        )}
         {(exampleProblem || note.exampleError) && <p className="mt-1 text-sm text-danger">{exampleProblem || note.exampleError}</p>}
       </div>
 
