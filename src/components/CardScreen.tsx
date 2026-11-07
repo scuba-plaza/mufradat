@@ -126,7 +126,14 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
     <div className="pb-[var(--bar-h)]">
       <h1 className="sr-only">{note.lemma}</h1>
       <div className="flex items-center justify-between gap-4 px-1 py-1 text-sm text-quiet">
-        <span>{note.rank > 0 ? `Word ${note.rank} of ${total}` : ""}</span>
+        <div className="flex items-center gap-1">
+          <span>{note.rank > 0 ? `Word ${note.rank} of ${total}` : ""}</span>
+          <button className="action-quiet min-w-control-sm px-2" aria-label="Reset word" title="Reset word" aria-haspopup="dialog" onClick={() => setResetOpen(true)}>
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" />
+            </svg>
+          </button>
+        </div>
         <span role="status">{SAVE_TEXT[saved]}</span>
       </div>
 
@@ -170,7 +177,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
         {(exampleProblem || note.exampleError) && <p className="mt-1 text-sm text-danger">{exampleProblem || note.exampleError}</p>}
       </div>
 
-      <Details note={note} save={save} onReset={() => setResetOpen(true)} />
+      <Details note={note} save={save} />
       <FormsDialog note={note} open={formsOpen} onClose={() => setFormsOpen(false)} save={save} onNote={setNote} />
       <ResetDialog note={note} open={resetOpen} busy={leaving} onClose={() => setResetOpen(false)} onReset={reset} />
       <ActionBar note={note} problems={problems} leaving={leaving} onApprove={approve} />

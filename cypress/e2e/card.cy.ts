@@ -356,8 +356,7 @@ describe("resetting a word", () => {
     cy.contains(status, "Saved");
   };
   const askToReset = () => {
-    cy.contains("summary", "Details").click();
-    cy.contains("button", "Reset word").click();
+    cy.get(by("Reset word")).click();
     cy.get("dialog[open]").should("contain", "Reset this word?");
   };
 
@@ -394,5 +393,34 @@ describe("resetting a word", () => {
     cy.get("dialog[open]").contains("button", "Reset").click();
     cy.location("search").should("eq", `?q=${encodeURIComponent(query)}`);
     cy.wordRow(207).should("exist");
+  });
+
+  it("puts Reset word right of the word counter, with Details closed", () => {
+    openWord(209);
+    cy.get("details").should("not.have.attr", "open");
+    cy.contains("span", "Word 209 of 5000").then(($counter) => {
+      cy.get(by("Reset word")).should("be.visible").then(($button) => {
+        const counter = $counter[0].getBoundingClientRect();
+        const button = $button[0].getBoundingClientRect();
+        expect(button.left).to.be.at.least(counter.right);
+        expect(Math.abs((button.top + button.bottom) / 2 - (counter.top + counter.bottom) / 2)).to.be.at.most(8);
+      });
+    });
+    cy.axe(by("Reset word"));
+  });
+
+  it("no longer has Reset word inside Details", () => {
+    openWord(210);
+    cy.contains("summary", "Details").click();
+    cy.contains("label", "Verb form").should("be.visible");
+    cy.get("details").should("not.contain", "Reset word");
+  });
+
+  it("gives the focus back to the Reset word button after Cancel", () => {
+    openWord(211);
+    askToReset();
+    cy.get("dialog[open]").contains("button", "Cancel").click();
+    cy.get("dialog[open]").should("not.exist");
+    cy.focused().should("have.attr", "aria-label", "Reset word");
   });
 });

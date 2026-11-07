@@ -6,7 +6,6 @@ import InlineText from "./InlineText";
 export default function Details(props: {
   note: Note;
   save: (patch: Record<string, unknown>) => void;
-  onReset: () => void;
 }) {
   const { note, save } = props;
   return (
@@ -36,10 +35,6 @@ export default function Details(props: {
           <span className="text-sm text-quiet">Verb form</span>
           <InlineText label="Verb form" value={note.verbForm} onSave={(verbForm) => save({ verbForm })} />
         </label>
-        <div className="grid justify-items-start gap-1 border-t border-rule pt-4">
-          <button className="action" aria-haspopup="dialog" onClick={props.onReset}>Reset word</button>
-          <p className="text-sm text-quiet">Deletes this card, so that the word starts over.</p>
-        </div>
       </div>
     </details>
   );

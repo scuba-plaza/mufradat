@@ -156,6 +156,16 @@ describe("a card made outside the list", () => {
   });
 });
 
+describe("resetting a card made outside the list", () => {
+  it("has the button without a word counter, and says the word leaves the list", () => {
+    cy.visit(`/open?lemma=${encodeURIComponent("آجَرَ")}&pos=verb`);
+    cy.hydrated('[aria-label="Hint"]');
+    cy.contains("Word ").should("not.exist");
+    cy.get('[aria-label="Reset word"]').click();
+    cy.get("dialog[open]").should("contain", "The word leaves your list; search for it to add it again.");
+  });
+});
+
 describe("the search bar", () => {
   it("searches when you press Enter, keeps what you typed in the box, and counts the words it found", () => {
     cy.visit("/");
