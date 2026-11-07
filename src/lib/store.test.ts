@@ -164,8 +164,13 @@ describe("tagging a card", () => {
     const s = openStore(":memory:");
     const n = s.createNote(kitab);
     s.setTags(n.id, ["a"]);
-    expect(() => s.deleteNote(n.id)).not.toThrow();
+    s.deleteNote(n.id);
     expect(s.getNote(n.id)).toBeNull();
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-tags-")), "copy.db");
+    s.exportDatabase(file);
+    const raw = new Database(file, { readonly: true });
+    expect(raw.prepare("SELECT count(*) AS n FROM note_tags").get()).toEqual({ n: 0 });
+    raw.close();
   });
 });
 

@@ -30,6 +30,8 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
   const [leaving, setLeaving] = useState(false);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const tags = useRef(initial.tags);
+  const tagsOpenRef = useRef(false);
+  tagsOpenRef.current = tagsOpen;
 
   /** Changes happen one at a time, in the order they were made, so that approving never overtakes a save. */
   const later = (work: () => Promise<void>) => {
@@ -69,6 +71,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
         } catch (e) {
           setTagProblem((e as Error).message);
           setSaved("failed");
+          if (!tagsOpenRef.current) setTagsOpen(true);
           resolve(false);
         }
       }),

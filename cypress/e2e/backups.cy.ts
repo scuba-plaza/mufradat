@@ -252,7 +252,7 @@ describe("a long list of backups", () => {
   }
 
   it("shows a spinner on Import backup while it imports, and moves nothing", () => {
-    cy.intercept("POST", "/api/backups/import", (req) => req.reply({ delay: 800, statusCode: 400, body: { error: "This is not a backup." } }));
+    cy.intercept("POST", "/api/backups/import", (req) => req.reply({ delay: 1500, statusCode: 400, body: { error: "This is not a backup." } }));
     openDialog();
     backUp();
     cy.get(`${dialog} ol[aria-label="Backups"]`).then(($list) => {

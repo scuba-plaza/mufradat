@@ -34,7 +34,6 @@ function RailButton(props: { icon: keyof typeof ICONS; title: string; onClick: (
   );
 }
 
-/** The audio of one text. `name` says what it is for, such as "the word". Editable, it wraps the field it belongs to and keeps its actions in a capsule on the right; its border shows whether there is audio. */
 export default function Clip(props: {
   note: Note;
   slot: string;
@@ -77,6 +76,10 @@ export default function Clip(props: {
 
   const generateNow = () => run(() => post("/api/tts", { id: note.id, slot }));
 
+  const message = problem || clip?.error || props.problem || "";
+  const { onMessage } = props;
+  useEffect(() => onMessage?.(message), [onMessage, message]);
+
   if (props.readOnly) {
     return (
       <span role="group" aria-label={`Audio for ${name}`} className="inline-flex min-h-control-sm items-center gap-1">
@@ -94,9 +97,6 @@ export default function Clip(props: {
 
   const working = busy || Boolean(props.extra?.busy);
   const canGenerate = Boolean(text.trim());
-  const message = problem || clip?.error || props.problem || "";
-  const { onMessage } = props;
-  useEffect(() => onMessage?.(message), [onMessage, message]);
   const tone = message ? "border-danger" : clip?.outdated ? "border-warn" : has ? "border-rule-strong" : "border-dashed border-rule-strong";
 
   return (

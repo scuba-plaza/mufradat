@@ -31,7 +31,10 @@ function visit(path: string) {
 describe("the export icon", () => {
   afterEach(() => {
     cy.colorScheme("light");
-    tagged.splice(0).forEach((id) => cy.request("PUT", `/api/notes/${id}/tags`, { tags: [] }));
+    tagged.splice(0).forEach((id) => {
+      cy.request("PUT", `/api/notes/${id}/tags`, { tags: [] });
+      cy.request("PUT", `/api/notes/${id}`, {});
+    });
   });
 
   it("sits right of Search, is named by how many approved cards the search holds, and exports exactly those", () => {
@@ -96,7 +99,7 @@ describe("the export icon", () => {
   it("shows a spinner in place of the icon while the deck is built, and moves nothing", () => {
     approvedCard(4403);
     visit("/");
-    cy.intercept("GET", "/api/export*", { delay: 600, headers: deckHeaders, body: "x" });
+    cy.intercept("GET", "/api/export*", { delay: 1500, headers: deckHeaders, body: "x" });
     cy.get(exportButton).then(($icon) => {
       cy.get(searchBar).then(($input) => {
         const page = $icon[0].ownerDocument;
@@ -124,7 +127,7 @@ describe("the export icon", () => {
   it("asks for the deck once however often it is clicked while it is built", () => {
     approvedCard(4403);
     visit("/");
-    cy.intercept("GET", "/api/export*", { delay: 600, headers: deckHeaders, body: "x" }).as("export");
+    cy.intercept("GET", "/api/export*", { delay: 1500, headers: deckHeaders, body: "x" }).as("export");
     cy.get(exportButton).dblclick();
     cy.get(status).should("have.text", "Preparing the deck…");
     cy.get(status).should("have.text", "");

@@ -26,7 +26,10 @@ function reopen() {
 describe("the tags and details of a card", () => {
   afterEach(() => {
     cy.colorScheme("light");
-    tagged.splice(0).forEach((id) => cy.request("PUT", `/api/notes/${id}/tags`, { tags: [] }));
+    tagged.splice(0).forEach((id) => {
+      cy.request("PUT", `/api/notes/${id}/tags`, { tags: [] });
+      cy.request("PUT", `/api/notes/${id}`, {});
+    });
   });
 
   it("has one icon button for tags and details, right of Reset word", () => {

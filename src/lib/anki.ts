@@ -14,6 +14,7 @@ const FONT_MEDIA_NAME = "_" + FONT_FILE;
 const PRODUCTION_TOP = 1000;
 const PRODUCTION_DELAY = 20;
 const UNRANKED_BASE = 10000;
+const UNRANKED_EPOCH = Date.parse("2025-01-01T00:00:00Z") / 1000;
 const TEMPLATES_REVISED = Date.UTC(2026, 9, 9, 12, 0, 0);
 const DESCRIPTION =
   "The most common Modern Standard Arabic words in frequency order, with fully vowelled examples.";
@@ -156,7 +157,6 @@ export function buildApkg(notes: Note[], readAudio: (key: string, place: ClipPla
 
   const ordered = [...notes].sort(studyOrder);
   const media = new Map<string, Uint8Array>([[FONT_MEDIA_NAME, font]]);
-  let unranked = 0;
   const rows = ordered.map((n) => {
     const v = Object.fromEntries(FIELDS.map((f) => [f, ""])) as Record<Field, string>;
     v.Arabic = escapeHtml(n.lemma);
@@ -180,7 +180,7 @@ export function buildApkg(notes: Note[], readAudio: (key: string, place: ClipPla
     v.FormsAudio = n.forms.map((f) => use(f.id)).join("");
     v.ExampleAudio = n.example.trim() ? use("example") : "";
 
-    const due = n.rank > 0 ? n.rank : UNRANKED_BASE + ++unranked;
+    const due = n.rank > 0 ? n.rank : UNRANKED_BASE + Math.max(0, Math.floor(Date.parse(n.createdAt) / 1000 - UNRANKED_EPOCH));
     const cards = [{ ord: 0, due }];
     if (n.rank > 0 && n.rank <= PRODUCTION_TOP) {
       v.Production = "y";

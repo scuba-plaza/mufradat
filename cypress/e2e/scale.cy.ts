@@ -54,7 +54,7 @@ describe("the scale of the interface", () => {
     it("fits a card with four forms, a marked example and its clips, with room to spare", () => {
       openFullCard(6);
       cy.get('[aria-label="Audio for the example"]').should(($button) => {
-        const content = $button[0].getBoundingClientRect().bottom;
+        const content = $button[0].parentElement!.parentElement!.getBoundingClientRect().bottom;
         const barTop = $button[0].ownerDocument.querySelector(bar)!.getBoundingClientRect().top;
         expect(barTop - content, "room between the last content and the bar").to.be.at.least(20);
       });

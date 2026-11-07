@@ -120,7 +120,9 @@ describe("exporting approved cards", () => {
     const due = (lemma: string) => c.cards.filter((x) => x.guid === notes.find((n) => n.lemma === lemma)!.id).map((x) => [x.ord, x.due]);
     expect(due("أَ")).toEqual([[0, 1000], [1, 1020]]);
     expect(due("بَ")).toEqual([[0, 1001]]);
-    expect([due("جَ")[0][1], due("دَ")[0][1]].sort()).toEqual([10001, 10002]);
+    const alone = collection(buildApkg([notes[2]], read(s), options));
+    expect(due("جَ")[0][1]).toBeGreaterThan(10000);
+    expect(alone.cards.map((x) => x.due)).toEqual([due("جَ")[0][1]]);
   });
 
   it("packs the font and exactly the audio the cards use", () => {

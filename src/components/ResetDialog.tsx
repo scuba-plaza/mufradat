@@ -24,7 +24,7 @@ export default function ResetDialog(props: { note: Note; open: boolean; busy: bo
       <div className="p-6">
         <h2 id="reset-title" className="text-xl font-semibold tracking-title">Reset this word?</h2>
         <p className="mt-2 text-sm text-quiet">
-          The card is deleted with its example, forms and audio clips.{" "}
+          The card is deleted with its example, forms, tags and audio clips.{" "}
           {note.rank > 0 ? "The word goes back to Not started." : "The word leaves your list; search for it to add it again."}
           {note.status === "approved" && " It is no longer part of the Anki export."}
         </p>

@@ -23,7 +23,7 @@ export default function TagsAndDetailsDialog(props: {
     if (!el) return;
     if (props.open && !el.open) {
       el.showModal();
-      input.current?.focus();
+      if (window.matchMedia("(pointer: fine)").matches) input.current?.focus();
     }
     if (!props.open && el.open) el.close();
   }, [props.open]);
@@ -51,7 +51,6 @@ export default function TagsAndDetailsDialog(props: {
           <div className="mt-3">
             <Details note={note} save={props.save} />
           </div>
-
         </section>
         <div className="mt-6 flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1 break-words text-sm text-danger">

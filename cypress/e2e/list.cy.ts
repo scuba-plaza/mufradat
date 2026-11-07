@@ -202,12 +202,12 @@ describe("the search bar", () => {
     });
 
     it("filters the list by tag", () => {
-      tag(4301, ["zz_one"]);
-      tag(4302, ["zz_two"]);
+      tag(4301, ["listspec_one"]);
+      tag(4302, ["listspec_two"]);
       tag(4303, ["other"]);
       cy.visit("/");
-      cy.get(bar).type("tag:zz_*{enter}");
-      cy.location("search").should("eq", `?q=${encodeURIComponent("tag:zz_*")}`);
+      cy.get(bar).type("tag:listspec_*{enter}");
+      cy.location("search").should("eq", `?q=${encodeURIComponent("tag:listspec_*")}`);
       cy.get(rows).should("have.length", 2);
       cy.wordRow(4301).should("exist");
       cy.wordRow(4302).should("exist");
