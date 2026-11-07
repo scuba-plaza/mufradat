@@ -82,6 +82,51 @@ export function markTarget(sentence: string, named: string): string | null {
   return null;
 }
 
+const MARK_OR_TATWEEL = /[ً-ٰٟـ]/;
+const SUFFIX = "(?:ه|ها|هم|هن|هما|ك|كم|كن|كما|ني|نا|ي)?";
+
+function stemSpan(word: string, stem: string): { start: number; end: number } | null {
+  const letterAt = [...word].flatMap((c, i) => (MARK_OR_TATWEEL.test(c) ? [] : [{ c: skeleton(c), i }]));
+  const found = new RegExp(`^([وف]?)(لل|[بكل]?)(ال)?(${stem})${SUFFIX}$`).exec(letterAt.map((l) => l.c).join(""));
+  if (!found) return null;
+  const start = letterAt[found[1].length + found[2].length].i;
+  let end = letterAt[found[1].length + found[2].length + (found[3] ?? "").length + stem.length - 1].i + 1;
+  while (end < word.length && MARK_OR_TATWEEL.test(word[end])) end++;
+  return { start, end };
+}
+
+function markStem(sentence: string, named: string): string | null {
+  const stem = letters(named);
+  if (stem === "") return null;
+  const hits = [...sentence.matchAll(WORD)].flatMap((m) => {
+    const span = stemSpan(m[0], stem);
+    return span ? [{ start: m.index + span.start, end: m.index + span.end }] : [];
+  });
+  if (hits.length !== 1) return null;
+  const { start, end } = hits[0];
+  return `${sentence.slice(0, start)}[${sentence.slice(start, end)}]${sentence.slice(end)}`;
+}
+
+export function autoMark(sentence: string, words: string[]): string | null {
+  for (const word of words) {
+    const marked = markTarget(sentence, word) ?? markStem(sentence, word);
+    if (marked) return marked;
+  }
+  return null;
+}
+
+export function markSelection(draft: string, start: number, end: number): string {
+  const plain = plainExample(draft);
+  let from = plainExample(draft.slice(0, start)).length;
+  let to = plainExample(draft.slice(0, end)).length;
+  while (from < to && /\s/.test(plain[from])) from++;
+  while (to > from && /\s/.test(plain[to - 1])) to--;
+  if (from === to || (from === 0 && to === plain.length)) return draft;
+  const parts = splitExample(draft);
+  if (parts && from === parts.before.length && to === from + parts.target.length) return plain;
+  return `${plain.slice(0, from)}[${plain.slice(from, to)}]${plain.slice(to)}`;
+}
+
 /** What stops a card from being approved. */
 export function approvalProblems(n: Note): string[] {
   const problems: string[] = [];

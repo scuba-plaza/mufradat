@@ -83,7 +83,6 @@ describe("the layout of a card", () => {
       what: string;
       rank: number;
       written?: boolean;
-      editing?: boolean;
       above: (doc: Document) => Element | null;
       below: (doc: Document) => Element | null;
     }[] = [
@@ -92,11 +91,10 @@ describe("the layout of a card", () => {
       { what: "the English meaning and the example", rank: 7, above: (doc) => doc.querySelector(by("English meaning")), below: (doc) => doc.querySelector(`${example} button`) },
       { what: "an empty example and the English translation", rank: 7, above: (doc) => doc.querySelector(example), below: (doc) => doc.querySelector(by("Example in English")) },
       { what: "the example and its translation", rank: 110, written: true, above: (doc) => doc.querySelector(example), below: (doc) => doc.querySelector(by("Example in English")) },
-      { what: "the example being edited and Mark target", rank: 111, editing: true, above: (doc) => doc.querySelector(`textarea${by("Example")}`), below: (doc) => byText(doc, "Mark target") },
     ];
 
     for (const [width, height] of [[1920, 1100], [390, 844]]) {
-      for (const { what, rank, written, editing, above, below } of pairs) {
+      for (const { what, rank, written, above, below } of pairs) {
         it(`leaves at least ${minimumGap}px between ${what} at ${width}px`, () => {
           cy.viewport(width, height);
           openWord(rank);
@@ -107,7 +105,6 @@ describe("the layout of a card", () => {
               cy.hydrated(by("Hint"));
             });
           }
-          if (editing) cy.get(by("Example")).click();
           cy.document().should((doc) => {
             const upper = above(doc);
             const lower = below(doc);

@@ -1,9 +1,8 @@
 "use client";
 import { useEffect, useRef, useState, type FocusEvent } from "react";
-import { plainExample, splitExample } from "@/lib/validate";
+import { autoMark, markSelection, splitExample } from "@/lib/validate";
 
-/** The example sentence: shown with its target word marked, and edited in the same place as `[target]` markup. */
-export default function ExampleText(props: { value: string; onSave: (v: string) => void }) {
+export default function ExampleText(props: { value: string; words: string[]; onSave: (v: string) => void }) {
   const [draft, setDraft] = useState(props.value);
   useEffect(() => setDraft(props.value), [props.value]);
   const [editing, setEditing] = useState(false);
@@ -19,22 +18,19 @@ export default function ExampleText(props: { value: string; onSave: (v: string) 
   function leave(e: FocusEvent<HTMLDivElement>) {
     if (e.currentTarget.contains(e.relatedTarget)) return;
     setEditing(false);
-    if (draft !== props.value) props.onSave(draft);
+    const final = /[[\]]/.test(draft) ? draft : (autoMark(draft, props.words) ?? draft);
+    setDraft(final);
+    if (final !== props.value) props.onSave(final);
   }
 
-  /** Puts the brackets around the selected text, wherever the old ones were. */
-  function mark() {
+  function markSelected() {
     const el = box.current;
-    if (!el || el.selectionStart === el.selectionEnd) return;
-    const plain = plainExample(draft);
-    const from = plainExample(draft.slice(0, el.selectionStart)).length;
-    const to = from + plainExample(draft.slice(el.selectionStart, el.selectionEnd)).length;
-    setDraft(`${plain.slice(0, from)}[${plain.slice(from, to)}]${plain.slice(to)}`);
+    if (el && el.selectionStart !== el.selectionEnd) setDraft(markSelection(draft, el.selectionStart, el.selectionEnd));
   }
 
   const unmarked = props.value !== "" && !splitExample(props.value);
   const warning = unmarked && (
-    <p className="mt-1 text-sm text-warn">It is not clear which word to highlight. Click the sentence, select the word and choose Mark target.</p>
+    <p className="mt-1 text-sm text-warn">It is not clear which word to highlight. Click the sentence and select the letters you are teaching.</p>
   );
 
   if (!editing) {
@@ -58,7 +54,7 @@ export default function ExampleText(props: { value: string; onSave: (v: string) 
   }
   return (
     <>
-      <div className="relative" onBlur={leave}>
+      <div onBlur={leave}>
         <textarea
           ref={box}
           aria-label="Example"
@@ -66,7 +62,10 @@ export default function ExampleText(props: { value: string; onSave: (v: string) 
           value={draft}
           lang="ar"
           dir="rtl"
+          title="Select the letters you are teaching to mark them"
           onChange={(e) => setDraft(e.target.value)}
+          onMouseUp={markSelected}
+          onKeyUp={markSelected}
           onKeyDown={(e) => {
             if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
             e.preventDefault();
@@ -74,10 +73,6 @@ export default function ExampleText(props: { value: string; onSave: (v: string) 
           }}
           className="edit ar block min-h-[calc(var(--ar-lg)*1.8+2px)] resize-none text-center text-ar-lg [field-sizing:content]"
         />
-        <p className="absolute inset-x-0 top-full z-10 mt-1 flex flex-wrap items-center justify-center gap-x-3 rounded-control border border-rule-strong bg-surface px-3 py-1 text-sm text-quiet shadow-modal">
-          <span>Select the word you are teaching, or put it in [square brackets].</span>
-          <button type="button" className="action" onMouseDown={(e) => e.preventDefault()} onClick={mark}>Mark target</button>
-        </p>
       </div>
       {warning}
     </>

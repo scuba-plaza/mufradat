@@ -75,13 +75,11 @@ describe("a word", () => {
     cy.get(`${by("Example")} mark`).should("have.text", "فِي");
   });
 
-  it("lets Tab move on from the example, by way of Mark target", () => {
+  it("lets Tab move on from the example to its English translation", () => {
     openWord(24);
     cy.get(by("English meaning")).focus();
     cy.press(Cypress.Keyboard.Keys.TAB);
     cy.focused().should("match", `textarea${by("Example")}`);
-    cy.press(Cypress.Keyboard.Keys.TAB);
-    cy.focused().should("contain", "Mark target");
     cy.press(Cypress.Keyboard.Keys.TAB);
     cy.focused().should("have.attr", "aria-label", "Example in English");
   });
@@ -91,39 +89,26 @@ describe("a word", () => {
     cy.get(by("Example")).click();
     cy.get(`textarea${by("Example")}`).type("الْكِتَابُ [فِي] الْحَقِيبَةِ");
     cy.press(Cypress.Keyboard.Keys.TAB);
-    cy.press(Cypress.Keyboard.Keys.TAB);
     cy.get(status).should("contain", "Saved");
     cy.reload();
     cy.get(`${by("Example")} mark`).should("have.text", "فِي");
   });
 
-  it("marks the selected text of the example as its target", () => {
+  it("marks the headword of the card by itself, and marks whatever letters are selected instead, with no button", () => {
     openWord(16);
     cy.get(by("Example")).click();
-    cy.get(`textarea${by("Example")}`).type("الْكِتَابُ فِي الْحَقِيبَةِ").then(($box) => {
-      const text = $box.val() as string;
-      const start = text.indexOf("فِي");
-      ($box[0] as HTMLTextAreaElement).setSelectionRange(start, start + "فِي".length);
-    });
-    cy.contains("button", "Mark target").click();
-    cy.get(`textarea${by("Example")}`).should("have.value", "الْكِتَابُ [فِي] الْحَقِيبَةِ").blur();
-    cy.get(`${by("Example")} mark`).should("have.text", "فِي");
-  });
-
-  it("marks the selected text of the example from the keyboard, and keeps the example open until Tab moves on", () => {
-    openWord(26);
+    cy.get(`textarea${by("Example")}`).type("تَحَدَّثْنَا عَنِ الْحَقِيبَةِ").blur();
+    cy.get(`${by("Example")} mark`).should("have.text", "عَنِ");
     cy.get(by("Example")).click();
-    cy.get(`textarea${by("Example")}`).type("الْكِتَابُ فِي الْحَقِيبَةِ").then(($box) => {
+    cy.get(`textarea${by("Example")}`).then(($box) => {
       const text = $box.val() as string;
-      const start = text.indexOf("فِي");
-      ($box[0] as HTMLTextAreaElement).setSelectionRange(start, start + "فِي".length);
+      const start = text.indexOf("حَقِيب");
+      ($box[0] as HTMLTextAreaElement).setSelectionRange(start, start + "حَقِيب".length);
     });
-    cy.press(Cypress.Keyboard.Keys.TAB);
-    cy.focused().should("contain", "Mark target");
-    cy.press(Cypress.Keyboard.Keys.SPACE);
-    cy.get(`textarea${by("Example")}`).should("have.value", "الْكِتَابُ [فِي] الْحَقِيبَةِ");
-    cy.press(Cypress.Keyboard.Keys.TAB);
-    cy.get(`${by("Example")} mark`).should("have.text", "فِي");
+    cy.get(`textarea${by("Example")}`).trigger("mouseup");
+    cy.get(`textarea${by("Example")}`).should("have.value", "تَحَدَّثْنَا عَنِ الْ[حَقِيب]َةِ").blur();
+    cy.get(`${by("Example")} mark`).should("have.text", "حَقِيب");
+    cy.contains("button", "Mark target").should("not.exist");
   });
 
   it("says when it is not clear which word of the example to highlight, until you mark it", () => {
@@ -142,7 +127,7 @@ describe("a word", () => {
       const start = ($box.val() as string).indexOf("فِي");
       ($box[0] as HTMLTextAreaElement).setSelectionRange(start, start + "فِي".length);
     });
-    cy.contains("button", "Mark target").click();
+    cy.get(`textarea${by("Example")}`).trigger("mouseup");
     cy.get(`textarea${by("Example")}`).blur();
     cy.get(`${by("Example")} mark`).should("have.text", "فِي");
     cy.contains("It is not clear which word to highlight").should("not.exist");

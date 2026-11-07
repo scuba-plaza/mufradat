@@ -214,7 +214,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
           extra={{ label: "New example", busy: exampleBusy, onSelect: generateExample }}
           problem={exampleProblem || note.exampleError || ""}
         >
-          <ExampleText value={note.example} onSave={(example) => save({ example })} />
+          <ExampleText value={note.example} words={[note.lemma, ...note.forms.map((f) => f.arabic)]} onSave={(example) => save({ example })} />
           <InlineText label="Example in English" placeholder="Add the English translation" value={note.exampleEn} className="mt-2 text-center text-lg" onSave={(exampleEn) => save({ exampleEn })} />
         </Clip>
       </div>
