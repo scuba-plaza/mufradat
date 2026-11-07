@@ -10,6 +10,7 @@ const ICONS = {
   regenerate: <><path d="M21 4v6h-6" /><path d="M3 20v-6h6" /><path d="M3.5 9a9 9 0 0 1 14.9-3.4L21 10" /><path d="M3 14l2.6 4.4A9 9 0 0 0 20.5 15" /></>,
   upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5" /><path d="M12 3v12" /></>,
   remove: <><path d="M3 6h18" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>,
+  removeForm: <><circle cx="12" cy="12" r="9" /><path d="M15 9l-6 6" /><path d="M9 9l6 6" /></>,
   newExample: <><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /><path d="M19 3v4" /><path d="M21 5h-4" /></>,
 };
 
@@ -41,9 +42,10 @@ export default function Clip(props: {
   text: string;
   onNote: (n: Note) => void;
   readOnly?: boolean;
-  extra?: { label: string; busy: boolean; onSelect: () => void };
+  extra?: { label: string; icon?: keyof typeof ICONS; busy?: boolean; onSelect: () => void };
   problem?: string;
   onMessage?: (message: string) => void;
+  inline?: boolean;
   children?: ReactNode;
 }) {
   const { note, slot, name, text } = props;
@@ -99,45 +101,58 @@ export default function Clip(props: {
   const canGenerate = Boolean(text.trim());
   const tone = message ? "border-danger" : clip?.outdated ? "border-warn" : has ? "border-rule-strong" : "border-dashed border-rule-strong";
 
+  const capsule = (
+    <div
+      role="group"
+      aria-label={`Audio for ${name}`}
+      className={`flex items-center rounded-full border bg-paper p-0.5 ${props.inline ? "" : "row-start-1 m-1 justify-self-center sm:col-start-3 sm:flex-col sm:justify-self-end"} ${tone}`}
+    >
+      <RailButton icon="play" title={`Play ${name}`} disabled={!has && !working} busy={working} onClick={() => !working && play()} />
+      <RailButton
+        icon={has ? "regenerate" : "generate"}
+        title={clip?.outdated ? "Regenerate (the Arabic changed)" : has ? "Regenerate" : "Generate"}
+        disabled={working || !canGenerate}
+        onClick={generateNow}
+      />
+      <RailButton icon="upload" title="Upload" disabled={working || !canGenerate} onClick={() => file.current?.click()} />
+      <RailButton icon="remove" title="Remove" disabled={working || !has} onClick={() => run(() => api(`/api/audio/${note.id}/${slot}`, { method: "DELETE" }))} />
+      {props.extra && (
+        <>
+          <span aria-hidden="true" className={`mx-px h-4 w-px bg-rule-strong/60 ${props.inline ? "" : "sm:mx-0 sm:my-px sm:h-px sm:w-4"}`} />
+          <RailButton icon={props.extra.icon ?? "newExample"} title={props.extra.label} disabled={working} onClick={props.extra.onSelect} />
+        </>
+      )}
+      {state && <span className="sr-only">{state}</span>}
+      <span role="status" className="sr-only">{working ? "Working…" : ""}</span>
+      <input
+        ref={file}
+        type="file"
+        accept="audio/mpeg,.mp3"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          e.target.blur();
+          if (f) run(() => api(`/api/audio/${note.id}/${slot}`, { method: "PUT", body: f }));
+        }}
+      />
+    </div>
+  );
+
+  if (props.inline) {
+    return (
+      <div>
+        {capsule}
+        {!onMessage && message && <p className="mt-1 text-xs text-danger">{message}</p>}
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="grid grid-cols-1 items-center sm:grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] lg:grid-cols-[3.2rem_minmax(0,1fr)_3.2rem]">
         <div className={`row-start-2 flex flex-col justify-center sm:col-start-2 sm:row-start-1 ${props.extra ? "sm:min-h-[137px] lg:min-h-[181px]" : "sm:min-h-[110px] lg:min-h-[146px]"}`}>{props.children}</div>
-        <div
-          role="group"
-          aria-label={`Audio for ${name}`}
-          className={`row-start-1 m-1 flex items-center justify-self-center sm:col-start-3 sm:flex-col sm:justify-self-end rounded-full border bg-paper p-0.5 ${tone}`}
-        >
-          <RailButton icon="play" title={`Play ${name}`} disabled={!has && !working} busy={working} onClick={() => !working && play()} />
-          <RailButton
-            icon={has ? "regenerate" : "generate"}
-            title={clip?.outdated ? "Regenerate (the Arabic changed)" : has ? "Regenerate" : "Generate"}
-            disabled={working || !canGenerate}
-            onClick={generateNow}
-          />
-          <RailButton icon="upload" title="Upload" disabled={working || !canGenerate} onClick={() => file.current?.click()} />
-          <RailButton icon="remove" title="Remove" disabled={working || !has} onClick={() => run(() => api(`/api/audio/${note.id}/${slot}`, { method: "DELETE" }))} />
-          {props.extra && (
-            <>
-              <span aria-hidden="true" className="mx-px h-4 w-px bg-rule-strong/60 sm:mx-0 sm:my-px sm:h-px sm:w-4" />
-              <RailButton icon="newExample" title={props.extra.label} disabled={working} onClick={props.extra.onSelect} />
-            </>
-          )}
-          {state && <span className="sr-only">{state}</span>}
-          <span role="status" className="sr-only">{working ? "Working…" : ""}</span>
-          <input
-            ref={file}
-            type="file"
-            accept="audio/mpeg,.mp3"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              e.target.value = "";
-              e.target.blur();
-              if (f) run(() => api(`/api/audio/${note.id}/${slot}`, { method: "PUT", body: f }));
-            }}
-          />
-        </div>
+        {capsule}
       </div>
       {!onMessage && <p className="min-h-[2lh] text-xs text-danger">{message}</p>}
     </div>

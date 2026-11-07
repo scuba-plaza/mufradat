@@ -49,8 +49,7 @@ export default function FormsDialog(props: {
                 <div className="w-48 min-w-0 shrink">
                   <InlineText label={`Arabic of form ${i + 1}`} value={f.arabic} arabic className="text-ar-sm" onSave={(arabic) => setForm(i, { arabic })} />
                 </div>
-                <Clip note={note} slot={f.id} name={f.label} text={f.arabic} onNote={props.onNote} />
-                <button className="action ml-auto" aria-label={`Remove form ${i + 1}`} onClick={() => save({ forms: note.forms.filter((_, j) => j !== i) })}>Remove</button>
+                <Clip inline note={note} slot={f.id} name={f.label} text={f.arabic} onNote={props.onNote} extra={{ label: `Remove form ${i + 1}`, icon: "removeForm", onSelect: () => save({ forms: note.forms.filter((_, j) => j !== i) }) }} />
               </li>
             ))}
           </ul>
