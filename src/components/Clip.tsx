@@ -21,12 +21,12 @@ function RailButton(props: { icon: keyof typeof ICONS; title: string; onClick: (
       disabled={props.disabled}
       aria-busy={props.busy || undefined}
       onClick={props.onClick}
-      className={`inline-flex h-[24px] w-[24px] items-center justify-center rounded-full text-ink transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40 ${props.busy ? "cursor-progress" : ""}`}
+      className={`inline-flex h-[24px] w-[24px] lg:h-[32px] lg:w-[32px] items-center justify-center rounded-full text-ink transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40 ${props.busy ? "cursor-progress" : ""}`}
     >
       {props.busy ? (
-        <Spinner size={13} />
+        <Spinner size={16} />
       ) : (
-        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           {ICONS[props.icon]}
         </svg>
       )}
@@ -98,12 +98,12 @@ export default function Clip(props: {
 
   return (
     <div>
-      <div className="grid grid-cols-[2rem_minmax(0,1fr)_2rem] items-center">
-        <div className={`col-start-2 row-start-1 flex flex-col justify-center ${props.extra ? "min-h-[129px]" : "min-h-[102px]"}`}>{props.children}</div>
+      <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center lg:grid-cols-[3.2rem_minmax(0,1fr)_3.2rem]">
+        <div className={`col-start-2 row-start-1 flex flex-col justify-center ${props.extra ? "min-h-[137px] lg:min-h-[181px]" : "min-h-[110px] lg:min-h-[146px]"}`}>{props.children}</div>
         <div
           role="group"
           aria-label={`Audio for ${name}`}
-          className={`col-start-3 row-start-1 flex flex-col items-center justify-self-end rounded-full border bg-paper p-0.5 ${tone}`}
+          className={`col-start-3 row-start-1 flex flex-col items-center m-1 justify-self-end rounded-full border bg-paper p-0.5 ${tone}`}
         >
           <RailButton icon="play" title={`Play ${name}`} disabled={!has && !working} busy={working} onClick={() => !working && play()} />
           <RailButton
