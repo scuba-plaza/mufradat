@@ -1,39 +1,21 @@
 "use client";
 import { useId, useRef, useState } from "react";
-import { refusal } from "./api";
 import Backups from "./Backups";
 import Shortcuts from "./Shortcuts";
 import UnusedAudio from "./UnusedAudio";
 
 type Open = "backups" | "audio" | "shortcuts" | null;
 
-export default function Menu({ approved }: { approved: number }) {
+export default function Menu() {
   const id = useId();
   const anchor = `--${id.replace(/[^a-z0-9]/gi, "")}`;
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState<Open>(null);
-  const [message, setMessage] = useState("");
 
   const close = () => {
     setOpen(null);
     trigger.current?.focus();
   };
-
-  async function exportDeck() {
-    setMessage("Preparing the deck…");
-    try {
-      const res = await fetch("/api/export");
-      if (!res.ok) throw await refusal(res);
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(await res.blob());
-      link.download = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? "arabic-deck.apkg";
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
-      setMessage("");
-    } catch (e) {
-      setMessage((e as Error).message);
-    }
-  }
 
   return (
     <>
@@ -43,9 +25,6 @@ export default function Menu({ approved }: { approved: number }) {
         </svg>
       </button>
       <div id={id} popover="auto" className="options options-end" style={{ positionAnchor: anchor }}>
-        <button className="options-item" disabled={approved === 0} popoverTarget={id} popoverTargetAction="hide" onClick={exportDeck}>
-          Export
-        </button>
         <button className="options-item" popoverTarget={id} popoverTargetAction="hide" onClick={() => setOpen("backups")}>
           Backups
         </button>
@@ -59,7 +38,6 @@ export default function Menu({ approved }: { approved: number }) {
       <Backups open={open === "backups"} onClose={close} />
       <UnusedAudio open={open === "audio"} onClose={close} />
       <Shortcuts open={open === "shortcuts"} onClose={close} />
-      <p role="status" className="w-full break-words pb-2 text-sm text-quiet empty:hidden">{message}</p>
     </>
   );
 }

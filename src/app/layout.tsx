@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import localFont from "next/font/local";
 import Menu from "@/components/Menu";
-import { context } from "@/lib/server";
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -26,14 +25,13 @@ export const dynamic = "force-dynamic";
 const arabic = localFont({ src: "../../public/ScheherazadeNew-Regular.ttf", variable: "--font-arabic" });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const { approved } = context().store.counts();
   return (
     <html lang="en" className={arabic.variable}>
       <body className="min-h-screen">
         <header className="topbar">
           <div className="topbar-inner">
             <a href="/" className="wordmark">Mufradat</a>
-            <Menu approved={approved} />
+            <Menu />
           </div>
         </header>
         <main className="mx-auto max-w-column px-5">{children}</main>

@@ -1,3 +1,4 @@
+import ExportButton from "@/components/ExportButton";
 import Pager from "@/components/Pager";
 import StatusMark from "@/components/StatusMark";
 import WordBar from "@/components/WordBar";
@@ -7,7 +8,7 @@ import type { SortKey } from "@/lib/query/fields";
 import { nextSort, withSort } from "@/lib/query/parse";
 import { context } from "@/lib/server";
 import type { WordStatus } from "@/lib/types";
-import { continueFrom, rowHref, view, wordRows } from "@/lib/words";
+import { approvedIds, continueFrom, rowHref, view, wordRows } from "@/lib/words";
 
 const PAGE_SIZE = 30;
 
@@ -54,7 +55,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
           <div className="h-full rounded-full bg-progress" style={{ width: `${(approvedListed / listed) * 100}%` }} />
         </div>
       </section>
-      <WordBar q={q} error={error} />
+      <WordBar q={q} error={error}>
+        <ExportButton q={q} count={approvedIds(rows).length} />
+      </WordBar>
       <nav aria-label="Status" className="mt-2 flex flex-wrap gap-1">
         {TABS.map((tab) => (
           <a

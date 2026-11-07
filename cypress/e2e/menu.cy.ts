@@ -88,10 +88,10 @@ describe("the menu", () => {
     cy.get("main").should("not.contain", "Backups").and("not.contain", "Prune audio");
   });
 
-  it("lists Export, Backups, Prune audio and Keyboard shortcuts in that order", () => {
+  it("lists Backups, Prune audio and Keyboard shortcuts in that order", () => {
     openMenu();
     cy.get(`${popover} .options-item`).then(($items) => {
-      expect([...$items].map((item) => item.textContent)).to.deep.equal(["Export", "Backups", "Prune audio", "Keyboard shortcuts"]);
+      expect([...$items].map((item) => item.textContent)).to.deep.equal(["Backups", "Prune audio", "Keyboard shortcuts"]);
     });
   });
 
@@ -108,98 +108,6 @@ describe("the menu", () => {
       });
     });
   }
-});
-
-const status = "header .topbar-inner > [role=\"status\"]";
-const deckHeaders = {
-  "Content-Type": "application/octet-stream",
-  "Content-Disposition": 'attachment; filename="arabic-deck-2026-01-01.apkg"',
-};
-
-function approvedCard() {
-  cy.visit("/open?rank=4100");
-  cy.location("pathname").then((card) => cy.request("POST", `/api${card.replace("/cards", "/notes")}/approve`, {}));
-}
-
-describe("export from the menu", () => {
-  it("is disabled while nothing is approved", () => {
-    cy.request("/api/backups").its("body.check.approved").then((approved: number) => {
-      if (approved > 0) return;
-      openMenu();
-      cy.contains(`${popover} .options-item`, /^Export$/).should("be.disabled");
-    });
-  });
-
-  it("is enabled once a card is approved", () => {
-    approvedCard();
-    openMenu();
-    cy.contains(`${popover} .options-item`, /^Export$/).should("not.be.disabled");
-  });
-
-  it("asks the server once, hands the deck to the browser and writes nothing to the workspace", () => {
-    approvedCard();
-    cy.visit("/");
-    cy.task<string[]>("downloads").then((before) => {
-      cy.intercept("GET", "/api/export").as("export");
-      cy.menuItem("Export");
-      cy.wait("@export").its("response.statusCode").should("eq", 200);
-      cy.get("@export.all").should("have.length", 1);
-      cy.task<string[]>("downloads", before.length + 1).should((after) => expect(after).to.have.length(before.length + 1));
-      cy.task<string[]>("workspaceExports").should("deep.equal", []);
-      cy.get(status).should("have.text", "");
-    });
-  });
-
-  it("says Preparing the deck… while it is built and nothing once it is on its way", () => {
-    approvedCard();
-    cy.visit("/");
-    cy.intercept("GET", "/api/export", { delay: 600, headers: deckHeaders, body: "x" });
-    cy.menuItem("Export");
-    cy.get(status).should("have.text", "Preparing the deck…");
-    cy.get(status).should("have.text", "");
-  });
-
-  it("says why when the export is refused and saves nothing", () => {
-    approvedCard();
-    cy.visit("/");
-    cy.task<string[]>("downloads").then((before) => {
-      cy.intercept("GET", "/api/export", { statusCode: 400, body: { error: "The card of the word X has no audio file." } });
-      cy.menuItem("Export");
-      cy.get(status).should("have.text", "The card of the word X has no audio file.");
-      cy.task<string[]>("downloads").should("deep.equal", before);
-    });
-  });
-
-  it("says Request failed (500). when the server answers with something that is not JSON", () => {
-    approvedCard();
-    cy.visit("/");
-    cy.intercept("GET", "/api/export", { statusCode: 500, headers: { "Content-Type": "text/html" }, body: "<!DOCTYPE html><p>oops</p>" });
-    cy.menuItem("Export");
-    cy.get(status).should("have.text", "Request failed (500).");
-  });
-
-  it("says Request failed (400). when the refusal carries no message", () => {
-    approvedCard();
-    cy.visit("/");
-    cy.intercept("GET", "/api/export", { statusCode: 400, body: {} });
-    cy.menuItem("Export");
-    cy.get(status).should("have.text", "Request failed (400).");
-  });
-
-  it("puts a message on its own row under the button and does not scroll the page sideways at 390px", () => {
-    cy.viewport(390, 844);
-    approvedCard();
-    cy.visit("/");
-    cy.intercept("GET", "/api/export", { statusCode: 400, body: { error: "The audio for كِتَابٌ (word) is missing from the workspace. ".repeat(4) } });
-    cy.menuItem("Export");
-    cy.get(status).should("contain", "is missing from the workspace");
-    cy.get(status).then(($message) => {
-      cy.get(trigger).then(($button) => {
-        expect($message[0].getBoundingClientRect().top).to.be.at.least($button[0].getBoundingClientRect().bottom - 1);
-      });
-    });
-    cy.document().should((doc) => expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth));
-  });
 
   it("shows the menu on the not-found page and opens it", () => {
     cy.visit("/cards/nope", { failOnStatusCode: false });
