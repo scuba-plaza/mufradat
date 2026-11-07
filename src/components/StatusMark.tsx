@@ -2,14 +2,14 @@ import type { WordStatus } from "@/lib/types";
 
 const LABEL: Record<Exclude<WordStatus, "todo">, string> = { progress: "in progress", ready: "ready", approved: "approved" };
 
-/** Where a card stands: a half-filled circle while it is being made, a filled one once approved. Shape and word, never colour alone. */
+/** Where a card stands, each state in a shape of its own: a half-filled circle while it is being made, a ring with a tick when it lacks nothing, a filled circle once approved. Shape and word, never colour alone. */
 export default function StatusMark({ status }: { status: Exclude<WordStatus, "todo"> }) {
-  const approved = status === "approved";
   return (
     <span className="status" data-status={status} title={LABEL[status]}>
-      <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">
-        <circle cx="5" cy="5" r="4" fill={approved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5" />
-        {!approved && <path d="M5 1a4 4 0 0 0 0 8z" fill="currentColor" />}
+      <svg viewBox="0 0 10 10" width="12" height="12" aria-hidden="true">
+        <circle cx="5" cy="5" r="4" fill={status === "approved" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5" />
+        {status === "progress" && <path d="M5 1a4 4 0 0 0 0 8z" fill="currentColor" />}
+        {status === "ready" && <path d="M3.2 5.2l1.4 1.4 2.3-2.8" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />}
       </svg>
       <span className="max-sm:sr-only">{LABEL[status]}</span>
     </span>

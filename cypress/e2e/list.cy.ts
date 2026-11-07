@@ -167,6 +167,25 @@ describe("a card made outside the list", () => {
   });
 });
 
+describe("the status of a word in the list", () => {
+  it("draws in progress, ready and approved as three different shapes, so that colour is not the only difference", () => {
+    cy.viewport(390, 844);
+    cy.visit("/open?rank=4101");
+    finishCard(4102);
+    finishCard(4103);
+    cy.location("pathname").then((card) => cy.request("POST", `/api${card.replace("/cards", "/notes")}/approve`, {}));
+    cy.visit(typed("rank:4101-4103"));
+    cy.get(rows).should("have.length", 3);
+    for (const [rank, status] of [[4101, "progress"], [4102, "ready"], [4103, "approved"]] as const) {
+      cy.wordRow(rank).find(".status").should("have.attr", "data-status", status);
+    }
+    cy.get(`${rows} .status svg`).should("be.visible").then(($marks) => {
+      const shapes = Array.from($marks).map((mark) => mark.innerHTML);
+      expect(new Set(shapes).size).to.equal(3);
+    });
+  });
+});
+
 describe("the search bar", () => {
   it("searches when you press Enter, keeps what you typed in the box, and counts the words it found", () => {
     cy.visit("/");
