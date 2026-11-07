@@ -21,7 +21,7 @@ function RailButton(props: { icon: keyof typeof ICONS; title: string; onClick: (
       disabled={props.disabled}
       aria-busy={props.busy || undefined}
       onClick={props.onClick}
-      className={`inline-flex h-[20px] w-[28px] items-center justify-center rounded-full text-ink sm:h-[24px] sm:w-[24px] transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40 ${props.busy ? "cursor-progress" : ""}`}
+      className={`inline-flex h-[24px] w-[24px] items-center justify-center rounded-full text-ink transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40 ${props.busy ? "cursor-progress" : ""}`}
     >
       {props.busy ? (
         <Spinner size={13} />
@@ -98,8 +98,8 @@ export default function Clip(props: {
 
   return (
     <div>
-      <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center sm:grid-cols-[2rem_minmax(0,1fr)_2rem]">
-        <div className="col-start-2 row-start-1">{props.children}</div>
+      <div className="grid grid-cols-[2rem_minmax(0,1fr)_2rem] items-center">
+        <div className={`col-start-2 row-start-1 flex flex-col justify-center ${props.extra ? "min-h-[129px]" : "min-h-[102px]"}`}>{props.children}</div>
         <div
           role="group"
           aria-label={`Audio for ${name}`}

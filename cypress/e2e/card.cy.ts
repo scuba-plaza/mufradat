@@ -248,7 +248,7 @@ describe("a word", () => {
     });
 
     for (const [width, height] of [[1280, 800], [390, 844]]) {
-      it(`keeps the text centred, the capsule in one column and, on a wide screen, no taller than its field at ${width}px`, () => {
+      it(`keeps the text centred, the capsule in one column of 24px buttons and no taller than its field at ${width}px`, () => {
         cy.viewport(width, height);
         openWord(42);
         cy.location("pathname").then((path) => {
@@ -267,15 +267,14 @@ describe("a word", () => {
             const buttons = Array.from(doc.querySelectorAll(`${group} button`)).map((button) => button.getBoundingClientRect());
             expect(new Set(buttons.map((box) => Math.round(box.left))).size, `${group} is one column`).to.equal(1);
             buttons.forEach((box) => {
-              expect(box.height, `${group} button height`).to.be.at.least(20);
-              expect(box.width, `${group} button width`).to.be.at.least(20);
+              expect(box.height, `${group} button height`).to.be.at.least(24);
+              expect(box.width, `${group} button width`).to.be.at.least(24);
             });
           }
-          if (width > 640) {
-            const wordBox = [rect(by("Arabic headword")).top, rect(by("Hint")).bottom];
-            expect(rect(word).height, "the capsule of the word").to.be.at.most(wordBox[1] - wordBox[0]);
-            const exampleBox = [rect(`div${by("Example")}`).top, rect(by("Example in English")).bottom];
-            expect(rect(example).height, "the capsule of the example").to.be.at.most(exampleBox[1] - exampleBox[0]);
+          for (const group of [word, example]) {
+            const capsule = rect(group).height;
+            const field = doc.querySelector(group)!.previousElementSibling!.getBoundingClientRect().height;
+            expect(capsule, `the capsule of ${group} against its field`).to.be.at.most(field);
           }
         });
       });
