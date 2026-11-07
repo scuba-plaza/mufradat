@@ -2,14 +2,18 @@ import fs from "node:fs";
 import { buildApkg } from "@/lib/anki";
 import { audioPath, MissingClipError, type ClipPlace } from "@/lib/audio";
 import { context, fail, handle } from "@/lib/server";
+import { approvedIds, view } from "@/lib/words";
 
 export const dynamic = "force-dynamic";
 
-export const GET = () =>
+export const GET = (req: Request) =>
   handle(() => {
     const { cfg, store } = context();
-    const notes = store.approvedNotes();
-    if (notes.length === 0) return fail("There are no approved cards to export.");
+    const q = new URL(req.url).searchParams.get("q") ?? "";
+    const found = view(store, q);
+    if (found.error) return fail(found.error);
+    const notes = approvedIds(found.rows).map((id) => store.getNote(id)!);
+    if (notes.length === 0) return fail(q.trim() === "" ? "There are no approved cards to export." : "No approved card matches this search.");
     const read = (key: string, place: ClipPlace) => {
       const file = audioPath(store.root, key);
       if (!fs.existsSync(file)) throw new MissingClipError(place);

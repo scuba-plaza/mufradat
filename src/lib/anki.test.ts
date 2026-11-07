@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { buildApkg } from "./anki";
 import { audioKey } from "./audio";
 import { openStore } from "./store";
+import { unzip } from "./testing/deck";
 import type { Note } from "./types";
 
 const FIELDS = [
@@ -11,24 +12,6 @@ const FIELDS = [
   "ExampleAudio", "Pos", "Details", "Production", "Check", "Rank", "NoteID",
 ];
 const clip = (n: number) => Buffer.from([0xff, 0xfb, 0x90, 0x00, n, n, n, n]);
-
-/** Reads the stored entries of a zip without any library. */
-function unzip(buf: Buffer): Map<string, Buffer> {
-  const out = new Map<string, Buffer>();
-  let p = 0;
-  while (buf.readUInt32LE(p) === 0x04034b50) {
-    const method = buf.readUInt16LE(p + 8);
-    const size = buf.readUInt32LE(p + 18);
-    const nameLen = buf.readUInt16LE(p + 26);
-    const extraLen = buf.readUInt16LE(p + 28);
-    const name = buf.subarray(p + 30, p + 30 + nameLen).toString();
-    expect(method).toBe(0);
-    const start = p + 30 + nameLen + extraLen;
-    out.set(name, buf.subarray(start, start + size));
-    p = start + size;
-  }
-  return out;
-}
 
 function collection(apkg: Buffer) {
   const files = unzip(apkg);

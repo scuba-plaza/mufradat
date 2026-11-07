@@ -85,6 +85,9 @@ export function continueFrom(rows: WordRow[]): WordRow | null {
 
 export const continueTarget = (store: Store): WordRow | null => continueFrom(wordRows(store));
 
+export const approvedIds = (rows: WordRow[]): string[] =>
+  rows.flatMap((r) => (r.status === "approved" && r.id !== null ? [r.id] : []));
+
 export interface View {
   rows: WordRow[];
   error: string | null;
