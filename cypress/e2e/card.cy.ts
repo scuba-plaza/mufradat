@@ -94,41 +94,41 @@ describe("a word", () => {
     cy.get(`${by("Example")} mark`).should("have.text", "فِي");
   });
 
-  it("marks the headword of the card by itself, and marks whatever letters are selected instead, with no button", () => {
+  const selectInExample = (letters: string) =>
+    cy.get(`textarea${by("Example")}`).focus().then(($box) => {
+      const start = ($box.val() as string).indexOf(letters);
+      ($box[0] as HTMLTextAreaElement).setSelectionRange(start, start + letters.length);
+    });
+
+  it("marks the headword of the card by itself when the example is typed", () => {
     openWord(16);
     cy.get(by("Example")).click();
     cy.get(`textarea${by("Example")}`).type("تَحَدَّثْنَا عَنِ الْحَقِيبَةِ").blur();
     cy.get(`${by("Example")} mark`).should("have.text", "عَنِ");
+  });
+
+  it("marks exactly the letters that are selected, takes the mark away when they are selected again, and keeps it away", () => {
+    openWord(17);
     cy.get(by("Example")).click();
-    cy.get(`textarea${by("Example")}`).then(($box) => {
-      const text = $box.val() as string;
-      const start = text.indexOf("حَقِيب");
-      ($box[0] as HTMLTextAreaElement).setSelectionRange(start, start + "حَقِيب".length);
-    });
-    cy.get(`textarea${by("Example")}`).trigger("mouseup");
-    cy.get(`textarea${by("Example")}`).should("have.value", "تَحَدَّثْنَا عَنِ الْ[حَقِيب]َةِ").blur();
-    cy.get(`${by("Example")} mark`).should("have.text", "حَقِيب");
-    cy.contains("button", "Mark target").should("not.exist");
+    cy.get(`textarea${by("Example")}`).type("الْكِتَابُ فِي الْحَقِيبَةِ");
+    selectInExample("حَقِيب");
+    cy.get(`textarea${by("Example")}`).should("have.value", "الْكِتَابُ فِي الْ[حَقِيب]َةِ");
+    cy.get(`textarea${by("Example")}`).click();
+    selectInExample("حَقِيب");
+    cy.get(`textarea${by("Example")}`).should("have.value", "الْكِتَابُ فِي الْحَقِيبَةِ").blur();
+    cy.get(`${by("Example")} mark`).should("not.exist");
+    cy.contains("It is not clear which word to highlight");
   });
 
   it("says when it is not clear which word of the example to highlight, until you mark it", () => {
     openWord(23);
     cy.get(by("Example")).click();
-    cy.get(`textarea${by("Example")}`).type("الْكِتَابُ فِي الْحَقِيبَةِ").then(($box) => {
-      const text = $box.val() as string;
-      const start = text.indexOf("فِي");
-      ($box[0] as HTMLTextAreaElement).setSelectionRange(start, start + "فِي".length);
-    });
-    cy.get(`textarea${by("Example")}`).blur();
+    cy.get(`textarea${by("Example")}`).type("الْكِتَابُ فِي الْحَقِيبَةِ").blur();
     cy.contains("It is not clear which word to highlight");
     cy.get(bar).should("contain", "the target word marked in the example");
     cy.get(by("Example")).click();
-    cy.get(`textarea${by("Example")}`).then(($box) => {
-      const start = ($box.val() as string).indexOf("فِي");
-      ($box[0] as HTMLTextAreaElement).setSelectionRange(start, start + "فِي".length);
-    });
-    cy.get(`textarea${by("Example")}`).trigger("mouseup");
-    cy.get(`textarea${by("Example")}`).blur();
+    selectInExample("فِي");
+    cy.get(`textarea${by("Example")}`).should("have.value", "الْكِتَابُ [فِي] الْحَقِيبَةِ").blur();
     cy.get(`${by("Example")} mark`).should("have.text", "فِي");
     cy.contains("It is not clear which word to highlight").should("not.exist");
     cy.get(bar).should("not.contain", "the target word marked in the example");
@@ -168,7 +168,7 @@ describe("a word", () => {
       cy.get(by("Example")).click();
       cy.get(`textarea${by("Example")}`).type("الْكِتَابُ [فِي] الْحَقِيبَةِ").blur();
       cy.get(status).should("contain", "Saved");
-      cy.contains("button", "Approve").click();
+      cy.contains("button", /^Approve$/).click();
       cy.get(alert).should("contain", "The example has no English translation.");
       cy.request("PUT", `/api/notes/${path.split("/").pop()}`, { exampleEn: "The book is in the bag." }).then((response) => {
         cy.intercept("POST", "/api/mistral", { body: { note: response.body.note } });
@@ -380,11 +380,11 @@ describe("a word", () => {
     cy.visit("/open?rank=60");
     cy.hydrated(by("Hint"));
     cy.location("pathname").then((card) => {
-      cy.contains("button", "Approve").click();
+      cy.contains("button", /^Approve$/).click();
       cy.location("pathname").should("not.eq", card).and("match", /^\/cards\/[0-9a-f-]{36}$/);
       cy.visit(card);
       cy.get(bar).should("contain", "approved");
-      cy.contains("button", "Approve").should("not.exist");
+      cy.contains("button", /^Approve$/).should("not.exist");
       cy.contains("a", "Next").should("have.attr", "href", "/next");
     });
   });
@@ -393,7 +393,7 @@ describe("a word", () => {
     openWord(61);
     cy.location("pathname").then((card) => {
       cy.get(by("English meaning")).clear().blur();
-      cy.contains("button", "Approve").click();
+      cy.contains("button", /^Approve$/).click();
       cy.get(alert).should("contain", "The English meaning is empty.");
       cy.location("pathname").should("eq", card);
     });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { autoMark, markSelection } from "./validate";
+import { autoMark, markSelection, skeleton } from "./validate";
 
 describe("marking the word of the card in an unmarked example", () => {
   it("marks the headword as it stands in the sentence, whatever its vowels", () => {
@@ -16,6 +16,18 @@ describe("marking the word of the card in an unmarked example", () => {
 
   it("tries the forms in turn when the headword is not in the sentence", () => {
     expect(autoMark("عِنْدِي كُتُبٌ كَثِيرَةٌ", ["كِتَاب", "كُتُب"])).toBe("عِنْدِي [كُتُبٌ] كَثِيرَةٌ");
+  });
+
+  it("does not look at later words once the first stands twice", () => {
+    expect(autoMark("الْكِتَابُ فَوْقَ الْكِتَابِ وَكُتُبٌ", ["كِتَاب", "كُتُب"])).toBeNull();
+  });
+
+  it("keeps Arabic-Indic digits when it takes the vowel marks away", () => {
+    expect(skeleton("كِتَابٌ ٣")).toBe("كتاب ٣");
+  });
+
+  it("copes with characters in a headword that mean something in a pattern", () => {
+    expect(autoMark("لَدَيْهِ كِتَابٌ جَمِيلٌ", ["[كتاب", "(كتاب+", "كِتَاب"])).toBe("لَدَيْهِ [كِتَابٌ] جَمِيلٌ");
   });
 
   it("does not guess when the word is absent or stands twice", () => {
@@ -48,5 +60,10 @@ describe("marking the letters that are selected", () => {
     const draft = "لَدَيْهِ كِتَابٌ جَمِيلٌ";
     expect(markSelection(draft, 4, 4)).toBe(draft);
     expect(markSelection(draft, 0, draft.length)).toBe(draft);
+  });
+
+  it("counts a lone bracket in the sentence as no mark", () => {
+    const draft = "لَدَيْهِ [كِتَابٌ جَمِيلٌ";
+    expect(markSelection(draft, draft.indexOf("جَمِيلٌ"), draft.length)).toBe("لَدَيْهِ كِتَابٌ [جَمِيلٌ]");
   });
 });

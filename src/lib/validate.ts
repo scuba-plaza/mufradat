@@ -46,26 +46,25 @@ export function sentenceProblems(sentence: string): string[] {
   return problems;
 }
 
-const VOWEL_MARK = /[ً-ٰٟ]/;
+const VOWEL_MARK = /[\u064B-\u065F\u0670]/;
+const NON_LETTER = /[\u064B-\u065F\u0670\u0640]/;
 const WORD = /[^\s،؛؟.,;:!?"'()«»[\]]+/g;
 /** A word by its letters alone: no vowels, tatweel or article, so that كِتَابٌ and الْكِتَابِ are the same. */
 const letters = (s: string) => skeleton(s).replace(/^ال/, "");
 
-/**
- * The sentence with [brackets] around the word the card is about, which Mistral names as it stands in the sentence.
- * The word is looked for as it was named, then attached to the next word (بِالْقَلَمِ), then by its letters alone
- * (another vowel, case ending or article). It returns null when the word is in none of these places or in several
- * of them: it never guesses, and the person marks the word.
- */
-export function markTarget(sentence: string, named: string): string | null {
+type Found = { start: number; end: number } | "many" | null;
+
+const wrap = (s: string, start: number, end: number) => `${s.slice(0, start)}[${s.slice(start, end)}]${s.slice(end)}`;
+const marked = (s: string, found: Found) => (found && found !== "many" ? wrap(s, found.start, found.end) : null);
+
+function findTarget(sentence: string, named: string): Found {
   const target = named.replace(/ـ/g, "").trim();
   if (target === "") return null;
-  const mark = (start: number, length: number) =>
-    `${sentence.slice(0, start)}[${sentence.slice(start, start + length)}]${sentence.slice(start + length)}`;
 
   if (/\s/.test(target)) {
     const at = sentence.indexOf(target);
-    return at >= 0 && sentence.indexOf(target, at + 1) < 0 ? mark(at, target.length) : null;
+    if (at < 0) return null;
+    return sentence.indexOf(target, at + 1) < 0 ? { start: at, end: at + target.length } : "many";
   }
   const words = [...sentence.matchAll(WORD)].map((m) => ({ text: m[0], start: m.index }));
   // Each rule gives how much of a word is the target, or 0. The first rule that finds anything decides.
@@ -75,42 +74,53 @@ export function markTarget(sentence: string, named: string): string | null {
     (w) => (letters(w) === letters(target) ? w.length : 0),
   ];
   for (const rule of rules) {
-    const hits = words.flatMap((w) => (rule(w.text) > 0 ? [{ start: w.start, length: rule(w.text) }] : []));
-    if (hits.length === 1) return mark(hits[0].start, hits[0].length);
-    if (hits.length > 1) return null;
+    const hits = words.flatMap((w) => (rule(w.text) > 0 ? [{ start: w.start, end: w.start + rule(w.text) }] : []));
+    if (hits.length === 1) return hits[0];
+    if (hits.length > 1) return "many";
   }
   return null;
 }
 
-const MARK_OR_TATWEEL = /[ً-ٰٟـ]/;
-const SUFFIX = "(?:ه|ها|هم|هن|هما|ك|كم|كن|كما|ني|نا|ي)?";
+/**
+ * The sentence with [brackets] around the word the card is about, which Mistral names as it stands in the sentence.
+ * The word is looked for as it was named, then attached to the next word (بِالْقَلَمِ), then by its letters alone
+ * (another vowel, case ending or article). It returns null when the word is in none of these places or in several
+ * of them: it never guesses, and the person marks the word.
+ */
+export const markTarget = (sentence: string, named: string): string | null => marked(sentence, findTarget(sentence, named));
+
+const PREFIXES = ["", "و", "ف"].flatMap((conjunction) =>
+  ["", "ب", "ك", "ل"].flatMap((preposition) => ["", "ال"].map((article) => conjunction + preposition + article)).concat(`${conjunction}لل`),
+);
+const SUFFIXES = ["", "ه", "ها", "هم", "هن", "هما", "ك", "كم", "كن", "كما", "ني", "نا", "ي"];
 
 function stemSpan(word: string, stem: string): { start: number; end: number } | null {
-  const letterAt = [...word].flatMap((c, i) => (MARK_OR_TATWEEL.test(c) ? [] : [{ c: skeleton(c), i }]));
-  const found = new RegExp(`^([وف]?)(لل|[بكل]?)(ال)?(${stem})${SUFFIX}$`).exec(letterAt.map((l) => l.c).join(""));
-  if (!found) return null;
-  const start = letterAt[found[1].length + found[2].length].i;
-  let end = letterAt[found[1].length + found[2].length + (found[3] ?? "").length + stem.length - 1].i + 1;
-  while (end < word.length && MARK_OR_TATWEEL.test(word[end])) end++;
-  return { start, end };
+  const letterAt = [...word].flatMap((c, i) => (NON_LETTER.test(c) ? [] : [{ c: skeleton(c), i }]));
+  const skeletal = letterAt.map((l) => l.c).join("");
+  const prefix = PREFIXES.find((p) => skeletal.startsWith(p + stem) && SUFFIXES.includes(skeletal.slice(p.length + stem.length)));
+  if (prefix === undefined) return null;
+  const article = prefix.endsWith("ال") ? 2 : 0;
+  const first = letterAt[prefix.length - article].i;
+  let end = letterAt[prefix.length + stem.length - 1].i + 1;
+  while (end < word.length && NON_LETTER.test(word[end])) end++;
+  return { start: first, end };
 }
 
-function markStem(sentence: string, named: string): string | null {
+function findStem(sentence: string, named: string): Found {
   const stem = letters(named);
   if (stem === "") return null;
   const hits = [...sentence.matchAll(WORD)].flatMap((m) => {
     const span = stemSpan(m[0], stem);
     return span ? [{ start: m.index + span.start, end: m.index + span.end }] : [];
   });
-  if (hits.length !== 1) return null;
-  const { start, end } = hits[0];
-  return `${sentence.slice(0, start)}[${sentence.slice(start, end)}]${sentence.slice(end)}`;
+  return hits.length > 1 ? "many" : (hits[0] ?? null);
 }
 
 export function autoMark(sentence: string, words: string[]): string | null {
   for (const word of words) {
-    const marked = markTarget(sentence, word) ?? markStem(sentence, word);
-    if (marked) return marked;
+    const found = findTarget(sentence, word) ?? findStem(sentence, word);
+    if (found === "many") return null;
+    if (found) return marked(sentence, found);
   }
   return null;
 }
@@ -124,7 +134,7 @@ export function markSelection(draft: string, start: number, end: number): string
   if (from === to || (from === 0 && to === plain.length)) return draft;
   const parts = splitExample(draft);
   if (parts && from === parts.before.length && to === from + parts.target.length) return plain;
-  return `${plain.slice(0, from)}[${plain.slice(from, to)}]${plain.slice(to)}`;
+  return wrap(plain, from, to);
 }
 
 /** What stops a card from being approved. */
@@ -148,7 +158,7 @@ export function approvalProblems(n: Note): string[] {
 /** Arabic without vowel marks, tatweel, or alef/yeh variants, for matching typed searches. */
 export function skeleton(s: string): string {
   return s
-    .replace(/[ً-ٰٟـ]/g, "")
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, "")
     .replace(/[أإآٱ]/g, "ا")
     .replace(/ى/g, "ي");
 }

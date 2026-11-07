@@ -76,8 +76,6 @@ describe("the layout of a card", () => {
 
   describe("the space under a text field", () => {
     const minimumGap = 8;
-    const byText = (doc: Document, text: string) =>
-      Array.from(doc.querySelectorAll("button")).find((button) => button.textContent?.trim() === text) ?? null;
     const example = `div${by("Example")}`;
     const pairs: {
       what: string;
@@ -124,7 +122,7 @@ describe("the layout of a card", () => {
       it(`gives Approve and Next the same size at ${width}px`, () => {
         cy.viewport(width, height);
         openWord(rank++);
-        cy.contains(`${bar} button`, "Approve").then(($approve) => {
+        cy.contains(`${bar} button`, /^Approve$/).then(($approve) => {
           const approve = sizeOf($approve[0]);
           if (width < 640) {
             const text = $approve[0].ownerDocument.querySelector(`${bar} p`)!;

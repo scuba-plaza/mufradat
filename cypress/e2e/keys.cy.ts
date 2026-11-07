@@ -27,7 +27,7 @@ describe("the keys of a card", () => {
       cy.get("body").type("{ctrl}{rightarrow}");
       cy.contains("Word 94 of 5000");
       cy.visit(card);
-      cy.contains("button", "Approve");
+      cy.contains("button", /^Approve$/);
     });
   });
 
