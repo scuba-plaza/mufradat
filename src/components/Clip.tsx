@@ -1,10 +1,40 @@
 "use client";
-import { useId, useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { Note } from "@/lib/types";
 import { api, post } from "./api";
 import Spinner from "./Spinner";
 
-/** The audio of one text: play it, or make it by generating it or uploading an MP3. `name` says what it is for, such as "the word". */
+const ICONS = {
+  play: <path d="M7 4l13 8-13 8z" fill="currentColor" stroke="none" />,
+  generate: <><path d="M11 5L6 9H2v6h4l5 4V5z" /><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M19 5a10 10 0 0 1 0 14" /></>,
+  regenerate: <><path d="M21 4v6h-6" /><path d="M3 20v-6h6" /><path d="M3.5 9a9 9 0 0 1 14.9-3.4L21 10" /><path d="M3 14l2.6 4.4A9 9 0 0 0 20.5 15" /></>,
+  upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5" /><path d="M12 3v12" /></>,
+  remove: <><path d="M3 6h18" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>,
+  newExample: <><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /><path d="M19 3v4" /><path d="M21 5h-4" /></>,
+};
+
+function RailButton(props: { icon: keyof typeof ICONS; title: string; onClick: () => void; disabled?: boolean; busy?: boolean }) {
+  return (
+    <button
+      type="button"
+      title={props.title}
+      disabled={props.disabled}
+      aria-busy={props.busy || undefined}
+      onClick={props.onClick}
+      className={`inline-flex h-[24px] w-[24px] items-center justify-center rounded-full text-ink transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40 ${props.busy ? "cursor-progress" : ""}`}
+    >
+      {props.busy ? (
+        <Spinner size={13} />
+      ) : (
+        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {ICONS[props.icon]}
+        </svg>
+      )}
+    </button>
+  );
+}
+
+/** The audio of one text. `name` says what it is for, such as "the word". Editable, it wraps the field it belongs to and keeps its actions in a capsule on the right; its border shows whether there is audio. */
 export default function Clip(props: {
   note: Note;
   slot: string;
@@ -14,6 +44,7 @@ export default function Clip(props: {
   readOnly?: boolean;
   extra?: { label: string; busy: boolean; onSelect: () => void };
   problem?: string;
+  children?: ReactNode;
 }) {
   const { note, slot, name, text } = props;
   const clip = note.audio[slot];
@@ -22,8 +53,6 @@ export default function Clip(props: {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState("");
   const file = useRef<HTMLInputElement>(null);
-  const menu = useId();
-  const anchor = `--${menu.replace(/[^a-z0-9]/gi, "")}`;
 
   async function run(work: () => Promise<{ note: Note }>) {
     setBusy(true);
@@ -63,68 +92,46 @@ export default function Clip(props: {
 
   const working = busy || Boolean(props.extra?.busy);
   const canGenerate = Boolean(text.trim());
-  const item = (label: string, onClick: () => void, disabled = false) => (
-    <button className="options-item" popoverTarget={menu} popoverTargetAction="hide" disabled={disabled} onClick={onClick}>
-      {label}
-    </button>
-  );
+  const message = problem || clip?.error || props.problem || "";
+  const state = !has ? "no audio" : clip.outdated ? "audio is out of date" : "";
+  const tone = message ? "border-danger" : clip?.outdated ? "border-warn" : has ? "border-rule-strong" : "border-dashed border-rule-strong";
 
   return (
-    <div role="group" aria-label={`Audio for ${name}`} className="flex flex-col items-center gap-0.5">
-      <div className="flex items-center gap-2 text-sm">
-        {has && (
-          <button
-            className={`action min-w-control-sm px-2 ${working ? "cursor-progress" : ""}`}
-            aria-label={`Play ${name}`}
-            aria-busy={working || undefined}
-            onClick={() => !working && play()}
-          >
-            {working ? <Spinner size={12} /> : <svg viewBox="0 0 10 10" width="12" height="12" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>}
-          </button>
-        )}
-        {has && clip.outdated && (
-          <>
-            <span className="text-warn">Audio is out of date</span>
-            <button className="action" disabled={working || !canGenerate} onClick={generateNow}>Regenerate</button>
-          </>
-        )}
-        <button
-          className="action min-w-control-sm px-2"
-          aria-label={`Audio options for ${name}`}
-          aria-busy={(working && !has) || undefined}
-          disabled={working}
-          popoverTarget={menu}
-          style={{ anchorName: anchor }}
+    <div>
+      <div className="grid grid-cols-[3.25rem_minmax(0,1fr)_3.25rem] items-center sm:grid-cols-[2rem_minmax(0,1fr)_2rem]">
+        <div className="col-start-2 row-start-1">{props.children}</div>
+        <div
+          role="group"
+          aria-label={`Audio for ${name}`}
+          className={`col-start-3 row-start-1 grid grid-cols-2 justify-items-center gap-px justify-self-end rounded-[1.1rem] border bg-paper p-0.5 sm:grid-cols-1 sm:rounded-full ${tone}`}
         >
-          {working && !has ? (
-            <Spinner size={16} />
-          ) : (
-            <svg viewBox="0 0 16 4" width="16" height="4" aria-hidden="true" fill="currentColor">
-              <circle cx="2" cy="2" r="1.6" /><circle cx="8" cy="2" r="1.6" /><circle cx="14" cy="2" r="1.6" />
-            </svg>
-          )}
-        </button>
-        <div id={menu} popover="auto" className="options" style={{ positionAnchor: anchor }}>
-          {item(has ? "Regenerate" : "Generate", generateNow, !canGenerate)}
-          {item("Upload", () => file.current?.click(), !canGenerate)}
-          {has && item("Remove", () => run(() => api(`/api/audio/${note.id}/${slot}`, { method: "DELETE" })))}
-          {props.extra && item(props.extra.label, props.extra.onSelect)}
+          <RailButton icon="play" title={`Play ${name}`} disabled={!has && !working} busy={working} onClick={() => !working && play()} />
+          <RailButton
+            icon={has ? "regenerate" : "generate"}
+            title={clip?.outdated ? "Regenerate (the Arabic changed)" : has ? "Regenerate" : "Generate"}
+            disabled={working || !canGenerate}
+            onClick={generateNow}
+          />
+          <RailButton icon="upload" title="Upload" disabled={working || !canGenerate} onClick={() => file.current?.click()} />
+          <RailButton icon="remove" title="Remove" disabled={working || !has} onClick={() => run(() => api(`/api/audio/${note.id}/${slot}`, { method: "DELETE" }))} />
+          {props.extra && <RailButton icon="newExample" title={props.extra.label} disabled={working} onClick={props.extra.onSelect} />}
+          {state && <span className="sr-only">{state}</span>}
+          <input
+            ref={file}
+            type="file"
+            accept="audio/mpeg,.mp3"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              e.target.blur();
+              if (f) run(() => api(`/api/audio/${note.id}/${slot}`, { method: "PUT", body: f }));
+            }}
+          />
         </div>
       </div>
       <span role="status" className="sr-only">{working ? "Working…" : ""}</span>
-      <input
-        ref={file}
-        type="file"
-        accept="audio/mpeg,.mp3"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          e.target.value = "";
-          e.target.blur();
-          if (f) run(() => api(`/api/audio/${note.id}/${slot}`, { method: "PUT", body: f }));
-        }}
-      />
-      <p className="min-h-[2lh] text-xs text-danger">{problem || clip?.error || props.problem}</p>
+      <p className="min-h-[2lh] text-xs text-danger">{message}</p>
     </div>
   );
 }

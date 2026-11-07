@@ -20,9 +20,9 @@ describe("the layout of a card", () => {
     it("keeps the control that Tab reaches clear of the action bar in a short window", () => {
       cy.viewport(1280, 400);
       openWord(100);
-      cy.get(by("Hint")).focus();
+      cy.get(by("Example in English")).focus();
       cy.press(Cypress.Keyboard.Keys.TAB);
-      cy.focused().should("contain", "Edit forms").should(($field) => {
+      cy.focused().should("have.attr", "title", "New example").should(($field) => {
         let fixed = $field[0].ownerDocument.querySelector(bar) as HTMLElement;
         while (getComputedStyle(fixed).position !== "fixed") fixed = fixed.parentElement!;
         expect($field[0].getBoundingClientRect().bottom).to.be.at.most(fixed.getBoundingClientRect().top);
@@ -72,13 +72,11 @@ describe("the layout of a card", () => {
       above: (doc: Document) => Element | null;
       below: (doc: Document) => Element | null;
     }[] = [
-      { what: "the headword and the audio of the word", rank: 7, above: (doc) => doc.querySelector(by("Arabic headword")), below: (doc) => doc.querySelector(`${by("Audio for the word")} button`) },
       { what: "the hint and Add forms", rank: 7, above: (doc) => doc.querySelector(by("Hint")), below: (doc) => byText(doc, "Add forms") },
       { what: "the hint and Edit forms", rank: 6, above: (doc) => doc.querySelector(by("Hint")), below: (doc) => byText(doc, "Edit forms") },
       { what: "the English meaning and the example", rank: 7, above: (doc) => doc.querySelector(by("English meaning")), below: (doc) => doc.querySelector(`${example} button`) },
       { what: "an empty example and the English translation", rank: 7, above: (doc) => doc.querySelector(example), below: (doc) => doc.querySelector(by("Example in English")) },
       { what: "the example and its translation", rank: 110, written: true, above: (doc) => doc.querySelector(example), below: (doc) => doc.querySelector(by("Example in English")) },
-      { what: "the translation and the audio of the example", rank: 110, written: true, above: (doc) => doc.querySelector(by("Example in English")), below: (doc) => doc.querySelector(`${by("Audio for the example")} button`) },
       { what: "the example being edited and Mark target", rank: 111, editing: true, above: (doc) => doc.querySelector(`textarea${by("Example")}`), below: (doc) => byText(doc, "Mark target") },
     ];
 
@@ -147,29 +145,6 @@ describe("the layout of a card", () => {
           });
         });
       });
-    }
-  });
-
-  describe("the headword and its audio", () => {
-    const minimumGap = 8;
-    let rank = 70;
-
-    for (const [width, height] of screens) {
-      for (const withAudio of [false, true]) {
-        it(`leave a gap of ${minimumGap}px between them at ${width}px ${withAudio ? "with" : "without"} audio`, () => {
-          cy.viewport(width, height);
-          openWord(rank++);
-          if (withAudio) {
-            cy.get(`${by("Audio for the word")} input[type="file"]`).selectFile(unplayable, { force: true });
-            cy.get(by("Play the word"));
-          }
-          cy.get(by("Arabic headword")).should(($field) => {
-            const control = $field[0].ownerDocument.querySelector(`${by("Audio for the word")} button`)!;
-            const gap = control.getBoundingClientRect().top - $field[0].getBoundingClientRect().bottom;
-            expect(gap, "gap between the headword and the first audio control").to.be.at.least(minimumGap);
-          });
-        });
-      }
     }
   });
 });

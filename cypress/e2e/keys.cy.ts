@@ -47,9 +47,9 @@ describe("the keys of a card", () => {
   it("plays the word with Ctrl+↑", () => {
     openWord(94);
     cy.get(`${by("Audio for the word")} input[type="file"]`).selectFile(unplayable, { force: true });
-    cy.get(by("Play the word"));
+    cy.get('[aria-label="Audio for the word"] [title="Remove"]').should("be.enabled");
     cy.get("body").type("{ctrl}{uparrow}");
-    cy.get(by("Audio for the word")).should("contain", "could not be played");
+    cy.contains("could not be played");
   });
 
   it("plays the example with Ctrl+↓", () => {
@@ -57,9 +57,9 @@ describe("the keys of a card", () => {
     cy.get(by("Example")).click();
     cy.get(`textarea${by("Example")}`).type("الْكِتَابُ [فِي] الْحَقِيبَةِ").blur();
     cy.get(`${by("Audio for the example")} input[type="file"]`).selectFile(unplayable, { force: true });
-    cy.get(by("Play the example"));
+    cy.get('[aria-label="Audio for the example"] [title="Remove"]').should("be.enabled");
     cy.get("body").type("{ctrl}{downarrow}");
-    cy.get(by("Audio for the example")).should("contain", "could not be played");
+    cy.contains("could not be played");
   });
 
   it("does not act on them while a field has focus", () => {

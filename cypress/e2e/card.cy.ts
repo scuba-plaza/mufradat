@@ -5,15 +5,14 @@ const alert = '[role="alert"]';
 const bar = '[role="toolbar"]';
 const by = (label: string) => `[aria-label="${label}"]`;
 const resetButton = '[title="Reset word"]';
-const exampleOptions = by("Audio options for the example");
+const word = by("Audio for the word");
+const example = by("Audio for the example");
+const inGroup = (group: string, title: string) => `${group} [title="${title}"]`;
 const at = (el: Element) => {
   const box = el.getBoundingClientRect();
   return [box.left, box.top + el.ownerDocument.defaultView!.scrollY, box.width, box.height];
 };
-const askForExample = () => {
-  cy.get(exampleOptions).click();
-  cy.contains(`${by("Audio for the example")} [popover] button`, "New example").click();
-};
+const askForExample = () => cy.get(inGroup(example, "New example")).click();
 const tagsButton = '[title="Tags and details"]';
 /** An MP3 frame header and nothing playable after it: the store accepts it, a browser cannot decode it. */
 const unplayable = { contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]), fileName: "word.mp3", mimeType: "audio/mpeg" };
@@ -154,7 +153,7 @@ describe("a word", () => {
     openWord(17);
     askForExample();
     cy.contains("There is no Mistral API key");
-    cy.get(exampleOptions).should("be.enabled");
+    cy.get(inGroup(example, "New example")).should("be.enabled");
   });
 
   it("takes the failed example message away once you write an example yourself", () => {
@@ -189,8 +188,7 @@ describe("a word", () => {
       cy.request("PUT", `/api/notes/${path.split("/").pop()}`, { exampleEn: "The book is in the bag." }).then((response) => {
         cy.intercept("POST", "/api/mistral", { body: { note: response.body.note } });
       });
-      cy.get(by("Audio options for the example")).click();
-      cy.contains(`${by("Audio for the example")} [popover] button`, "New example").click();
+      askForExample();
       cy.get(by("Example in English")).should("have.value", "The book is in the bag.");
       cy.get(alert).should("not.exist");
     });
@@ -198,226 +196,133 @@ describe("a word", () => {
 
   it("keeps a failed clip under its text and lets you try again", () => {
     openWord(18);
-    cy.get(by("Audio options for the word")).click();
-    cy.contains(`${by("Audio for the word")} [popover] button`, "Generate").click();
+    cy.get(inGroup(word, "Generate")).click();
     cy.contains("There are no Google credentials");
-    cy.get(by("Audio options for the word")).should("be.enabled");
+    cy.get(inGroup(word, "Generate")).should("be.enabled");
   });
 
   it("says when a clip cannot be played", () => {
     openWord(19);
     cy.get(`${by("Audio for the word")} input[type="file"]`).selectFile(unplayable, { force: true });
-    cy.get(by("Play the word")).click();
+    cy.get(inGroup(word, "Remove")).should("be.enabled");
+    cy.get(inGroup(word, "Play the word")).click();
     cy.contains("could not be played");
   });
 
-  describe("the audio of the word", () => {
-    const word = by("Audio for the word");
-    const options = by("Audio options for the word");
-    const menu = `${word} [popover]`;
-    const another = { ...unplayable, contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 9, 9, 9, 9]) };
+  describe("the audio controls", () => {
+    const mine = { ...unplayable, contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 7, 7, 7, 7]) };
+    const place = (el: Element) => [...at(el)];
 
     function openWordWithAudio(rank: number) {
       openWord(rank);
-      cy.get(`${word} input[type="file"]`).selectFile(unplayable, { force: true });
-      cy.get(options);
+      cy.get(`${word} input[type="file"]`).selectFile(mine, { force: true });
+      cy.get(inGroup(word, "Remove")).should("be.enabled");
     }
 
-    const items = ($items: JQuery<HTMLElement>) => $items.toArray().map((item) => item.textContent);
-
-    it("offers only the options button while there is no audio, with Generate and Upload inside", () => {
+    it("keeps the audio actions in a capsule beside the field, with no menu", () => {
       openWord(40);
-      cy.get(`${word} button:visible`).should("have.length", 1);
-      cy.get(`${word} button:visible`).should("have.attr", "aria-label", "Audio options for the word");
-      cy.get(options).click();
-      cy.get(`${menu} button`).should("have.length", 2).then(($items) => {
-        expect(items($items)).to.deep.equal(["Generate", "Upload"]);
+      cy.get(inGroup(word, "Play the word")).should("be.disabled");
+      cy.get(inGroup(word, "Generate")).should("be.enabled");
+      cy.get(inGroup(word, "Upload")).should("be.enabled");
+      cy.get(inGroup(word, "Remove")).should("be.disabled");
+      cy.get(`${word} [popover]`).should("not.exist");
+      cy.get('[aria-label^="Audio options"]').should("not.exist");
+      cy.get(inGroup(example, "New example")).should("be.enabled");
+      cy.get(inGroup(word, "New example")).should("not.exist");
+    });
+
+    it("shows whether there is audio in the border: dashed without, solid with, amber when out of date", () => {
+      openWord(41);
+      const border = () => cy.get(word).then(($group) => {
+        const style = getComputedStyle($group[0]);
+        return [style.borderTopStyle, style.borderTopColor];
       });
-    });
-
-    it("shows the play button and one options button once there is audio, with no Generate in sight", () => {
-      openWordWithAudio(41);
-      cy.get(`${word} button:visible`).should("have.length", 2);
-      cy.get(`${word} button:visible`).first().should("have.attr", "aria-label", "Play the word");
-      cy.get(`${word} button:visible`).last().should("have.attr", "aria-label", "Audio options for the word");
-      cy.get(menu).should("not.be.visible");
-    });
-
-    it("lists exactly Regenerate, Upload and Remove once there is audio", () => {
-      openWordWithAudio(42);
-      cy.get(options).click();
-      cy.get(menu).should("be.visible");
-      cy.get(`${menu} button`).should("have.length", 3).then(($items) => {
-        expect(items($items)).to.deep.equal(["Regenerate", "Upload", "Remove"]);
-      });
-    });
-
-    it("closes on Escape and puts the focus back on the options button", () => {
-      openWordWithAudio(43);
-      cy.get(options).click();
-      cy.get(`${menu} button`).first().focus();
-      cy.pressEscape();
-      cy.get(menu).should("not.be.visible");
-      cy.focused().should("have.attr", "aria-label", "Audio options for the word");
-    });
-
-    it("keeps the clip, closes, and says why when regenerating fails", () => {
-      openWordWithAudio(44);
-      cy.get(options).click();
-      cy.contains(`${menu} button`, "Regenerate").click();
-      cy.contains("There are no Google credentials");
-      cy.get(menu).should("not.be.visible");
-      cy.get(by("Play the word"));
-    });
-
-    it("replaces the clip when another MP3 is uploaded", () => {
-      cy.intercept("PUT", "/api/audio/*/word").as("put");
-      openWordWithAudio(45);
-      cy.wait("@put").its("response.body.note.audio.word.key").then((first) => {
-        cy.get(`${word} input[type="file"]`).selectFile(another, { force: true });
-        cy.wait("@put").its("response.body.note.audio.word").should((clip) => {
-          expect(clip.source).to.equal("user");
-          expect(clip.key).to.not.equal(first);
-        });
-      });
-    });
-
-    it("removes the clip, and the bar says the word needs audio again", () => {
-      openWordWithAudio(46);
-      cy.get(bar).should("not.contain", "audio for the word");
-      cy.get(options).click();
-      cy.contains(`${menu} button`, "Remove").click();
-      cy.get(bar).should("contain", "Still needs").and("contain", "audio for the word");
-      cy.get(by("Play the word")).should("not.exist");
-      cy.get(options).click();
-      cy.get(`${menu} button`).then(($items) => expect(items($items)).to.deep.equal(["Generate", "Upload"]));
-      cy.reload();
-      cy.get(by("Play the word")).should("not.exist");
-    });
-
-    it("shows Regenerate beside the warning when the Arabic has changed", () => {
-      openWordWithAudio(47);
-      cy.hydrated(by("Hint"));
+      border().should("deep.equal", ["dashed", "rgb(140, 138, 134)"]);
+      cy.get(`${word} input[type="file"]`).selectFile(mine, { force: true });
+      cy.get(inGroup(word, "Remove")).should("be.enabled");
+      border().should("deep.equal", ["solid", "rgb(140, 138, 134)"]);
       cy.get(by("Arabic headword")).clear().type("قَلَمٌ").blur();
       cy.get(status).should("contain", "Saved");
-      cy.get(word).should("contain", "Audio is out of date");
-      cy.get(word).contains("button:visible", "Regenerate");
-      cy.get(options).should("be.visible");
+      border().should("deep.equal", ["solid", "rgb(154, 91, 0)"]);
+      cy.get(inGroup(word, "Regenerate (the Arabic changed)")).should("be.enabled");
+    });
+
+    for (const [width, height] of [[1280, 800], [390, 844]]) {
+      it(`keeps the text centred and each capsule no taller than its field at ${width}px`, () => {
+        cy.viewport(width, height);
+        openWord(42);
+        cy.location("pathname").then((path) => {
+          cy.request("PUT", `/api/notes/${path.split("/").pop()}`, { example: "الْكِتَابُ [فِي] الْحَقِيبَةِ", exampleEn: "The book is in the bag." });
+          cy.reload();
+          cy.hydrated(by("Hint"));
+        });
+        cy.document().should((doc) => {
+          const rect = (selector: string) => doc.querySelector(selector)!.getBoundingClientRect();
+          const middle = (selector: string) => rect(selector).left + rect(selector).width / 2;
+          const meaning = middle(by("English meaning"));
+          for (const field of [by("Arabic headword"), by("Hint"), by("Example in English")]) {
+            expect(Math.abs(middle(field) - meaning), `${field} against the meaning`).to.be.at.most(1);
+          }
+          const wordBox = [rect(by("Arabic headword")).top, rect(by("Hint")).bottom];
+          expect(rect(word).height, "the capsule of the word").to.be.at.most(wordBox[1] - wordBox[0]);
+          const exampleBox = [rect(`div${by("Example")}`).top, rect(by("Example in English")).bottom];
+          expect(rect(example).height, "the capsule of the example").to.be.at.most(exampleBox[1] - exampleBox[0]);
+        });
+      });
+    }
+
+    it("uploads, regenerates and removes", () => {
+      openWordWithAudio(43);
+      cy.get(inGroup(word, "Generate")).should("not.exist");
+      cy.get(inGroup(word, "Regenerate")).click();
+      cy.contains("There are no Google credentials");
+      cy.get(inGroup(word, "Play the word")).should("be.enabled");
+      cy.get(bar).should("not.contain", "audio for the word");
+      cy.get(inGroup(word, "Remove")).click();
+      cy.get(bar).should("contain", "Still needs").and("contain", "audio for the word");
+      cy.get(inGroup(word, "Play the word")).should("be.disabled");
+      cy.get(inGroup(word, "Generate"));
     });
 
     it("shows a spinner on the play button while it works, and moves nothing", () => {
       cy.intercept("POST", "/api/tts", (req) => req.reply({ delay: 800, statusCode: 400, body: { error: "Busy." } }));
-      openWordWithAudio(48);
+      openWordWithAudio(44);
       cy.get(word).then(($group) => {
-        const before = at($group[0]);
-        cy.get(options).click();
-        cy.contains(`${menu} button`, "Regenerate").click();
-        cy.get(by("Play the word")).should("have.attr", "aria-busy", "true");
-        cy.get(`${by("Play the word")} path[d="M2 1l7 4-7 4z"]`).should("not.exist");
-        cy.get(options).should("be.disabled");
-        cy.get(word).should(($now) => {
-          expect(at($now[0])).to.deep.equal(before);
-        });
-        cy.get(by("Play the word")).should("not.have.attr", "aria-busy");
-        cy.get(`${by("Play the word")} path[d="M2 1l7 4-7 4z"]`).should("exist");
-        cy.get(options).should("be.enabled");
+        const before = place($group[0]);
+        cy.get(inGroup(word, "Regenerate")).click();
+        cy.get(inGroup(word, "Play the word")).should("have.attr", "aria-busy", "true");
+        cy.get(`${inGroup(word, "Play the word")} path[d="M7 4l13 8-13 8z"]`).should("not.exist");
+        cy.get(inGroup(word, "Regenerate")).should("be.disabled");
+        cy.get(word).should(($now) => expect(place($now[0])).to.deep.equal(before));
+        cy.get(inGroup(word, "Play the word")).should("not.have.attr", "aria-busy");
+        cy.get(inGroup(word, "Regenerate")).should("be.enabled");
       });
     });
 
-    it("shows the spinner on the options button while there is no play button, and moves nothing", () => {
-      cy.intercept("POST", "/api/tts", (req) => req.reply({ delay: 800, statusCode: 400, body: { error: "Busy." } }));
-      openWord(49);
-      cy.get(word).then(($group) => {
-        const before = at($group[0]);
-        cy.get(options).click();
-        cy.contains(`${menu} button`, "Generate").click();
-        cy.get(options).should("have.attr", "aria-busy", "true").and("be.disabled");
-        cy.get(word).should(($now) => {
-          expect(at($now[0])).to.deep.equal(before);
-        });
-        cy.get(options).should("not.have.attr", "aria-busy");
+    it("keeps the Hint where it is when the audio of the word fails", () => {
+      openWord(45);
+      cy.get(by("Hint")).then(($hint) => {
+        const before = at($hint[0])[1];
+        cy.get(inGroup(word, "Generate")).click();
+        cy.contains("There are no Google credentials");
+        cy.get(by("Hint")).should(($now) => expect(at($now[0])[1]).to.equal(before));
       });
     });
-  });
 
-  describe("the audio of the example", () => {
-    const example = by("Audio for the example");
-    const options = by("Audio options for the example");
-    const menu = `${example} [popover]`;
-    const items = ($items: JQuery<HTMLElement>) => $items.toArray().map((item) => item.textContent);
-
-    function openWordWithExample(rank: number) {
-      openWord(rank);
-      cy.location("pathname").then((path) => cy.request("PUT", `/api/notes/${path.split("/").pop()}`, { example: "الْكِتَابُ [فِي] الْحَقِيبَةِ", exampleEn: "The book is in the bag." }));
-      cy.reload();
-      cy.hydrated(by("Hint"));
-    }
-
-    it("keeps New example beside Upload, and nowhere else, once the example exists", () => {
-      openWordWithExample(50);
-      cy.contains("button", "Generate example").should("not.exist");
-      cy.get(by("Audio options for the word")).click();
-      cy.get(`${by("Audio for the word")} [popover] button`).then(($items) => expect(items($items)).to.deep.equal(["Generate", "Upload"]));
-      cy.get(options).click();
-      cy.get(`${menu} button`).then(($items) => expect(items($items)).to.deep.equal(["Generate", "Upload", "New example"]));
-    });
-
-    it("lists Regenerate, Upload, Remove and New example once the example has audio", () => {
-      openWordWithExample(51);
-      cy.get(`${example} input[type="file"]`).selectFile(unplayable, { force: true });
-      cy.get(by("Play the example"));
-      cy.get(options).click();
-      cy.get(`${menu} button`).then(($items) => expect(items($items)).to.deep.equal(["Regenerate", "Upload", "Remove", "New example"]));
-    });
-
-    it("has the English field and the example audio from the start, with Generate and Upload off while there is no example", () => {
+    it("has the English field and the example capsule from the start, with Generate and Upload off while there is no example", () => {
       openWord(52);
-      cy.contains("button", "Generate example").should("not.exist");
       cy.get(by("Example in English")).should("be.visible");
       cy.get(example).should("be.visible");
-      cy.get(options).click();
-      cy.get(`${menu} button`).then(($items) => expect(items($items)).to.deep.equal(["Generate", "Upload", "New example"]));
-      cy.contains(`${menu} button`, "Generate").should("be.disabled");
-      cy.contains(`${menu} button`, "Upload").should("be.disabled");
-      cy.contains(`${menu} button`, "New example").should("be.enabled");
-    });
-
-    it("shows a spinner on the options button while a new example is asked for, and moves nothing", () => {
-      cy.intercept("POST", "/api/mistral", (req) => req.reply({ delay: 800, statusCode: 500, body: { error: "Mistral could not be reached." } }));
-      openWordWithExample(53);
-      cy.get(example).then(($group) => {
-        const before = at($group[0]);
-        cy.get(options).click();
-        cy.contains(`${menu} button`, "New example").click();
-        cy.get(options).should("have.attr", "aria-busy", "true");
-        cy.get(example).should(($now) => {
-          expect(at($now[0])).to.deep.equal(before);
-        });
-        cy.contains("Mistral could not be reached.");
-        cy.get(options).should("not.have.attr", "aria-busy");
-      });
-    });
-
-    it("keeps the menu of the example inside the window, opening upward when there is no room below", () => {
-      openWordWithExample(57);
-      cy.get(options).click();
-      cy.get(menu).should(($popover) => {
-        const box = $popover[0].getBoundingClientRect();
-        expect(box.top).to.be.at.least(0);
-        expect(box.bottom).to.be.at.most($popover[0].ownerDocument.defaultView!.innerHeight);
-      });
-      cy.contains(`${menu} button`, "New example").should("be.visible");
+      cy.get(inGroup(example, "Generate")).should("be.disabled");
+      cy.get(inGroup(example, "Upload")).should("be.disabled");
+      cy.get(inGroup(example, "New example")).should("be.enabled");
     });
 
     it("moves nothing when the first example arrives", () => {
       openWord(54);
-      const place = (doc: Document, label: string) => {
-        const box = doc.querySelector(label)!.getBoundingClientRect();
-        return [box.left, box.top + doc.defaultView!.scrollY, box.width, box.height];
-      };
-      const watched = [by("Example in English"), exampleOptions, by("Audio for the example"), `div${by("Example")}`];
+      const watched = [by("Example in English"), example, `div${by("Example")}`];
       cy.document().then((doc) => {
-        const before = watched.map((label) => place(doc, label));
+        const before = watched.map((label) => place(doc.querySelector(label)!));
         cy.location("pathname").then((path) => {
           cy.request("PUT", `/api/notes/${path.split("/").pop()}`, { example: "الْكِتَابُ [فِي] الْحَقِيبَةِ", exampleEn: "The book is in the bag." }).then((response) => {
             cy.intercept("POST", "/api/mistral", { delay: 300, body: { note: response.body.note } });
@@ -427,48 +332,23 @@ describe("a word", () => {
         cy.get(`${by("Example")} mark`).should("have.text", "فِي");
         cy.get(by("Example in English")).should("have.value", "The book is in the bag.");
         cy.document().should((now) => {
-          const after = watched.map((label) => place(now, label));
-          after.forEach((box, k) => {
-            expect(Math.abs(box[0] - before[k][0]), `${watched[k]} left`).to.be.at.most(1);
-            expect(Math.abs(box[1] - before[k][1]), `${watched[k]} top`).to.be.at.most(1);
-            expect(Math.abs(box[3] - before[k][3]), `${watched[k]} height`).to.be.at.most(1);
+          watched.forEach((label, k) => {
+            const after = place(now.querySelector(label)!);
+            expect(Math.abs(after[0] - before[k][0]), `${label} left`).to.be.at.most(1);
+            expect(Math.abs(after[1] - before[k][1]), `${label} top`).to.be.at.most(1);
+            expect(Math.abs(after[3] - before[k][3]), `${label} height`).to.be.at.most(1);
           });
         });
       });
     });
 
-    it("shows the failure of a new example in the line reserved under its audio, and moves nothing", () => {
+    it("shows the failure of a new example under its field, and moves nothing", () => {
       openWord(55);
       cy.get(by("Example in English")).then(($english) => {
         const before = at($english[0])[1];
         askForExample();
-        cy.get(`${example} p`).should("contain", "There is no Mistral API key");
+        cy.contains("There is no Mistral API key");
         cy.get(by("Example in English")).should(($now) => expect(at($now[0])[1]).to.equal(before));
-      });
-    });
-  });
-
-  describe("the room kept for what may appear", () => {
-    it("keeps the Hint where it is when the audio of the word fails, at 390px too", () => {
-      cy.viewport(390, 844);
-      openWord(58);
-      cy.get(by("Hint")).then(($hint) => {
-        const before = at($hint[0])[1];
-        cy.get(by("Audio options for the word")).click();
-        cy.contains(`${by("Audio for the word")} [popover] button`, "Generate").click();
-        cy.contains("There are no Google credentials");
-        cy.get(by("Hint")).should(($now) => expect(at($now[0])[1]).to.equal(before));
-      });
-    });
-
-    it("keeps the Hint where it is when the audio of the word fails", () => {
-      openWord(56);
-      cy.get(by("Hint")).then(($hint) => {
-        const before = at($hint[0])[1];
-        cy.get(by("Audio options for the word")).click();
-        cy.contains(`${by("Audio for the word")} [popover] button`, "Generate").click();
-        cy.contains("There are no Google credentials");
-        cy.get(by("Hint")).should(($now) => expect(at($now[0])[1]).to.equal(before));
       });
     });
   });

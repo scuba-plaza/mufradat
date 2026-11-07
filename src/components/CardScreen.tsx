@@ -118,7 +118,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
   }
 
   useEffect(() => {
-    const play = (name: string) => document.querySelector<HTMLButtonElement>(`button[aria-label="Play ${name}"]`)?.click();
+    const play = (name: string) => document.querySelector<HTMLButtonElement>(`button[title="Play ${name}"]`)?.click();
     const go = (direction: "previous" | "next") =>
       later(async () => {
         try {
@@ -140,12 +140,6 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [note.id, q]);
-
-  const clip = (slot: string, name: string, text: string, extra?: { label: string; busy: boolean; onSelect: () => void }, problem?: string) => (
-    <div className="mt-2">
-      <Clip note={note} slot={slot} name={name} text={text} onNote={setNote} extra={extra} problem={problem} />
-    </div>
-  );
 
   return (
     <div className="pb-[var(--bar-h)]">
@@ -171,9 +165,10 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
       </div>
 
       <div className="mt-6 text-center">
-        <InlineText label="Arabic headword" value={note.lemma} arabic className="text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
-        {clip("word", "the word", note.lemma)}
-        <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-2 text-center text-quiet" onSave={(hint) => save({ hint })} />
+        <Clip note={note} slot="word" name="the word" text={note.lemma} onNote={setNote}>
+          <InlineText label="Arabic headword" value={note.lemma} arabic className="text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
+          <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-2 text-center text-quiet" onSave={(hint) => save({ hint })} />
+        </Clip>
         {note.forms.length > 0 ? (
           <section aria-label="Forms" className="panel mx-auto mt-5 max-w-lg px-4 py-3">
             <div className="flex items-center justify-between">
@@ -197,9 +192,18 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
       </div>
 
       <div className="mt-10 text-center">
-        <ExampleText value={note.example} onSave={(example) => save({ example })} />
-        <InlineText label="Example in English" placeholder="Add the English translation" value={note.exampleEn} className="mt-2 text-center text-lg" onSave={(exampleEn) => save({ exampleEn })} />
-        {clip("example", "the example", plainExample(note.example), { label: "New example", busy: exampleBusy, onSelect: generateExample }, exampleProblem || note.exampleError || "")}
+        <Clip
+          note={note}
+          slot="example"
+          name="the example"
+          text={plainExample(note.example)}
+          onNote={setNote}
+          extra={{ label: "New example", busy: exampleBusy, onSelect: generateExample }}
+          problem={exampleProblem || note.exampleError || ""}
+        >
+          <ExampleText value={note.example} onSave={(example) => save({ example })} />
+          <InlineText label="Example in English" placeholder="Add the English translation" value={note.exampleEn} className="mt-2 text-center text-lg" onSave={(exampleEn) => save({ exampleEn })} />
+        </Clip>
       </div>
 
       <TagsAndDetailsDialog note={note} open={tagsOpen} onClose={() => setTagsOpen(false)} save={save} saveTags={saveTags} tagProblem={tagProblem} clearTagProblem={() => setTagProblem("")} problems={problems} />
