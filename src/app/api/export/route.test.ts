@@ -43,7 +43,6 @@ describe("exporting through the API", () => {
     const res = await GET();
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Disposition")).toMatch(/^attachment; filename="arabic-deck-\d{4}-\d{2}-\d{2}\.apkg"$/);
-    expect(res.headers.get("X-Card-Count")).toBe("1");
     expect([...Buffer.from(await res.arrayBuffer()).subarray(0, 2)]).toEqual([0x50, 0x4b]);
     expect(fs.existsSync(path.join(store.root, "exports"))).toBe(false);
     expect(fs.readdirSync(store.root, { recursive: true }).filter((file) => String(file).endsWith(".apkg"))).toEqual([]);

@@ -114,7 +114,6 @@ const status = "header .topbar-inner > [role=\"status\"]";
 const deckHeaders = {
   "Content-Type": "application/octet-stream",
   "Content-Disposition": 'attachment; filename="arabic-deck-2026-01-01.apkg"',
-  "X-Card-Count": "1",
 };
 
 function approvedCard() {
@@ -143,20 +142,21 @@ describe("export from the menu", () => {
     cy.task<string[]>("downloads").then((before) => {
       cy.intercept("GET", "/api/export").as("export");
       cy.menuItem("Export");
-      cy.get(status).invoke("text").should("match", /^Exported \d+ cards?\.$/);
+      cy.wait("@export").its("response.statusCode").should("eq", 200);
       cy.get("@export.all").should("have.length", 1);
       cy.task<string[]>("downloads", before.length + 1).should((after) => expect(after).to.have.length(before.length + 1));
       cy.task<string[]>("workspaceExports").should("deep.equal", []);
+      cy.get(status).should("have.text", "");
     });
   });
 
-  it("says Preparing the deck… and then Exported 1 card.", () => {
+  it("says Preparing the deck… while it is built and nothing once it is on its way", () => {
     approvedCard();
     cy.visit("/");
     cy.intercept("GET", "/api/export", { delay: 600, headers: deckHeaders, body: "x" });
     cy.menuItem("Export");
     cy.get(status).should("have.text", "Preparing the deck…");
-    cy.get(status).should("have.text", "Exported 1 card.");
+    cy.get(status).should("have.text", "");
   });
 
   it("says why when the export is refused and saves nothing", () => {
@@ -186,12 +186,13 @@ describe("export from the menu", () => {
     cy.get(status).should("have.text", "Request failed (400).");
   });
 
-  it("puts the message on its own row under the button and does not scroll the page sideways at 390px", () => {
+  it("puts a message on its own row under the button and does not scroll the page sideways at 390px", () => {
     cy.viewport(390, 844);
     approvedCard();
     cy.visit("/");
+    cy.intercept("GET", "/api/export", { statusCode: 400, body: { error: "The audio for كِتَابٌ (word) is missing from the workspace. ".repeat(4) } });
     cy.menuItem("Export");
-    cy.get(status).should("contain", "Exported");
+    cy.get(status).should("contain", "is missing from the workspace");
     cy.get(status).then(($message) => {
       cy.get(trigger).then(($button) => {
         expect($message[0].getBoundingClientRect().top).to.be.at.least($button[0].getBoundingClientRect().bottom - 1);

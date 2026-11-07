@@ -27,7 +27,6 @@ export const GET = () =>
       headers: {
         "Content-Type": "application/octet-stream",
         "Content-Disposition": `attachment; filename="${name}"`,
-        "X-Card-Count": String(notes.length),
       },
     });
   });

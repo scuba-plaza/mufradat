@@ -2,7 +2,6 @@
 import { useId, useRef, useState } from "react";
 import { refusal } from "./api";
 import Backups from "./Backups";
-import { plural } from "./format";
 import Shortcuts from "./Shortcuts";
 import UnusedAudio from "./UnusedAudio";
 
@@ -25,13 +24,12 @@ export default function Menu({ approved }: { approved: number }) {
     try {
       const res = await fetch("/api/export");
       if (!res.ok) throw await refusal(res);
-      const cards = Number(res.headers.get("X-Card-Count"));
       const link = document.createElement("a");
       link.href = URL.createObjectURL(await res.blob());
       link.download = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? "arabic-deck.apkg";
       link.click();
       setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
-      setMessage(`Exported ${cards} ${plural(cards, "card")}.`);
+      setMessage("");
     } catch (e) {
       setMessage((e as Error).message);
     }
