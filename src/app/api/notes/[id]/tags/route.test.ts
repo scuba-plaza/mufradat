@@ -38,6 +38,13 @@ describe("setting a card's tags through the API", () => {
     expect(note.tags).toEqual(["grammar", "lesson_1", "lesson_2"]);
     expect(store.getNote(id)!.tags).toEqual(["grammar", "lesson_1", "lesson_2"]);
   });
+  it("turns every kind of space into _, including the next-line character", async () => {
+    const { store } = context();
+    const id = openCard(store, { rank: 10 })!;
+    const res = await put(id, { tags: ["a\u0085b", "c\u00a0d", "e\tf"] });
+    expect((await res.json()).note.tags).toEqual(["a_b", "c_d", "e_f"]);
+  });
+
   it("leaves an approved card approved", async () => {
     const { store } = context();
     const id = openCard(store, { rank: 10 })!;

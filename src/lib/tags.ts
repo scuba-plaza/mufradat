@@ -7,7 +7,7 @@ export function parseTags(input: unknown): { tags: string[] } | { error: string 
   }
   const tags = new Set<string>();
   for (const entry of input as string[]) {
-    const tag = entry.trim().toLowerCase().replace(/\s+/g, "_");
+    const tag = entry.trim().toLowerCase().replace(/[\s\u0085]+/g, "_");
     if (tag === "") continue;
     if (/[,"*]/.test(tag)) return { error: "A tag cannot contain commas, quotes or *." };
     if (tag.length > MAX_TAG_LENGTH) return { error: `A tag is at most ${MAX_TAG_LENGTH} characters.` };
