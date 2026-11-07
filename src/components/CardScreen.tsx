@@ -11,7 +11,6 @@ import FormsDialog from "./FormsDialog";
 import InlineText from "./InlineText";
 import { keyPressed } from "./keys";
 import ResetDialog from "./ResetDialog";
-import Spinner from "./Spinner";
 import TagsAndDetailsDialog from "./TagsAndDetailsDialog";
 
 const SAVE_TEXT = { idle: "", saving: "Saving…", saved: "Saved", failed: "Not saved" };
@@ -142,9 +141,9 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
     return () => window.removeEventListener("keydown", onKey);
   }, [note.id, q]);
 
-  const clip = (slot: string, name: string, text: string, extra?: { label: string; busy: boolean; onSelect: () => void }) => (
+  const clip = (slot: string, name: string, text: string, extra?: { label: string; busy: boolean; onSelect: () => void }, problem?: string) => (
     <div className="mt-2">
-      <Clip note={note} slot={slot} name={name} text={text} onNote={setNote} extra={extra} />
+      <Clip note={note} slot={slot} name={name} text={text} onNote={setNote} extra={extra} problem={problem} />
     </div>
   );
 
@@ -199,19 +198,8 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
 
       <div className="mt-10 text-center">
         <ExampleText value={note.example} onSave={(example) => save({ example })} />
-        {note.example.trim() !== "" && (
-          <>
-            <InlineText label="Example in English" placeholder="Add the English translation" value={note.exampleEn} className="mt-2 text-center text-lg" onSave={(exampleEn) => save({ exampleEn })} />
-            {clip("example", "the example", plainExample(note.example), { label: "New example", busy: exampleBusy, onSelect: generateExample })}
-          </>
-        )}
-        {note.example.trim() === "" && (
-          <button className="action relative mt-5" disabled={exampleBusy} aria-busy={exampleBusy || undefined} onClick={generateExample}>
-            <span className={exampleBusy ? "invisible" : ""}>Generate example</span>
-            {exampleBusy && <span className="absolute inset-0 flex items-center justify-center"><Spinner size={16} /></span>}
-          </button>
-        )}
-        {(exampleProblem || note.exampleError) && <p className="mt-1 text-sm text-danger">{exampleProblem || note.exampleError}</p>}
+        <InlineText label="Example in English" placeholder="Add the English translation" value={note.exampleEn} className="mt-2 text-center text-lg" onSave={(exampleEn) => save({ exampleEn })} />
+        {clip("example", "the example", plainExample(note.example), { label: "New example", busy: exampleBusy, onSelect: generateExample }, exampleProblem || note.exampleError || "")}
       </div>
 
       <TagsAndDetailsDialog note={note} open={tagsOpen} onClose={() => setTagsOpen(false)} save={save} saveTags={saveTags} tagProblem={tagProblem} clearTagProblem={() => setTagProblem("")} problems={problems} />

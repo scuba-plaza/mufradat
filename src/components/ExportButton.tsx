@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { refusal } from "./api";
 import Spinner from "./Spinner";
 
@@ -7,6 +7,16 @@ export default function ExportButton({ q, count }: { q: string; count: number })
   const [message, setMessage] = useState("");
   const [preparing, setPreparing] = useState(false);
   const building = useRef(false);
+  const notice = useRef<HTMLDivElement>(null);
+  const id = useId();
+  const anchor = `--${id.replace(/[^a-z0-9]/gi, "")}`;
+
+  useEffect(() => {
+    const el = notice.current;
+    if (!el) return;
+    if (message && !el.matches(":popover-open")) el.showPopover();
+    if (!message && el.matches(":popover-open")) el.hidePopover();
+  }, [message]);
 
   async function exportDeck() {
     if (building.current) return;
@@ -38,6 +48,7 @@ export default function ExportButton({ q, count }: { q: string; count: number })
         title={`Export ${count} approved ${count === 1 ? "card" : "cards"}`}
         disabled={count === 0}
         aria-busy={preparing || undefined}
+        style={{ anchorName: anchor }}
         onClick={exportDeck}
       >
         {preparing ? (
@@ -48,7 +59,17 @@ export default function ExportButton({ q, count }: { q: string; count: number })
           </svg>
         )}
       </button>
-      <p role="status" className={preparing ? "sr-only" : "w-full break-words px-1 text-sm text-quiet empty:hidden"}>{preparing ? "Preparing the deck…" : message}</p>
+      <div
+        ref={notice}
+        popover="auto"
+        role="alert"
+        className="options options-end max-w-[min(28rem,calc(100vw-2.5rem))] break-words px-3 py-2 text-sm text-danger"
+        style={{ positionAnchor: anchor }}
+        onToggle={(e) => e.newState === "closed" && setMessage("")}
+      >
+        {message}
+      </div>
+      <p role="status" className="sr-only">{preparing ? "Preparing the deck…" : ""}</p>
     </>
   );
 }

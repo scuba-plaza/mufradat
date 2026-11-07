@@ -4,6 +4,7 @@ const searchBar = 'form[role="search"] input';
 const searchButton = 'form[role="search"] button';
 const exportButton = 'button[title^="Export "]';
 const status = '[role="search"] ~ [role="status"]';
+const notice = '[role="search"] ~ [popover][role="alert"]';
 const tag = "zz_export";
 const deckHeaders = {
   "Content-Type": "application/octet-stream",
@@ -136,9 +137,32 @@ describe("the export icon", () => {
     cy.task<string[]>("downloads").then((before) => {
       cy.intercept("GET", "/api/export*", { statusCode: 400, body: { error: "The card of the word X has no audio file." } });
       cy.get(exportButton).click();
-      cy.get(status).should("have.text", "The card of the word X has no audio file.");
+      cy.get(notice).should("be.visible").and("have.text", "The card of the word X has no audio file.");
       cy.task<string[]>("downloads").should("deep.equal", before);
     });
+  });
+
+  it("keeps the tabs where they are when the export is refused", () => {
+    approvedCard(4403);
+    visit("/");
+    cy.intercept("GET", "/api/export*", { statusCode: 400, body: { error: "The card of the word X has no audio file." } });
+    const placed = ($tabs: JQuery<HTMLElement>) => $tabs[0].getBoundingClientRect().top + $tabs[0].ownerDocument.defaultView!.scrollY;
+    cy.get('nav[aria-label="Status"]').then(($tabs) => {
+      const before = placed($tabs);
+      cy.get(exportButton).click();
+      cy.get(notice).should("be.visible").and("have.text", "The card of the word X has no audio file.");
+      cy.get('nav[aria-label="Status"]').should(($now) => expect(placed($now)).to.equal(before));
+    });
+  });
+
+  it("closes the message with Escape", () => {
+    approvedCard(4403);
+    visit("/");
+    cy.intercept("GET", "/api/export*", { statusCode: 400, body: { error: "The card of the word X has no audio file." } });
+    cy.get(exportButton).click();
+    cy.get(notice).should("be.visible");
+    cy.pressEscape();
+    cy.get(notice).should("not.be.visible");
   });
 
   it("says Request failed (500). when the server answers with something that is not JSON", () => {
@@ -146,7 +170,7 @@ describe("the export icon", () => {
     visit("/");
     cy.intercept("GET", "/api/export*", { statusCode: 500, headers: { "Content-Type": "text/html" }, body: "<!DOCTYPE html><p>oops</p>" });
     cy.get(exportButton).click();
-    cy.get(status).should("have.text", "Request failed (500).");
+    cy.get(notice).should("be.visible").and("have.text", "Request failed (500).");
   });
 
   it("says Request failed (400). when the refusal carries no message", () => {
@@ -154,23 +178,25 @@ describe("the export icon", () => {
     visit("/");
     cy.intercept("GET", "/api/export*", { statusCode: 400, body: {} });
     cy.get(exportButton).click();
-    cy.get(status).should("have.text", "Request failed (400).");
+    cy.get(notice).should("be.visible").and("have.text", "Request failed (400).");
   });
 
-  it("keeps the icon in the row and the message under it, and does not scroll sideways, at 390px", () => {
+  it("keeps the icon in the row and the message inside the window, and does not scroll sideways, at 390px", () => {
     cy.viewport(390, 844);
     approvedCard(4403);
     visit("/");
     cy.intercept("GET", "/api/export*", { statusCode: 400, body: { error: "The audio for كِتَابٌ (word) is missing from the workspace. ".repeat(4) } });
     cy.get(exportButton).click();
-    cy.get(status).should("contain", "is missing from the workspace");
+    cy.get(notice).should("be.visible").and("contain", "is missing from the workspace");
     cy.get(searchButton).then(($search) => {
       cy.get(exportButton).then(($icon) => {
-        cy.get(status).then(($message) => {
+        cy.get(notice).then(($message) => {
           const search = $search[0].getBoundingClientRect();
           const icon = $icon[0].getBoundingClientRect();
+          const box = $message[0].getBoundingClientRect();
           expect(Math.abs((icon.top + icon.bottom) / 2 - (search.top + search.bottom) / 2)).to.be.at.most(2);
-          expect($message[0].getBoundingClientRect().top).to.be.at.least(icon.bottom - 1);
+          expect(box.left).to.be.at.least(0);
+          expect(box.right).to.be.at.most($message[0].ownerDocument.defaultView!.innerWidth);
         });
       });
     });

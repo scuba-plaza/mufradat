@@ -37,7 +37,7 @@ export default function ExampleText(props: { value: string; onSave: (v: string) 
     return (
       <>
         <div role="group" aria-label="Example">
-          <button type="button" onClick={() => setEditing(true)} onFocus={() => setEditing(true)} className="block min-h-control w-full rounded-control px-1 text-center hover:bg-hover">
+          <button type="button" onClick={() => setEditing(true)} onFocus={() => setEditing(true)} className="block min-h-[calc(var(--ar-lg)*1.8)] w-full rounded-control px-1 text-center hover:bg-hover">
             {draft === "" ? (
               <span className="text-sm text-quiet">Add an example, or generate one</span>
             ) : (

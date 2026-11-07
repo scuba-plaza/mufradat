@@ -203,6 +203,7 @@
   .options {
     @apply p-1;
     position-area: bottom;
+    position-try-fallbacks: flip-block;
     margin: 0.25rem 0 0;
     color: rgb(var(--ink));
     background: rgb(var(--paper));

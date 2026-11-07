@@ -13,6 +13,7 @@ export default function Clip(props: {
   onNote: (n: Note) => void;
   readOnly?: boolean;
   extra?: { label: string; busy: boolean; onSelect: () => void };
+  problem?: string;
 }) {
   const { note, slot, name, text } = props;
   const clip = note.audio[slot];
@@ -105,7 +106,7 @@ export default function Clip(props: {
         </button>
         <div id={menu} popover="auto" className="options" style={{ positionAnchor: anchor }}>
           {item(has ? "Regenerate" : "Generate", generateNow, !canGenerate)}
-          {item("Upload", () => file.current?.click())}
+          {item("Upload", () => file.current?.click(), !canGenerate)}
           {has && item("Remove", () => run(() => api(`/api/audio/${note.id}/${slot}`, { method: "DELETE" })))}
           {props.extra && item(props.extra.label, props.extra.onSelect)}
         </div>
@@ -123,7 +124,7 @@ export default function Clip(props: {
           if (f) run(() => api(`/api/audio/${note.id}/${slot}`, { method: "PUT", body: f }));
         }}
       />
-      {(problem || clip?.error) && <p className="text-sm text-danger">{problem || clip?.error}</p>}
+      <p className="min-h-[2lh] text-xs text-danger">{problem || clip?.error || props.problem}</p>
     </div>
   );
 }

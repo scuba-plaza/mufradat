@@ -51,13 +51,17 @@ export default function TagsAndDetailsDialog(props: {
           <div className="mt-3">
             <Details note={note} save={props.save} />
           </div>
-          {props.problems.length > 0 && (
-            <ul role="alert" className="mt-3 text-sm text-danger">
-              {props.problems.map((p) => <li key={p}>{p}</li>)}
-            </ul>
-          )}
+
         </section>
-        <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 break-words text-sm text-danger">
+            {props.tagProblem && <p role="alert">{props.tagProblem}</p>}
+            {props.problems.length > 0 && (
+              <ul role="alert">
+                {props.problems.map((p) => <li key={p}>{p}</li>)}
+              </ul>
+            )}
+          </div>
           <button className="action-main" onClick={props.onClose}>Done</button>
         </div>
       </div>

@@ -168,4 +168,30 @@ describe("the tags and details of a card", () => {
       cy.get("dialog[open]").should(($now) => expect($now[0].getBoundingClientRect().height).to.equal(before));
     });
   });
+
+  it("keeps the height of the dialog when a tag is refused and when the refusal goes", () => {
+    openWord(4213);
+    cy.get(tagsButton).click();
+    cy.get("dialog[open]").then(($dialog) => {
+      const before = $dialog[0].getBoundingClientRect().height;
+      cy.get(addTag).type("a,b{enter}");
+      cy.get('dialog[open] [role="alert"]').should("exist");
+      cy.get("dialog[open]").should(($now) => expect($now[0].getBoundingClientRect().height).to.equal(before));
+      cy.get(addTag).type("c");
+      cy.get('dialog[open] [role="alert"]').should("not.exist");
+      cy.get("dialog[open]").should(($now) => expect($now[0].getBoundingClientRect().height).to.equal(before));
+    });
+  });
+
+  it("keeps the height of the dialog when a detail is refused", () => {
+    openWord(4214);
+    cy.intercept("PUT", "/api/notes/*", { statusCode: 500, body: { error: "The disk is full." } });
+    cy.get(tagsButton).click();
+    cy.get("dialog[open]").then(($dialog) => {
+      const before = $dialog[0].getBoundingClientRect().height;
+      cy.get("dialog[open]").contains("label", "Gender").find("select").select("masculine");
+      cy.get('dialog[open] [role="alert"]').should("contain", "The disk is full.");
+      cy.get("dialog[open]").should(($now) => expect($now[0].getBoundingClientRect().height).to.equal(before));
+    });
+  });
 });

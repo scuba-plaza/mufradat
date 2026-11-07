@@ -5,6 +5,15 @@ const alert = '[role="alert"]';
 const bar = '[role="toolbar"]';
 const by = (label: string) => `[aria-label="${label}"]`;
 const resetButton = '[title="Reset word"]';
+const exampleOptions = by("Audio options for the example");
+const at = (el: Element) => {
+  const box = el.getBoundingClientRect();
+  return [box.left, box.top + el.ownerDocument.defaultView!.scrollY, box.width, box.height];
+};
+const askForExample = () => {
+  cy.get(exampleOptions).click();
+  cy.contains(`${by("Audio for the example")} [popover] button`, "New example").click();
+};
 const tagsButton = '[title="Tags and details"]';
 /** An MP3 frame header and nothing playable after it: the store accepts it, a browser cannot decode it. */
 const unplayable = { contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]), fileName: "word.mp3", mimeType: "audio/mpeg" };
@@ -75,7 +84,7 @@ describe("a word", () => {
     cy.press(Cypress.Keyboard.Keys.TAB);
     cy.focused().should("contain", "Mark target");
     cy.press(Cypress.Keyboard.Keys.TAB);
-    cy.focused().should("contain", "Generate example");
+    cy.focused().should("have.attr", "aria-label", "Example in English");
   });
 
   it("keeps what was typed in the example when Tab moves on", () => {
@@ -143,14 +152,14 @@ describe("a word", () => {
 
   it("keeps a failed example under the example and lets you try again", () => {
     openWord(17);
-    cy.contains("button", "Generate example").click();
+    askForExample();
     cy.contains("There is no Mistral API key");
-    cy.contains("button", "Generate example").should("be.enabled");
+    cy.get(exampleOptions).should("be.enabled");
   });
 
   it("takes the failed example message away once you write an example yourself", () => {
     openWord(27);
-    cy.contains("button", "Generate example").click();
+    askForExample();
     cy.contains("There is no Mistral API key");
     cy.get(by("Example")).click();
     cy.get(`textarea${by("Example")}`).type("الْكِتَابُ [فِي] الْحَقِيبَةِ").blur();
@@ -161,7 +170,7 @@ describe("a word", () => {
   it("takes a failed example request away once you write an example yourself", () => {
     cy.intercept("POST", "/api/mistral", { statusCode: 500, body: { error: "Mistral could not be reached." } });
     openWord(28);
-    cy.contains("button", "Generate example").click();
+    askForExample();
     cy.contains("Mistral could not be reached.");
     cy.get(by("Example")).click();
     cy.get(`textarea${by("Example")}`).type("الْكِتَابُ [فِي] الْحَقِيبَةِ").blur();
@@ -300,15 +309,14 @@ describe("a word", () => {
       cy.intercept("POST", "/api/tts", (req) => req.reply({ delay: 800, statusCode: 400, body: { error: "Busy." } }));
       openWordWithAudio(48);
       cy.get(word).then(($group) => {
-        const before = $group[0].getBoundingClientRect();
+        const before = at($group[0]);
         cy.get(options).click();
         cy.contains(`${menu} button`, "Regenerate").click();
         cy.get(by("Play the word")).should("have.attr", "aria-busy", "true");
         cy.get(`${by("Play the word")} path[d="M2 1l7 4-7 4z"]`).should("not.exist");
         cy.get(options).should("be.disabled");
         cy.get(word).should(($now) => {
-          const during = $now[0].getBoundingClientRect();
-          expect([during.top, during.left, during.width, during.height]).to.deep.equal([before.top, before.left, before.width, before.height]);
+          expect(at($now[0])).to.deep.equal(before);
         });
         cy.get(by("Play the word")).should("not.have.attr", "aria-busy");
         cy.get(`${by("Play the word")} path[d="M2 1l7 4-7 4z"]`).should("exist");
@@ -320,13 +328,12 @@ describe("a word", () => {
       cy.intercept("POST", "/api/tts", (req) => req.reply({ delay: 800, statusCode: 400, body: { error: "Busy." } }));
       openWord(49);
       cy.get(word).then(($group) => {
-        const before = $group[0].getBoundingClientRect();
+        const before = at($group[0]);
         cy.get(options).click();
         cy.contains(`${menu} button`, "Generate").click();
         cy.get(options).should("have.attr", "aria-busy", "true").and("be.disabled");
         cy.get(word).should(($now) => {
-          const during = $now[0].getBoundingClientRect();
-          expect([during.top, during.left, during.width, during.height]).to.deep.equal([before.top, before.left, before.width, before.height]);
+          expect(at($now[0])).to.deep.equal(before);
         });
         cy.get(options).should("not.have.attr", "aria-busy");
       });
@@ -363,41 +370,105 @@ describe("a word", () => {
       cy.get(`${menu} button`).then(($items) => expect(items($items)).to.deep.equal(["Regenerate", "Upload", "Remove", "New example"]));
     });
 
-    it("keeps Generate example while there is no example", () => {
+    it("has the English field and the example audio from the start, with Generate and Upload off while there is no example", () => {
       openWord(52);
-      cy.contains("button", "Generate example").should("be.visible");
-      cy.get(example).should("not.exist");
+      cy.contains("button", "Generate example").should("not.exist");
+      cy.get(by("Example in English")).should("be.visible");
+      cy.get(example).should("be.visible");
+      cy.get(options).click();
+      cy.get(`${menu} button`).then(($items) => expect(items($items)).to.deep.equal(["Generate", "Upload", "New example"]));
+      cy.contains(`${menu} button`, "Generate").should("be.disabled");
+      cy.contains(`${menu} button`, "Upload").should("be.disabled");
+      cy.contains(`${menu} button`, "New example").should("be.enabled");
     });
 
     it("shows a spinner on the options button while a new example is asked for, and moves nothing", () => {
       cy.intercept("POST", "/api/mistral", (req) => req.reply({ delay: 800, statusCode: 500, body: { error: "Mistral could not be reached." } }));
       openWordWithExample(53);
       cy.get(example).then(($group) => {
-        const before = $group[0].getBoundingClientRect();
+        const before = at($group[0]);
         cy.get(options).click();
         cy.contains(`${menu} button`, "New example").click();
         cy.get(options).should("have.attr", "aria-busy", "true");
         cy.get(example).should(($now) => {
-          const during = $now[0].getBoundingClientRect();
-          expect([during.top, during.left, during.width, during.height]).to.deep.equal([before.top, before.left, before.width, before.height]);
+          expect(at($now[0])).to.deep.equal(before);
         });
         cy.contains("Mistral could not be reached.");
         cy.get(options).should("not.have.attr", "aria-busy");
       });
     });
 
-    it("keeps the label of Generate example and shows a spinner on it while it works", () => {
-      cy.intercept("POST", "/api/mistral", (req) => req.reply({ delay: 800, statusCode: 500, body: { error: "Mistral could not be reached." } }));
+    it("keeps the menu of the example inside the window, opening upward when there is no room below", () => {
+      openWordWithExample(57);
+      cy.get(options).click();
+      cy.get(menu).should(($popover) => {
+        const box = $popover[0].getBoundingClientRect();
+        expect(box.top).to.be.at.least(0);
+        expect(box.bottom).to.be.at.most($popover[0].ownerDocument.defaultView!.innerHeight);
+      });
+      cy.contains(`${menu} button`, "New example").should("be.visible");
+    });
+
+    it("moves nothing when the first example arrives", () => {
       openWord(54);
-      cy.contains("button", "Generate example").then(($button) => {
-        const before = $button[0].getBoundingClientRect();
-        cy.wrap($button).click();
-        cy.contains("button", "Generate example").should("have.attr", "aria-busy", "true").and(($now) => {
-          const during = $now[0].getBoundingClientRect();
-          expect([during.top, during.left, during.width, during.height]).to.deep.equal([before.top, before.left, before.width, before.height]);
+      const place = (doc: Document, label: string) => {
+        const box = doc.querySelector(label)!.getBoundingClientRect();
+        return [box.left, box.top + doc.defaultView!.scrollY, box.width, box.height];
+      };
+      const watched = [by("Example in English"), exampleOptions, by("Audio for the example"), `div${by("Example")}`];
+      cy.document().then((doc) => {
+        const before = watched.map((label) => place(doc, label));
+        cy.location("pathname").then((path) => {
+          cy.request("PUT", `/api/notes/${path.split("/").pop()}`, { example: "الْكِتَابُ [فِي] الْحَقِيبَةِ", exampleEn: "The book is in the bag." }).then((response) => {
+            cy.intercept("POST", "/api/mistral", { delay: 300, body: { note: response.body.note } });
+          });
         });
-        cy.contains("Mistral could not be reached.");
-        cy.contains("button", "Generate example").should("not.have.attr", "aria-busy");
+        askForExample();
+        cy.get(`${by("Example")} mark`).should("have.text", "فِي");
+        cy.get(by("Example in English")).should("have.value", "The book is in the bag.");
+        cy.document().should((now) => {
+          const after = watched.map((label) => place(now, label));
+          after.forEach((box, k) => {
+            expect(Math.abs(box[0] - before[k][0]), `${watched[k]} left`).to.be.at.most(1);
+            expect(Math.abs(box[1] - before[k][1]), `${watched[k]} top`).to.be.at.most(1);
+            expect(Math.abs(box[3] - before[k][3]), `${watched[k]} height`).to.be.at.most(1);
+          });
+        });
+      });
+    });
+
+    it("shows the failure of a new example in the line reserved under its audio, and moves nothing", () => {
+      openWord(55);
+      cy.get(by("Example in English")).then(($english) => {
+        const before = at($english[0])[1];
+        askForExample();
+        cy.get(`${example} p`).should("contain", "There is no Mistral API key");
+        cy.get(by("Example in English")).should(($now) => expect(at($now[0])[1]).to.equal(before));
+      });
+    });
+  });
+
+  describe("the room kept for what may appear", () => {
+    it("keeps the Hint where it is when the audio of the word fails, at 390px too", () => {
+      cy.viewport(390, 844);
+      openWord(58);
+      cy.get(by("Hint")).then(($hint) => {
+        const before = at($hint[0])[1];
+        cy.get(by("Audio options for the word")).click();
+        cy.contains(`${by("Audio for the word")} [popover] button`, "Generate").click();
+        cy.contains("There are no Google credentials");
+        cy.get(by("Hint")).should(($now) => expect(at($now[0])[1]).to.equal(before));
+      });
+    });
+
+    it("keeps the Hint where it is when the audio of the word fails", () => {
+      openWord(56);
+      cy.get(by("Hint")).then(($hint) => {
+        const before = at($hint[0])[1];
+        cy.get(by("Audio options for the word")).click();
+        cy.contains(`${by("Audio for the word")} [popover] button`, "Generate").click();
+        cy.contains("There are no Google credentials");
+        cy.get(by("Hint")).should(($now) => expect(at($now[0])[1]).to.equal(before));
       });
     });
   });

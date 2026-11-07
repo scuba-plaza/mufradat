@@ -76,7 +76,7 @@ describe("the layout of a card", () => {
       { what: "the hint and Add forms", rank: 7, above: (doc) => doc.querySelector(by("Hint")), below: (doc) => byText(doc, "Add forms") },
       { what: "the hint and Edit forms", rank: 6, above: (doc) => doc.querySelector(by("Hint")), below: (doc) => byText(doc, "Edit forms") },
       { what: "the English meaning and the example", rank: 7, above: (doc) => doc.querySelector(by("English meaning")), below: (doc) => doc.querySelector(`${example} button`) },
-      { what: "an empty example and Generate example", rank: 7, above: (doc) => doc.querySelector(example), below: (doc) => byText(doc, "Generate example") },
+      { what: "an empty example and the English translation", rank: 7, above: (doc) => doc.querySelector(example), below: (doc) => doc.querySelector(by("Example in English")) },
       { what: "the example and its translation", rank: 110, written: true, above: (doc) => doc.querySelector(example), below: (doc) => doc.querySelector(by("Example in English")) },
       { what: "the translation and the audio of the example", rank: 110, written: true, above: (doc) => doc.querySelector(by("Example in English")), below: (doc) => doc.querySelector(`${by("Audio for the example")} button`) },
       { what: "the example being edited and Mark target", rank: 111, editing: true, above: (doc) => doc.querySelector(`textarea${by("Example")}`), below: (doc) => byText(doc, "Mark target") },

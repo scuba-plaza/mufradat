@@ -43,7 +43,6 @@ export default function Tags(props: {
         className="field mt-2"
       />
       <p className="mt-1 text-sm text-quiet">Press Enter to add a tag. A space becomes _.</p>
-      {props.problem && <p role="alert" className="mt-1 text-sm text-danger">{props.problem}</p>}
     </div>
   );
 }
