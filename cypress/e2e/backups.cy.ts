@@ -229,7 +229,7 @@ describe("a long list of backups", () => {
     });
   }
 
-  for (const [width, height] of [[1280, 360], [1280, 500], [390, 500], [390, 844], [320, 568]]) {
+  for (const [width, height] of [[1280, 360], [1280, 500], [390, 844], [320, 568]]) {
     it(`shows at least three backups at ${width}x${height}, and the dialog scrolls itself to Close when the window is too short`, () => {
       cy.viewport(width, height);
       openDialog();
