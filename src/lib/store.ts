@@ -210,12 +210,12 @@ export function openStore(dir: string) {
     return touch(id);
   }
 
-  /** Replaces a card's tags. A tag labels a card rather than changing it, so approval and the edited time stay. */
   function setTags(id: string, tags: readonly string[]): Note {
     need(id);
+    const insert = db.prepare("INSERT INTO note_tags (note_id, tag) VALUES (?, ?)");
     db.transaction(() => {
       db.prepare("DELETE FROM note_tags WHERE note_id = ?").run(id);
-      for (const tag of new Set(tags)) db.prepare("INSERT INTO note_tags (note_id, tag) VALUES (?, ?)").run(id, tag);
+      for (const tag of tags) insert.run(id, tag);
     })();
     return getNote(id)!;
   }

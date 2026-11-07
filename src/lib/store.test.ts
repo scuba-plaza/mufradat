@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { audioKey, audioPath } from "./audio";
 import { missingParts } from "./missing";
 import { openStore, type Store } from "./store";
@@ -139,15 +139,21 @@ describe("tagging a card", () => {
     expect(s.allNotes()[0].tags).toEqual(["a", "b"]);
   });
 
-  it("leaves an approved card approved and its edited time alone", () => {
-    const s = openStore(":memory:");
-    const n = s.createNote(kitab);
-    s.updateNote(n.id, { example: "هٰذَا [كِتَابٌ] جَمِيلٌ", exampleEn: "this is a nice book" });
-    s.approve(n.id);
-    const before = s.getNote(n.id)!;
-    const tagged = s.setTags(n.id, ["lesson_1"]);
-    expect(tagged.status).toBe("approved");
-    expect(tagged.updatedAt).toBe(before.updatedAt);
+  describe("an approved card", () => {
+    afterEach(() => vi.useRealTimers());
+
+    it("stays approved and keeps its edited time", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-01T10:00:00.000Z"));
+      const s = openStore(":memory:");
+      const n = s.createNote(kitab);
+      s.updateNote(n.id, { example: "هٰذَا [كِتَابٌ] جَمِيلٌ", exampleEn: "this is a nice book" });
+      s.approve(n.id);
+      vi.setSystemTime(new Date("2026-11-02T10:00:00.000Z"));
+      const tagged = s.setTags(n.id, ["lesson_1"]);
+      expect(tagged.status).toBe("approved");
+      expect(tagged.updatedAt).toBe("2026-11-01T10:00:00.000Z");
+    });
   });
 
   it("refuses an unknown card", () => {

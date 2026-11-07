@@ -38,6 +38,16 @@ describe("setting a card's tags through the API", () => {
     expect(note.tags).toEqual(["grammar", "lesson_1", "lesson_2"]);
     expect(store.getNote(id)!.tags).toEqual(["grammar", "lesson_1", "lesson_2"]);
   });
+  it("leaves an approved card approved", async () => {
+    const { store } = context();
+    const id = openCard(store, { rank: 10 })!;
+    store.updateNote(id, { example: "هٰذَا [كِتَابٌ] جَمِيلٌ", exampleEn: "this is a nice book" });
+    store.approve(id);
+    const { note } = await (await put(id, { tags: ["lesson_1"] })).json();
+    expect(note.status).toBe("approved");
+    expect(store.counts().approved).toBe(1);
+  });
+
   const refusal = async (body: unknown) => {
     const { store } = context();
     const id = openCard(store, { rank: 10 })!;
