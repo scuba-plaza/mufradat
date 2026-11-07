@@ -126,7 +126,7 @@ describe("exporting approved cards", () => {
   describe("a card without a rank", () => {
     afterEach(() => vi.useRealTimers());
 
-    it("is due by the hour it was made, so that it is the same in any export and below 1,000,000", () => {
+    it("is due after the ranked words, in the order the cards were made, whatever part of the deck is exported", () => {
       vi.useFakeTimers({ toFake: ["Date"] });
       const s = openStore(":memory:");
       const make = (lemma: string, at: string) => {
@@ -135,14 +135,12 @@ describe("exporting approved cards", () => {
         s.approve(n.id);
         return s.getNote(n.id)!;
       };
-      const first = make("جَ", "2026-11-07T12:30:00Z");
-      const second = make("دَ", "2026-11-07T14:10:00Z");
+      const deck = [make("جَ", "2026-11-07T12:00:00Z"), make("دَ", "2026-11-07T13:00:00Z"), make("هَ", "2026-11-08T09:00:00Z")];
       const dueOf = (c: ReturnType<typeof collection>, n: Note) => c.cards.filter((x) => x.guid === n.id).map((x) => x.due);
-      const whole = collection(buildApkg([first, second], read(s), options));
-      const part = collection(buildApkg([second], read(s), options));
-      expect(dueOf(whole, first)).toEqual([26212]);
-      expect(dueOf(whole, second)).toEqual([26214]);
-      expect(dueOf(part, second)).toEqual([26214]);
+      const whole = collection(buildApkg(deck, read(s), options));
+      const part = collection(buildApkg([deck[2]], read(s), options, deck));
+      expect(deck.map((n) => dueOf(whole, n))).toEqual([[5001], [5002], [5003]]);
+      expect(dueOf(part, deck[2])).toEqual([5003]);
     });
   });
 

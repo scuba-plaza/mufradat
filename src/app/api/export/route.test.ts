@@ -3,7 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { audioKey, audioPath } from "@/lib/audio";
-import { deckGuids } from "@/lib/testing/deck";
+import Database from "better-sqlite3";
+import { deckGuids, unzip } from "@/lib/testing/deck";
 import { context } from "@/lib/server";
 import type { Store } from "@/lib/store";
 import { openCard } from "@/lib/words";
@@ -114,5 +115,26 @@ describe("exporting through the API", () => {
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({ error: "No approved card matches this search." });
     }
+  });
+
+  it("numbers the cards without a rank by the whole workspace, so a filtered export keeps their due", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const { store } = context();
+    const make = (lemma: string, at: string, approved: boolean) => {
+      vi.setSystemTime(new Date(at));
+      const n = store.createNote({ lemma, english: "x", pos: "noun", rank: 0 });
+      store.setAudio(n.id, "word", mp3, "tts");
+      if (approved) expect(store.approve(n.id).ok).toBe(true);
+      store.setTags(n.id, approved ? ["wanted"] : []);
+      return n.id;
+    };
+    make("جَ", "2026-11-07T12:00:00Z", false);
+    const wanted = make("دَ", "2026-11-07T13:00:00Z", true);
+    vi.useRealTimers();
+    const res = await GET(request("tag:wanted"));
+    const db = new Database(unzip(Buffer.from(await res.arrayBuffer())).get("collection.anki2")!);
+    const cards = db.prepare("SELECT c.due, n.guid FROM cards c JOIN notes n ON n.id = c.nid").all();
+    db.close();
+    expect(cards).toEqual([{ due: 5002, guid: wanted }]);
   });
 });
