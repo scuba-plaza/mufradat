@@ -1,6 +1,5 @@
 "use client";
 import { useId, useRef, useState } from "react";
-import { post } from "./api";
 import Backups from "./Backups";
 import { plural } from "./format";
 import Shortcuts from "./Shortcuts";
@@ -21,11 +20,17 @@ export default function Menu({ approved }: { approved: number }) {
   };
 
   async function exportDeck() {
-    setMessage("");
+    setMessage("Preparing the deck…");
     try {
-      const r = await post<{ file: string; path: string; cards: number }>("/api/export", {});
-      setMessage(`Exported ${r.cards} ${plural(r.cards, "card")} to ${r.path}`);
-      window.location.href = `/api/export?file=${r.file}`;
+      const res = await fetch("/api/export");
+      if (!res.ok) throw new Error(((await res.json()) as { error: string }).error);
+      const cards = Number(res.headers.get("X-Card-Count"));
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(await res.blob());
+      link.download = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? "arabic-deck.apkg";
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
+      setMessage(`Exported ${cards} ${plural(cards, "card")}.`);
     } catch (e) {
       setMessage((e as Error).message);
     }
@@ -40,7 +45,7 @@ export default function Menu({ approved }: { approved: number }) {
       </button>
       <div id={id} popover="auto" className="options options-end" style={{ positionAnchor: anchor }}>
         <button className="options-item" disabled={approved === 0} popoverTarget={id} popoverTargetAction="hide" onClick={exportDeck}>
-          {approved === 0 ? "Export to Anki (nothing approved yet)" : `Export ${approved} approved ${plural(approved, "card")} to Anki`}
+          Export
         </button>
         <button className="options-item" popoverTarget={id} popoverTargetAction="hide" onClick={() => setOpen("backups")}>
           Backups…

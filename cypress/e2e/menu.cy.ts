@@ -90,73 +90,63 @@ describe("the menu", () => {
 });
 
 const status = "header .topbar-inner > [role=\"status\"]";
+const deckHeaders = {
+  "Content-Type": "application/octet-stream",
+  "Content-Disposition": 'attachment; filename="arabic-deck-2026-01-01.apkg"',
+  "X-Card-Count": "1",
+};
 
 function approvedCard() {
   cy.visit("/open?rank=4100");
   cy.location("pathname").then((card) => cy.request("POST", `/api${card.replace("/cards", "/notes")}/approve`, {}));
 }
 
-const approvedLabel = /^Export (1 approved card|(?:[02-9]|[1-9]\d+) approved cards) to Anki$/;
-
-function expectExportLabel() {
-  cy.request("/api/backups").its("body.check.approved").then((approved: number) => {
-    cy.contains(`${popover} .options-item`, "Export")
-      .invoke("text")
-      .should("match", approvedLabel)
-      .and("contain", `Export ${approved} approved`);
-  });
-}
-
 describe("export from the menu", () => {
-  it("names the approved cards in its text, and is disabled when there are none", () => {
+  it("is disabled while nothing is approved", () => {
     cy.request("/api/backups").its("body.check.approved").then((approved: number) => {
+      if (approved > 0) return;
       openMenu();
-      if (approved === 0) cy.contains(`${popover} .options-item`, "Export to Anki (nothing approved yet)").should("be.disabled");
-      else expectExportLabel();
+      cy.contains(`${popover} .options-item`, /^Export$/).should("be.disabled");
     });
   });
 
-  it("says card for one approved card and cards for more, with the number", () => {
+  it("is enabled once a card is approved", () => {
     approvedCard();
     openMenu();
-    expectExportLabel();
+    cy.contains(`${popover} .options-item`, /^Export$/).should("not.be.disabled");
   });
 
-  it("exports the approved cards, says where the file is and downloads it", () => {
+  it("saves exactly one file, asks the server once and writes nothing to the workspace", () => {
     approvedCard();
     cy.visit("/");
-    cy.intercept("GET", "/api/export?file=*").as("download");
-    cy.menuItem("Export");
-    cy.get(status)
-      .invoke("text")
-      .should("match", /^Exported \d+ cards? to .*\/exports\/arabic-deck-\d{4}-\d{2}-\d{2}\.apkg$/)
-      .then((text) => {
-        cy.wait("@download").its("response.statusCode").should("eq", 200);
-        const name = text.slice(text.lastIndexOf("/") + 1);
-        cy.readFile(`${Cypress.config("downloadsFolder")}/${name}`, null, { timeout: 15000 }).should("exist");
-      });
-  });
-
-  it("says why when the export is refused and starts no download", () => {
-    approvedCard();
-    cy.visit("/");
-    cy.intercept("POST", "/api/export", { statusCode: 400, body: { error: "The card of the word X has no audio file." } });
-    cy.intercept("GET", "/api/export?file=*", cy.spy().as("download"));
-    cy.menuItem("Export");
-    cy.get(status).should("have.text", "The card of the word X has no audio file.");
-    cy.get("@download").should("not.have.been.called");
-  });
-
-  it("says card, not cards, for one", () => {
-    approvedCard();
-    cy.visit("/");
-    cy.intercept("POST", "/api/export", { body: { file: "arabic-deck-2026-01-01.apkg", path: "/x/exports/arabic-deck-2026-01-01.apkg", cards: 1 } });
-    cy.intercept("GET", "/api/export?file=*", {
-      headers: { "Content-Type": "application/octet-stream", "Content-Disposition": 'attachment; filename="arabic-deck-2026-01-01.apkg"' },
-      body: "x",
+    cy.task<string[]>("downloads").then((before) => {
+      cy.intercept("GET", "/api/export").as("export");
+      cy.menuItem("Export");
+      cy.get(status).invoke("text").should("match", /^Exported \d+ cards?\.$/);
+      cy.get("@export.all").should("have.length", 1);
+      cy.task<string[]>("downloads", before.length + 1).should((after) => expect(after).to.have.length(before.length + 1));
+      cy.task<string[]>("workspaceExports").should("deep.equal", []);
     });
+  });
+
+  it("says Preparing the deck… and then Exported 1 card.", () => {
+    approvedCard();
+    cy.visit("/");
+    cy.intercept("GET", "/api/export", { delay: 600, headers: deckHeaders, body: "x" });
     cy.menuItem("Export");
-    cy.get(status).should("have.text", "Exported 1 card to /x/exports/arabic-deck-2026-01-01.apkg");
+    cy.get(status).should("have.text", "Preparing the deck…");
+    cy.get(status).should("have.text", "Exported 1 card.");
+  });
+
+  it("says why when the export is refused and saves nothing", () => {
+    approvedCard();
+    cy.visit("/");
+    cy.task<string[]>("downloads").then((before) => {
+      cy.intercept("GET", "/api/export", { statusCode: 400, body: { error: "The card of the word X has no audio file." } });
+      cy.menuItem("Export");
+      cy.get(status).should("have.text", "The card of the word X has no audio file.");
+      cy.task<string[]>("downloads").should("deep.equal", before);
+    });
   });
 
   it("puts the message on its own row under the button and does not scroll the page sideways at 390px", () => {
@@ -179,4 +169,3 @@ describe("export from the menu", () => {
     cy.get(popover).should("be.visible").and("contain", "Keyboard shortcuts");
   });
 });
-
