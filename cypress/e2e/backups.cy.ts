@@ -195,3 +195,35 @@ describe("backups", () => {
     });
   });
 });
+
+describe("a long list of backups", () => {
+  const made: string[] = [];
+
+  afterEach(() => {
+    made.splice(0).forEach((id) => cy.request({ method: "DELETE", url: `/api/backups/${id}`, failOnStatusCode: false }));
+  });
+
+  for (const [width, height] of [[1280, 500], [390, 600]]) {
+    it(`keeps Close in view with 30 backups, the list scrolling and nothing above it overflowing at ${width}x${height}`, () => {
+      cy.viewport(width, height);
+      Cypress._.times(30, () => cy.request("POST", "/api/backups").its("body.snapshot.id").then((id: string) => made.push(id)));
+      openDialog();
+      cy.get(rows).should("have.length.at.least", 30);
+      cy.get(dialog).then(($dialog) => {
+        const box = $dialog[0];
+        const win = box.ownerDocument.defaultView!;
+        const list = box.querySelector('ol[aria-label="Backups"]')!;
+        const close = Array.from(box.querySelectorAll("button")).find((button) => button.textContent === "Close")!.getBoundingClientRect();
+        const frame = box.getBoundingClientRect();
+        expect(frame.top).to.be.at.least(0);
+        expect(frame.bottom).to.be.at.most(win.innerHeight);
+        expect(close.top).to.be.at.least(0);
+        expect(close.bottom).to.be.at.most(win.innerHeight);
+        expect(box.scrollHeight).to.be.at.most(box.clientHeight + 1);
+        expect(win.getComputedStyle(list).overflowY).to.equal("auto");
+        expect(list.scrollHeight).to.be.greaterThan(list.clientHeight);
+      });
+    });
+  }
+});
+

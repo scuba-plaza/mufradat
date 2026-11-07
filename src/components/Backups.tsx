@@ -104,9 +104,9 @@ export default function Backups({ open, onClose }: { open: boolean; onClose: () 
       aria-labelledby="backups-title"
       onClose={close}
       onClick={(e) => e.target === dialog.current && close()}
-      className="text-sm w-[calc(100%-2.5rem)] max-w-2xl rounded-modal border border-rule bg-surface p-0 text-ink shadow-modal backdrop:bg-black/70"
+      className="text-sm open:flex open:flex-col w-[calc(100%-2.5rem)] max-w-2xl rounded-modal border border-rule bg-surface p-0 text-ink shadow-modal backdrop:bg-black/70"
     >
-      <div className="p-6">
+      <div className="flex min-h-0 flex-col p-6">
         <h2 id="backups-title" className="text-xl font-semibold tracking-title">Backups</h2>
         <p className="mt-2 text-sm text-quiet">
           These backups are on this computer. Download one to keep a copy somewhere else.
@@ -168,7 +168,7 @@ export default function Backups({ open, onClose }: { open: boolean; onClose: () 
                 {data.snapshots.length === 0 ? (
                   <p className="mt-4">No backups yet.</p>
                 ) : (
-                  <ol aria-label="Backups" className="mt-4">
+                  <ol aria-label="Backups" className="mt-4 overflow-y-auto">
                     {data.snapshots.map((s) => (
                       <li key={s.id} className="border-t border-rule py-3">
                         <p>{REASONS[s.reason]} · {when(s)}</p>
