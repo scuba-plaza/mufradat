@@ -14,7 +14,6 @@ const FONT_MEDIA_NAME = "_" + FONT_FILE;
 const PRODUCTION_TOP = 1000;
 const PRODUCTION_DELAY = 20;
 const UNRANKED_BASE = 10000;
-const UNRANKED_EPOCH = Date.parse("2025-01-01T00:00:00Z") / 1000;
 const TEMPLATES_REVISED = Date.UTC(2026, 9, 9, 12, 0, 0);
 const DESCRIPTION =
   "The most common Modern Standard Arabic words in frequency order, with fully vowelled examples.";
@@ -37,7 +36,7 @@ const SCHEMA = `
 CREATE TABLE col (id integer primary key, crt integer not null, mod integer not null, scm integer not null, ver integer not null, dty integer not null, usn integer not null, ls integer not null, conf text not null, models text not null, decks text not null, dconf text not null, tags text not null);
 CREATE TABLE notes (id integer primary key, guid text not null, mid integer not null, mod integer not null, usn integer not null, tags text not null, flds text not null, sfld integer not null, csum integer not null, flags integer not null, data text not null);
 CREATE TABLE cards (id integer primary key, nid integer not null, did integer not null, ord integer not null, mod integer not null, usn integer not null, type integer not null, queue integer not null, due integer not null, ivl integer not null, factor integer not null, reps integer not null, lapses integer not null, left integer not null, odue integer not null, odid integer not null, flags integer not null, data text not null);
-CREATE TABLE revlog (id integer primary key, cid integer not null, usn integer not null, ivl integer not null, lastIvl integer not null, factor integer not null, time integer not null, type integer not null);
+CREATE TABLE revlog (id integer primary key, cid integer not null, usn integer not null, ease integer not null, ivl integer not null, lastIvl integer not null, factor integer not null, time integer not null, type integer not null);
 CREATE TABLE graves (usn integer not null, oid integer not null, type integer not null);
 CREATE INDEX ix_notes_usn on notes (usn);
 CREATE INDEX ix_cards_usn on cards (usn);
@@ -147,7 +146,7 @@ const TEMPLATE_FILES = [
  * Builds an .apkg from approved notes. `readAudio` returns the bytes of a clip by key.
  * The same notes in any order give the same bytes.
  */
-export function buildApkg(notes: Note[], readAudio: (key: string, place: ClipPlace) => Uint8Array, opts: ExportOptions): Buffer<ArrayBuffer> {
+export function buildApkg(notes: Note[], readAudio: (key: string, place: ClipPlace) => Uint8Array, opts: ExportOptions, deck: Note[] = notes): Buffer<ArrayBuffer> {
   if (notes.length === 0) throw new Error("There are no approved cards to export.");
   const resources = opts.resources ?? path.join(process.cwd(), "data");
   const templates = Object.fromEntries(
@@ -156,6 +155,7 @@ export function buildApkg(notes: Note[], readAudio: (key: string, place: ClipPla
   const font = fs.readFileSync(path.join(process.cwd(), "public", FONT_FILE));
 
   const ordered = [...notes].sort(studyOrder);
+  const unranked = new Map([...deck].filter((n) => n.rank <= 0).sort(studyOrder).map((n, i) => [n.id, i + 1]));
   const media = new Map<string, Uint8Array>([[FONT_MEDIA_NAME, font]]);
   const rows = ordered.map((n) => {
     const v = Object.fromEntries(FIELDS.map((f) => [f, ""])) as Record<Field, string>;
@@ -180,7 +180,7 @@ export function buildApkg(notes: Note[], readAudio: (key: string, place: ClipPla
     v.FormsAudio = n.forms.map((f) => use(f.id)).join("");
     v.ExampleAudio = n.example.trim() ? use("example") : "";
 
-    const due = n.rank > 0 ? n.rank : UNRANKED_BASE + Math.max(0, Math.floor(Date.parse(n.createdAt) / 1000 - UNRANKED_EPOCH));
+    const due = n.rank > 0 ? n.rank : UNRANKED_BASE + (unranked.get(n.id) ?? 0);
     const cards = [{ ord: 0, due }];
     if (n.rank > 0 && n.rank <= PRODUCTION_TOP) {
       v.Production = "y";

@@ -120,9 +120,29 @@ describe("exporting approved cards", () => {
     const due = (lemma: string) => c.cards.filter((x) => x.guid === notes.find((n) => n.lemma === lemma)!.id).map((x) => [x.ord, x.due]);
     expect(due("أَ")).toEqual([[0, 1000], [1, 1020]]);
     expect(due("بَ")).toEqual([[0, 1001]]);
-    const alone = collection(buildApkg([notes[2]], read(s), options));
-    expect(due("جَ")[0][1]).toBeGreaterThan(10000);
-    expect(alone.cards.map((x) => x.due)).toEqual([due("جَ")[0][1]]);
+    expect([due("جَ")[0][1], due("دَ")[0][1]].sort()).toEqual([10001, 10002]);
+  });
+
+  it("gives a card without a rank the same due in an export of part of the deck as in the whole", () => {
+    const s = openStore(":memory:");
+    const make = (lemma: string) => {
+      const n = s.createNote({ lemma, english: "x", pos: "noun", rank: 0 });
+      s.approve(n.id);
+      return s.getNote(n.id)!;
+    };
+    const deck = [make("جَ"), make("دَ"), make("هَ")];
+    const whole = collection(buildApkg(deck, read(s), options));
+    const part = collection(buildApkg([deck[2]], read(s), options, deck));
+    const dueOf = (c: ReturnType<typeof collection>, n: Note) => c.cards.filter((x) => x.guid === n.id).map((x) => x.due);
+    expect(dueOf(part, deck[2])).toEqual(dueOf(whole, deck[2]));
+    expect(dueOf(whole, deck[2])[0]).toBeLessThan(1_000_000);
+  });
+
+  it("writes the review log in the table layout Anki reads, so that learning progress can be imported", () => {
+    const { s, id } = approvedStore();
+    const files = unzip(buildApkg([s.getNote(id)!], read(s), options));
+    const db = new Database(files.get("collection.anki2")!);
+    expect(db.prepare("SELECT id, cid, usn, ease, cast(ivl AS integer), cast(lastIvl AS integer), factor, time, type FROM revlog").all()).toEqual([]);
   });
 
   it("packs the font and exactly the audio the cards use", () => {
