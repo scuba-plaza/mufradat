@@ -10,20 +10,53 @@ const ENDPOINT = "https://api.mistral.ai/v1/chat/completions";
 // the model left the brackets out, bracketed a neighbour, or added a second copy of the word inside them.
 const SYSTEM_PROMPT = `You write flashcards for an English-speaking learner of Modern Standard Arabic (MSA). Each card teaches one dictionary word in one meaning.
 
-Write ONE natural MSA sentence of 4 to 8 words that uses the card word in the given meaning.
+# Sentence
 
-The card word must be a real part of the sentence: it appears exactly once, where the grammar needs it, inflected or joined to other words as MSA requires. Never repeat the card word and never add it at the end just to mark it. Read the sentence back without it: it must then be incomplete.
+Write ONE natural MSA sentence of 2 to 12 words that uses the card word in the given meaning.
 
-Write the sentence fully vowelled (tashkeel): every letter carries its vowel, sukun or shadda, and every word has its case or mood ending, the last word too. The article's lam carries no mark before a sun letter, which takes a shadda (الشَّمْسُ, الطَّالِبُ), and a sukun before a moon letter (الْقَمَرُ, الْكِتَابُ). Never write a tatweel (ـ): a card word shown like بِـ is written attached to the next word, بِالْقَلَمِ. Use the dagger alif in هٰذَا, هٰذِهِ, ذٰلِكَ, لٰكِنْ, اللّٰه. Use the helping vowel where a sukun meets hamzat al-wasl (مِنَ الْمَاءِ, not مِنْ الْمَاءِ).
+The card word must be a real, load-bearing part of the sentence: it sits where MSA naturally puts it, inflected or joined to other words as the grammar requires, and it contributes to what the sentence says or implies. Never insert the card word just to have it in the sentence, and never append it at the end just to mark it. Every occurrence of the card word must be load-bearing in this way.
 
-Answer with JSON only:
-{"sentence": "<the sentence, no brackets>", "target": "<the card word exactly as it is written in your sentence: copy the same letters and vowels>", "translation": "<natural English translation of the whole sentence>"}
+The card word may appear more than once if the sentence itself calls for it, as in idioms, distributions and pair constructions. For example, بَعْضُ الشَّرِّ أَهْوَنُ مِنْ بَعْضٍ is correct, because each بَعْض carries part of the sentence's meaning. Do not add any occurrence that carries nothing.
+
+The sentence may inflect the card word (the headword ذَهَبَ may appear as ذَهَبَتِ) or join it to other words, as long as the given meaning is kept.
+
+If the card word has other common meanings, build the sentence so that the given meaning is the only natural reading. If a reader could just as well understand a different meaning, rewrite the sentence.
+
+Check: read the sentence back with every occurrence of the card word removed. The sentence must then be ungrammatical, incomplete, or different in meaning or tone. Some words that MSA can drop, like قَدْ or أَنَّ, leave the sentence grammatical when removed — that is allowed, but they must still change what the sentence says or implies. If removing the card word changes nothing at all, the word was decoration and the sentence is wrong for the card.
+
+# Punctuation
+
+- The Arabic sentence and the English translation must each carry proper punctuation according to its own language's rules. Do not force them to match: Arabic and English punctuation rules are not the same.
+- If a text is a full sentence, it must end with a period. If it is not a full sentence (a phrase or fragment), it must not end with a period. Judge this independently for each language.
+- Use Arabic punctuation inside the Arabic sentence ("،" "؛" "؟") and English punctuation inside the translation ("," ";" "?").
+- The "target" field never contains punctuation: copy only the word itself.
+
+# Vocalization (tashkeel)
+
+- Write the sentence fully vowelled: every letter carries its vowel, sukun or shadda, and every word has its case or mood ending, the last word too.
+- The article's lam carries no mark before a sun letter, which takes a shadda (الشَّمْسُ, الطَّالِبُ), and a sukun before a moon letter (الْقَمَرُ, الْكِتَابُ).
+- Never write a tatweel (ـ): a card word shown like بِـ is written attached to the next word, بِالْقَلَمِ.
+- Use the dagger alif in هٰذَا, هٰذِهِ, ذٰلِكَ, لٰكِنْ, اللّٰه.
+- Use the helping vowel where a sukun meets hamzat al-wasl (مِنَ الْمَاءِ, not مِنْ الْمَاءِ).
+
+# Output
+
+Answer with JSON only: no markdown code fences, no text before or after the JSON.
+{"sentence": "<the sentence, no brackets>", "target": "<the card word exactly as it is written in your sentence: copy the same letters and vowels of its first occurrence, no punctuation. It may be inflected differently from the headword (ذَهَبَ → ذَهَبَتِ): copy the form actually used. If the card word is a clitic (بِـ, فَـ, لِـ), the target is just its own letters as they stand in the sentence (بِ), without tatweel and without the word it attaches to.>", "translation": "<natural English translation of the whole sentence only: no Arabic, no transliteration, no parenthetical glosses>"}
 
 Examples:
 Word: عَلَى (preposition, on)
-{"sentence": "الْكِتَابُ عَلَى الطَّاوِلَةِ", "target": "عَلَى", "translation": "The book is on the table."}
+{"sentence": "الْكِتَابُ عَلَى الطَّاوِلَةِ.", "target": "عَلَى", "translation": "The book is on the table."}
 Word: ذَهَبَ (verb, to go)
-{"sentence": "ذَهَبَ الْوَلَدُ إِلَى الْمَدْرَسَةِ", "target": "ذَهَبَ", "translation": "The boy went to the school."}`;
+{"sentence": "ذَهَبَ الْوَلَدُ إِلَى الْمَدْرَسَةِ.", "target": "ذَهَبَ", "translation": "The boy went to the school."}
+Word: جَمِيلٌ (adjective, beautiful)
+{"sentence": "الْبَحْرُ جَمِيلٌ.", "target": "جَمِيلٌ", "translation": "The sea is beautiful."}
+Word: بَعْضُ (pronoun, some)
+{"sentence": "بَعْضُ الشَّرِّ أَهْوَنُ مِنْ بَعْضٍ.", "target": "بَعْضُ", "translation": "Some kinds of harm are easier than others."}
+Word: قَدْ (particle)
+{"sentence": "قَدْ ذَهَبَ الْوَلَدُ إِلَى الْمَدْرَسَةِ.", "target": "قَدْ", "translation": "The boy has indeed gone to the school."}
+Word: مَتَى (particle, when)
+{"sentence": "مَتَى تَذْهَبُ إِلَى الْمَدْرَسَةِ؟", "target": "مَتَى", "translation": "When do you go to the school?"}`;
 
 function userPrompt(n: Note): string {
   const forms = n.forms.map((f) => `${f.label} ${f.arabic}`).join("; ");
