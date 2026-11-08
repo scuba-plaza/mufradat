@@ -5,9 +5,6 @@ import path from "node:path";
 export interface Config {
   workspace: string;
   mistralApiKey: string;
-  mistralModel: string;
-  /** Sent to Mistral as `reasoning_effort` when not empty; unset, the model answers without reasoning. */
-  mistralReasoningEffort: string;
   googleCredentials: string;
   ttsVoice: string;
   audioRate: number;
@@ -48,8 +45,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     workspace: expand(env.MUFRADAT_WORKSPACE || text("workspace", path.join(home(), ".local", "share", "mufradat"))),
     mistralApiKey: env.MISTRAL_API_KEY || text("mistral_api_key", ""),
-    mistralModel: text("mistral_model", "mistral-medium-latest"),
-    mistralReasoningEffort: text("mistral_reasoning_effort", ""),
     googleCredentials: env.GOOGLE_APPLICATION_CREDENTIALS || text("google_credentials_file", ""),
     ttsVoice: text("tts_voice", "ar-XA-Chirp3-HD-Achernar"),
     audioRate: num("audio_rate", 0.9),

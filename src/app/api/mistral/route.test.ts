@@ -15,7 +15,7 @@ function askFor(id: string) {
 describe("asking Mistral for an example", () => {
   let home: string;
   let answer: unknown;
-  let requests: { messages: { role: string; content: string }[]; reasoning_effort?: string }[];
+  let requests: { agent_id: string; agent_version: number; inputs: string }[];
 
   beforeEach(() => {
     home = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-route-"));
@@ -26,7 +26,7 @@ describe("asking Mistral for an example", () => {
     requests = [];
     vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
       requests.push(JSON.parse(init.body));
-      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(answer) } }] }));
+      return new Response(JSON.stringify({ outputs: [{ type: "message.output", content: JSON.stringify(answer) }] }));
     });
   });
   afterEach(() => {
@@ -37,10 +37,50 @@ describe("asking Mistral for an example", () => {
   it("sends the card and no list of allowed words", async () => {
     const note = context().store.createNote(cardForRank(2000)!);
     await askFor(note.id);
-    const [system, user] = ["system", "user"].map((role) => requests[0].messages.find((m) => m.role === role)!.content);
-    expect(system).not.toMatch(/vocabulary/i);
+    const user = requests[0].inputs;
     expect(user).not.toMatch(/vocabulary/i);
     expect(user.length).toBeLessThan(500);
+  });
+
+  it("asks the agent, in its version, for the example", async () => {
+    const note = context().store.createNote(cardForRank(2)!);
+    await askFor(note.id);
+    expect(requests[0]).toMatchObject({ agent_id: "ag_01a1bac4790370849e18231695016789", agent_version: 4, store: false });
+    for (const key of ["model", "messages", "temperature", "max_tokens", "top_p", "reasoning_effort", "response_format"]) {
+      expect(requests[0]).not.toHaveProperty(key);
+    }
+  });
+
+  it.each([
+    { status: 401, problem: /rejected the API key/ },
+    { status: 404, problem: /agent/ },
+    { status: 429, problem: /rate limiting/ },
+    { status: 503, problem: /server error/ },
+  ])("keeps the failure for a $status on the card", async ({ status, problem }) => {
+    vi.stubGlobal("fetch", async () => new Response("{}", { status }));
+    const note = context().store.createNote(cardForRank(2)!);
+    const saved = (await (await askFor(note.id)).json()).note;
+    expect(saved.example).toBe("");
+    expect(saved.exampleError).toMatch(problem);
+  });
+
+  it.each([
+    { what: "no message output", outputs: [{ type: "tool.execution", content: "x" }] },
+    { what: "no output at all", outputs: [] },
+    { what: "an answer that is not JSON", outputs: [{ type: "message.output", content: "Here is a sentence." }] },
+  ])("keeps the failure for $what", async ({ outputs }) => {
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ outputs })));
+    const note = context().store.createNote(cardForRank(2)!);
+    const saved = (await (await askFor(note.id)).json()).note;
+    expect(saved.exampleError).toMatch(/not the expected JSON/);
+  });
+
+  it("reads an answer that comes as chunks of text", async () => {
+    vi.stubGlobal("fetch", async () =>
+      new Response(JSON.stringify({ outputs: [{ type: "message.output", content: [{ type: "text", text: JSON.stringify(river).slice(0, 20) }, { type: "reference", text: "ignored" }, { type: "text", text: JSON.stringify(river).slice(20) }] }] })));
+    const note = context().store.createNote(cardForRank(2)!);
+    const saved = (await (await askFor(note.id)).json()).note;
+    expect(saved.exampleEn).toBe(river.translation);
   });
 
   it("puts the brackets around the word Mistral names as the target", async () => {
@@ -91,20 +131,5 @@ describe("asking Mistral for an example", () => {
     const saved = (await (await askFor(note.id)).json()).note;
     expect(saved.example).toBe("");
     expect(saved.exampleError).toMatch(/no Arabic/);
-  });
-
-  it("asks for no reasoning unless the config sets an effort", async () => {
-    const note = context().store.createNote(cardForRank(2)!);
-    await askFor(note.id);
-    expect(requests[0]).not.toHaveProperty("reasoning_effort");
-  });
-
-  it("asks for the reasoning effort set in the config", async () => {
-    const file = path.join(home, "config", "mufradat", "config.toml");
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, 'mistral_reasoning_effort = "high"\n', { mode: 0o600 });
-    const note = context().store.createNote(cardForRank(2)!);
-    await askFor(note.id);
-    expect(requests[0].reasoning_effort).toBe("high");
   });
 });
