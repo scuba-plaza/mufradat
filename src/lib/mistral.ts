@@ -2,12 +2,15 @@ import { ApiError } from "./api-error";
 import type { Config } from "./config";
 import type { Note } from "./types";
 import { POS_LABELS } from "./types";
-import { autoMark, sentenceProblems, translationProblems } from "./validate";
+import { autoMark, plainExample, sentenceProblems, translationProblems } from "./validate";
 
 const ENDPOINT = "https://api.mistral.ai/v1/conversations";
 // The agent holds the model, the instructions and the sampling settings; the app sends only the card.
 
-/** The card as the agent takes it: a JSON object of the fields the card has, trimmed, and no field that is empty. */
+/**
+ * The card as the agent takes it: a JSON object of the fields the card has, trimmed, and no field that is empty.
+ * The example the card has now goes in without its brackets, so that the agent writes another one.
+ */
 function userPrompt(n: Note): string {
   const filled = (v: string) => v.trim() || undefined;
   const forms = n.forms
@@ -22,6 +25,7 @@ function userPrompt(n: Note): string {
     verb_form: filled(n.verbForm),
     forms: forms.length > 0 ? forms : undefined,
     hint: filled(n.hint),
+    current_example: filled(plainExample(n.example)),
   });
 }
 

@@ -82,6 +82,20 @@ describe("asking Mistral for an example", () => {
     expect(JSON.parse(requests[1].inputs)).not.toHaveProperty("forms");
   });
 
+  it("sends the example the card has now, without its brackets", async () => {
+    const store = context().store;
+    const note = store.createNote(cardForRank(2)!);
+    store.updateNote(note.id, { example: "شَرِبَ الْوَلَدُ [مِنْ] مَاءِ النَّهْرِ" });
+    await askFor(note.id);
+    expect(JSON.parse(requests[0].inputs).current_example).toBe("شَرِبَ الْوَلَدُ مِنْ مَاءِ النَّهْرِ");
+  });
+
+  it("sends no current example for a card without one", async () => {
+    const note = context().store.createNote(cardForRank(2)!);
+    await askFor(note.id);
+    expect(JSON.parse(requests[0].inputs)).not.toHaveProperty("current_example");
+  });
+
   it("does not ask Mistral for a card with no English meaning", async () => {
     const store = context().store;
     const note = store.createNote(cardForRank(2)!);
