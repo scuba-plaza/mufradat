@@ -21,11 +21,18 @@ describe("asking Mistral for an example", () => {
   let answer: unknown;
   let requests: { agent_id: string; agent_version: number; inputs: string }[];
 
+  function writeConfig(content: string) {
+    const file = path.join(home, "config", "mufradat", "config.toml");
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, content, { mode: 0o600 });
+  }
+
   beforeEach(() => {
     home = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-route-"));
     vi.stubEnv("XDG_CONFIG_HOME", path.join(home, "config"));
     vi.stubEnv("MUFRADAT_WORKSPACE", path.join(home, "workspace"));
     vi.stubEnv("MISTRAL_API_KEY", "test-key");
+    writeConfig('mistral_agent_id = "ag_test"\nmistral_agent_version = 3\n');
     answer = river;
     requests = [];
     vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
@@ -49,10 +56,28 @@ describe("asking Mistral for an example", () => {
   it("asks the agent, in its version, for the example", async () => {
     const note = context().store.createNote(cardForRank(2)!);
     await askFor(note.id);
-    expect(requests[0]).toMatchObject({ agent_id: "ag_01a1bac4790370849e18231695016789", agent_version: 5, store: false });
+    expect(requests[0]).toMatchObject({ agent_id: "ag_test", agent_version: 3, store: false });
     for (const key of ["model", "messages", "temperature", "max_tokens", "top_p", "reasoning_effort", "response_format"]) {
       expect(requests[0]).not.toHaveProperty(key);
     }
+  });
+
+  it("asks the agent and the version set in the config", async () => {
+    writeConfig('mistral_agent_id = "ag_other"\nmistral_agent_version = 9\n');
+    const note = context().store.createNote(cardForRank(2)!);
+    await askFor(note.id);
+    expect(requests[0]).toMatchObject({ agent_id: "ag_other", agent_version: 9 });
+  });
+
+  it.each([
+    { what: "no agent id", config: "mistral_agent_version = 3\n", problem: /no Mistral agent id/ },
+    { what: "no agent version", config: 'mistral_agent_id = "ag_test"\n', problem: /no Mistral agent version/ },
+  ])("does not call Mistral with $what in the config", async ({ config, problem }) => {
+    writeConfig(config);
+    const note = context().store.createNote(cardForRank(2)!);
+    const saved = (await (await askFor(note.id)).json()).note;
+    expect(saved.exampleError).toMatch(problem);
+    expect(requests).toHaveLength(0);
   });
 
   it.each([

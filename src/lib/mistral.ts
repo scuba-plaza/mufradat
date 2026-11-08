@@ -6,8 +6,6 @@ import { autoMark, sentenceProblems, translationProblems } from "./validate";
 
 const ENDPOINT = "https://api.mistral.ai/v1/conversations";
 // The agent holds the model, the instructions and the sampling settings; the app sends only the card.
-const AGENT_ID = "ag_01a1bac4790370849e18231695016789";
-const AGENT_VERSION = 5;
 
 function userPrompt(n: Note): string {
   const forms = n.forms.map((f) => `${f.label} ${f.arabic}`).join("; ");
@@ -26,7 +24,7 @@ function userPrompt(n: Note): string {
 
 function httpProblem(status: number): string {
   if (status === 401) return "Mistral rejected the API key (401). Check mistral_api_key in config.toml.";
-  if (status === 404) return "Mistral does not know the agent (404). Check the agent id and version in src/lib/mistral.ts.";
+  if (status === 404) return "Mistral does not know the agent (404). Check mistral_agent_id and mistral_agent_version in config.toml.";
   if (status === 429) return "Mistral is rate limiting requests (429). Try again in a moment.";
   if (status >= 500) return `Mistral had a server error (${status}). Try again later.`;
   return `Mistral refused the request (${status}).`;
@@ -40,18 +38,20 @@ interface GeneratedExample {
 /** One call to the Mistral agent. Throws ApiError with a message for the card; never retries. */
 export async function generateExample(
   note: Note,
-  cfg: Pick<Config, "mistralApiKey">,
+  cfg: Pick<Config, "mistralApiKey" | "mistralAgentId" | "mistralAgentVersion">,
   fetchImpl: typeof fetch = fetch,
 ): Promise<GeneratedExample> {
   if (!cfg.mistralApiKey) throw new ApiError("There is no Mistral API key. Set mistral_api_key in config.toml or MISTRAL_API_KEY.");
+  if (!cfg.mistralAgentId) throw new ApiError("There is no Mistral agent id. Set mistral_agent_id in config.toml.");
+  if (cfg.mistralAgentVersion === null) throw new ApiError("There is no Mistral agent version. Set mistral_agent_version in config.toml.");
   let res: Response;
   try {
     res = await fetchImpl(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.mistralApiKey}` },
       body: JSON.stringify({
-        agent_id: AGENT_ID,
-        agent_version: AGENT_VERSION,
+        agent_id: cfg.mistralAgentId,
+        agent_version: cfg.mistralAgentVersion,
         store: false,
         inputs: userPrompt(note),
       }),

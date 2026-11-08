@@ -5,6 +5,9 @@ import path from "node:path";
 export interface Config {
   workspace: string;
   mistralApiKey: string;
+  mistralAgentId: string;
+  /** Null when the config has none. */
+  mistralAgentVersion: number | null;
   googleCredentials: string;
   ttsVoice: string;
   audioRate: number;
@@ -45,6 +48,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     workspace: expand(env.MUFRADAT_WORKSPACE || text("workspace", path.join(home(), ".local", "share", "mufradat"))),
     mistralApiKey: env.MISTRAL_API_KEY || text("mistral_api_key", ""),
+    mistralAgentId: text("mistral_agent_id", ""),
+    mistralAgentVersion: typeof values.mistral_agent_version === "number" ? values.mistral_agent_version : null,
     googleCredentials: env.GOOGLE_APPLICATION_CREDENTIALS || text("google_credentials_file", ""),
     ttsVoice: text("tts_voice", "ar-XA-Chirp3-HD-Achernar"),
     audioRate: num("audio_rate", 0.9),
