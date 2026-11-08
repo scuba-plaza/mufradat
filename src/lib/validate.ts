@@ -3,6 +3,9 @@ import { POS_VALUES } from "./types";
 
 const ARABIC = /[؀-ۿݐ-ݿ]/;
 const LATIN = /[A-Za-z]/;
+/** An Arabic letter: not a vowel mark, the tatweel or a digit. */
+const LETTER = /[\u0621-\u063A\u0641-\u064A\u0671-\u06D3]/;
+const COUNTED = /[\p{L}\p{N}]/u;
 
 const hasArabic = (s: string) => ARABIC.test(s);
 const hasLatin = (s: string) => LATIN.test(s);
@@ -32,21 +35,35 @@ export function plainExample(s: string): string {
   return p ? p.before + p.target + p.after : s.replace(/[[\]]/g, "");
 }
 
-function wordCount(s: string): number {
-  return plainExample(s).split(/\s+/).filter(Boolean).length;
-}
+const VOWEL_MARK = /[\u064B-\u065F\u0670]/;
+/** A vowel the letter before it is read with: tanwin, fatha, damma, kasra, sukun or the dagger alif. A shadda alone is not one. */
+const VOWEL = /[\u064B-\u0650\u0652\u0670]/;
+const SPOKEN_WORD = /[^\s،؛؟.,;:!?"'()«»—–…“”‘’-]+/g;
 
-/** Everything wrong with the sentence of an example from Mistral, whichever word is marked in it: length and script. */
+/**
+ * What is wrong with the sentence of the agent's answer, by the rules of its system prompt: written in Arabic,
+ * 2 to 12 words, no square brackets (the app marks the card's word with them), and a vowel mark on every word. Whether
+ * a word is vocalized completely, and every other rule (collocations, history, grammar), cannot be checked here.
+ */
 export function sentenceProblems(sentence: string): string[] {
   const problems: string[] = [];
-  const words = wordCount(sentence);
-  if (words < 3 || words > 9) problems.push(`The example has ${words} words; it must have 3 to 9.`);
-  if (!hasArabic(sentence)) problems.push("The example has no Arabic text.");
-  if (hasLatin(sentence)) problems.push("The Arabic example contains Latin letters.");
+  const words = (sentence.match(SPOKEN_WORD) ?? []).filter((w) => COUNTED.test(w));
+  if (words.length < 2 || words.length > 12) {
+    problems.push(`The sentence has ${words.length} ${words.length === 1 ? "word" : "words"}; it must have 2 to 12.`);
+  }
+  if (!hasArabic(sentence)) problems.push("The sentence has no Arabic text.");
+  if (hasLatin(sentence)) problems.push("The Arabic sentence contains Latin letters.");
+  if (/[[\]]/.test(sentence)) problems.push("The sentence contains square brackets.");
+  const bare = words.filter((w) => LETTER.test(w) && !VOWEL.test(w));
+  if (bare.length > 0) problems.push(`The sentence has words without a vowel mark: ${bare.join(" ")}.`);
   return problems;
 }
 
-const VOWEL_MARK = /[\u064B-\u065F\u0670]/;
+/** What is wrong with the translation of the agent's answer: it must not be in Arabic. */
+export function translationProblems(translation: string): string[] {
+  return hasArabic(translation) ? ["The translation contains Arabic text."] : [];
+}
+
 const NON_LETTER = /[\u064B-\u065F\u0670\u0640]/;
 const WORD = /[^\s،؛؟.,;:!?"'()«»[\]]+/g;
 /** A word by its letters alone: no vowels, tatweel or article, so that كِتَابٌ and الْكِتَابِ are the same. */
@@ -80,14 +97,6 @@ function findTarget(sentence: string, named: string): Found {
   }
   return null;
 }
-
-/**
- * The sentence with [brackets] around the word the card is about, which Mistral names as it stands in the sentence.
- * The word is looked for as it was named, then attached to the next word (بِالْقَلَمِ), then by its letters alone
- * (another vowel, case ending or article). It returns null when the word is in none of these places or in several
- * of them: it never guesses, and the person marks the word.
- */
-export const markTarget = (sentence: string, named: string): string | null => marked(sentence, findTarget(sentence, named));
 
 const PREFIXES = ["", "و", "ف"].flatMap((conjunction) =>
   ["", "ب", "ك", "ل"].flatMap((preposition) => ["", "ال"].map((article) => conjunction + preposition + article)).concat(`${conjunction}لل`),

@@ -2,12 +2,12 @@ import { ApiError } from "./api-error";
 import type { Config } from "./config";
 import type { Note } from "./types";
 import { POS_LABELS } from "./types";
-import { markTarget, sentenceProblems } from "./validate";
+import { autoMark, sentenceProblems, translationProblems } from "./validate";
 
 const ENDPOINT = "https://api.mistral.ai/v1/conversations";
 // The agent holds the model, the instructions and the sampling settings; the app sends only the card.
 const AGENT_ID = "ag_01a1bac4790370849e18231695016789";
-const AGENT_VERSION = 4;
+const AGENT_VERSION = 5;
 
 function userPrompt(n: Note): string {
   const forms = n.forms.map((f) => `${f.label} ${f.arabic}`).join("; ");
@@ -60,25 +60,47 @@ export async function generateExample(
     throw new ApiError("Could not reach Mistral. Check the network connection and try again.");
   }
   if (!res.ok) throw new ApiError(httpProblem(res.status));
-  let parsed: { sentence?: unknown; target?: unknown; translation?: unknown };
+  let text: string;
   try {
-    const body = (await res.json()) as { outputs?: { type?: string; content?: unknown }[] };
-    const content = body.outputs?.find((o) => o.type === "message.output")?.content;
-    // The content is a string, or a list of chunks of which the text ones make the answer.
-    const answer = Array.isArray(content)
-      ? content.map((c: { type?: string; text?: string }) => (c.type === "text" ? (c.text ?? "") : "")).join("")
-      : content;
-    parsed = JSON.parse(typeof answer === "string" ? answer : "");
+    text = messageText(await res.json());
   } catch {
     throw new ApiError("Mistral's answer was not the expected JSON. Try again.");
   }
-  const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
-  // No brackets of its own, and no tatweel: the card shows a particle like كَـ with one, but a sentence never does.
-  const sentence = text(parsed.sentence).replace(/[[\]ـ]/g, "");
-  const exampleEn = text(parsed.translation);
-  const problems = sentence === "" ? ["The answer has no sentence."] : sentenceProblems(sentence);
-  if (exampleEn === "") problems.push("The answer has no English translation.");
+  // The agent thinks before it answers: when it runs out of tokens while thinking, the output has no text at all.
+  if (text.trim() === "") throw new ApiError("Mistral's agent gave no answer; it may have run out of tokens while thinking. Try again.");
+  let answer: unknown;
+  try {
+    answer = JSON.parse(text);
+  } catch {
+    throw new ApiError("Mistral's answer was not the expected JSON. Try again.");
+  }
+  const { sentence, translation } = answerParts(answer);
+  const problems = [
+    ...(sentence === "" ? ["The answer has no sentence."] : sentenceProblems(sentence)),
+    ...(translation === "" ? ["The answer has no English translation."] : translationProblems(translation)),
+  ];
   if (problems.length > 0) throw new ApiError(`Mistral's example was not saved. ${problems.join(" ")}`);
-  // A sentence whose word cannot be found for certain is kept without brackets, for the person to mark.
-  return { example: markTarget(sentence, text(parsed.target)) ?? sentence, exampleEn };
+  // The agent does not name the word. The card's word is marked when it stands once in the sentence, and the
+  // sentence is kept unmarked otherwise, for the person to mark.
+  const words = [note.lemma, ...note.forms.map((f) => f.arabic)];
+  return { example: autoMark(sentence, words) ?? sentence, exampleEn: translation };
+}
+
+/** The text of the answer: the content of the message output is a string, or a list of chunks of which the text ones make it. */
+function messageText(body: unknown): string {
+  const outputs = (body as { outputs?: { type?: string; content?: unknown }[] }).outputs;
+  const content = outputs?.find((o) => o.type === "message.output")?.content;
+  if (Array.isArray(content)) {
+    return content.map((c: { type?: string; text?: string }) => (c.type === "text" ? (c.text ?? "") : "")).join("");
+  }
+  return typeof content === "string" ? content : "";
+}
+
+/** The agent answers with {meanings, sentence, translation}; the card keeps the sentence and its translation. */
+function answerParts(answer: unknown): { sentence: string; translation: string } {
+  const field = (key: string) => {
+    const v = typeof answer === "object" && answer !== null ? (answer as Record<string, unknown>)[key] : undefined;
+    return typeof v === "string" ? v.trim() : "";
+  };
+  return { sentence: field("sentence"), translation: field("translation") };
 }

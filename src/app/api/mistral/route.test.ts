@@ -6,7 +6,11 @@ import { cardForRank } from "@/lib/lexicon";
 import { POST } from "./route";
 import { context } from "@/lib/server";
 
-const river = { sentence: "شَرِبْتُ مِنْ مَاءِ النَّهْرِ", target: "مِنْ", translation: "I drank some of the river's water." };
+const river = {
+  meanings: ["from", "of"],
+  sentence: "شَرِبَ الْوَلَدُ مِنْ مَاءِ النَّهْرِ الْبَارِدِ",
+  translation: "The boy drank from the cold river water.",
+};
 
 function askFor(id: string) {
   return POST(new Request("http://127.0.0.1/api/mistral", { method: "POST", body: JSON.stringify({ id }) }));
@@ -45,7 +49,7 @@ describe("asking Mistral for an example", () => {
   it("asks the agent, in its version, for the example", async () => {
     const note = context().store.createNote(cardForRank(2)!);
     await askFor(note.id);
-    expect(requests[0]).toMatchObject({ agent_id: "ag_01a1bac4790370849e18231695016789", agent_version: 4, store: false });
+    expect(requests[0]).toMatchObject({ agent_id: "ag_01a1bac4790370849e18231695016789", agent_version: 5, store: false });
     for (const key of ["model", "messages", "temperature", "max_tokens", "top_p", "reasoning_effort", "response_format"]) {
       expect(requests[0]).not.toHaveProperty(key);
     }
@@ -65,14 +69,14 @@ describe("asking Mistral for an example", () => {
   });
 
   it.each([
-    { what: "no message output", outputs: [{ type: "tool.execution", content: "x" }] },
-    { what: "no output at all", outputs: [] },
-    { what: "an answer that is not JSON", outputs: [{ type: "message.output", content: "Here is a sentence." }] },
-  ])("keeps the failure for $what", async ({ outputs }) => {
+    { what: "no message output", outputs: [{ type: "tool.execution", content: "x" }], problem: /gave no answer/ },
+    { what: "no output at all", outputs: [], problem: /gave no answer/ },
+    { what: "an answer that is not JSON", outputs: [{ type: "message.output", content: "Here is a sentence." }], problem: /not the expected JSON/ },
+  ])("keeps the failure for $what", async ({ outputs, problem }) => {
     vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ outputs })));
     const note = context().store.createNote(cardForRank(2)!);
     const saved = (await (await askFor(note.id)).json()).note;
-    expect(saved.exampleError).toMatch(/not the expected JSON/);
+    expect(saved.exampleError).toMatch(problem);
   });
 
   it("reads an answer that comes as chunks of text", async () => {
@@ -83,53 +87,90 @@ describe("asking Mistral for an example", () => {
     expect(saved.exampleEn).toBe(river.translation);
   });
 
-  it("puts the brackets around the word Mistral names as the target", async () => {
+  it("saves the sentence with the card's word marked, and the translation", async () => {
     const note = context().store.createNote(cardForRank(2)!);
     const saved = (await (await askFor(note.id)).json()).note;
-    expect(saved.example).toBe("شَرِبْتُ [مِنْ] مَاءِ النَّهْرِ");
+    expect(saved.example).toBe("شَرِبَ الْوَلَدُ [مِنْ] مَاءِ النَّهْرِ الْبَارِدِ");
+    expect(saved.exampleEn).toBe(river.translation);
+    expect(saved.exampleError).toBeNull();
+  });
+
+  it("marks a form of the card's word when the headword is not in the sentence", async () => {
+    answer = { ...river, sentence: "ذَكَرَ الْمُؤَرِّخُ آبَاءَ الثَّوْرَةِ فِي كِتَابِهِ" };
+    const note = context().store.createNote(cardForRank(115)!);
+    const saved = (await (await askFor(note.id)).json()).note;
+    expect(saved.example).toBe("ذَكَرَ الْمُؤَرِّخُ [آبَاءَ] الثَّوْرَةِ فِي كِتَابِهِ");
+  });
+
+  it("reads the answer after the agent's thinking chunk", async () => {
+    vi.stubGlobal("fetch", async () =>
+      new Response(JSON.stringify({ outputs: [{ type: "message.output", content: [
+        { type: "thinking", thinking: [{ type: "text", text: "hmm" }] },
+        { type: "text", text: JSON.stringify(river) },
+      ] }] })));
+    const note = context().store.createNote(cardForRank(2)!);
+    const saved = (await (await askFor(note.id)).json()).note;
     expect(saved.exampleEn).toBe(river.translation);
   });
 
-  // The word of the card shows up in its sentence in another form than the card has it: attached to the next
-  // word, with another case ending, with the article, or beside punctuation. The brackets still find it.
-  it.each([
-    { what: "a preposition attached to the next word", rank: 19, sentence: "كَتَبْتُ بِالْقَلَمِ فِي الْكِتَابِ", target: "بِ", marked: "كَتَبْتُ [بِ]الْقَلَمِ فِي الْكِتَابِ" },
-    { what: "a particle that merges with the article", rank: 13, sentence: "ذَهَبْتُ لِلْمَدْرَسَةِ صَبَاحًا", target: "لِ", marked: "ذَهَبْتُ [لِ]لْمَدْرَسَةِ صَبَاحًا" },
-    { what: "a particle named with a tatweel", rank: 19, sentence: "كَتَبْتُ بِالْقَلَمِ فِي الْكِتَابِ", target: "بِـ", marked: "كَتَبْتُ [بِ]الْقَلَمِ فِي الْكِتَابِ" },
-    { what: "another case ending than the one named", rank: 115, sentence: "تَحَدَّثْتُ مَعَ أَبٍ كَرِيمٍ", target: "أَبٌ", marked: "تَحَدَّثْتُ مَعَ [أَبٍ] كَرِيمٍ" },
-    { what: "a particle that the sentence carries a tatweel on", rank: 230, sentence: "هُوَ يَكْتُبُ كَـالْمُعَلِّمِ", target: "كَ", marked: "هُوَ يَكْتُبُ [كَ]الْمُعَلِّمِ" },
-    { what: "the word with the article", rank: 2000, sentence: "الْكِتَابُ جَدِيدٌ جِدًّا", target: "كِتَابٌ", marked: "[الْكِتَابُ] جَدِيدٌ جِدًّا" },
-    { what: "a word beside punctuation", rank: 2000, sentence: "هَلْ ذَهَبْتَ إِلَى الْمَدْرَسَةِ؟", target: "الْمَدْرَسَةِ", marked: "هَلْ ذَهَبْتَ إِلَى [الْمَدْرَسَةِ]؟" },
-    { what: "a phrase of several words", rank: 2000, sentence: "هٰذِهِ دَارَةٌ إِلِكْتْرُونِيَّةٌ", target: "دَارَةٌ إِلِكْتْرُونِيَّةٌ", marked: "هٰذِهِ [دَارَةٌ إِلِكْتْرُونِيَّةٌ]" },
-  ])("finds $what", async ({ rank, sentence, target, marked }) => {
-    answer = { sentence, target, translation: "x" };
-    const note = context().store.createNote(cardForRank(rank)!);
-    const saved = (await (await askFor(note.id)).json()).note;
-    expect(saved.example).toBe(marked);
-    expect(saved.exampleError).toBeNull();
-  });
-
-  // When the word cannot be found for certain, nothing is guessed: the sentence is kept as it is, without brackets,
-  // and the person marks the word.
-  it.each([
-    { what: "a target that is not in the sentence", sentence: "شَرِبْتُ مِنْ مَاءِ النَّهْرِ", target: "كِتَابٌ" },
-    { what: "a target that is several words of the sentence", sentence: "كَانَ الْيَوْمُ كَانَ مُمْطِرًا", target: "كَانَ" },
-    { what: "no target", sentence: "شَرِبْتُ مِنْ مَاءِ النَّهْرِ", target: "" },
-    { what: "a target that would cut a word through its vowel mark", sentence: "ذَهَبْتُ مَعَ أَبِي إِلَى الْبَيْتِ", target: "أَب" },
-  ])("keeps the sentence and leaves the word unmarked for $what", async ({ sentence, target }) => {
-    answer = { sentence, target, translation: "The translation." };
+  it("keeps the sentence unmarked when the card's word is not in it", async () => {
+    answer = { ...river, sentence: "ذَهَبَ الْوَلَدُ إِلَى الْمَدْرَسَةِ الْقَرِيبَةِ صَبَاحًا" };
     const note = context().store.createNote(cardForRank(2)!);
     const saved = (await (await askFor(note.id)).json()).note;
-    expect(saved.example).toBe(sentence);
-    expect(saved.exampleEn).toBe("The translation.");
+    expect(saved.example).toBe((answer as { sentence: string }).sentence);
     expect(saved.exampleError).toBeNull();
   });
 
-  it("does not save a sentence that is not Arabic", async () => {
-    answer = { sentence: "The book is new", target: "book", translation: "The book is new." };
+  it("keeps the sentence unmarked when the card's word stands twice in it", async () => {
+    answer = { ...river, sentence: "أَخَذَ الْوَلَدُ مِنْ الْبَيْتِ ثُمَّ مِنْ الْمَدْرَسَةِ" };
+    const note = context().store.createNote(cardForRank(2)!);
+    const saved = (await (await askFor(note.id)).json()).note;
+    expect(saved.example).toBe((answer as { sentence: string }).sentence);
+  });
+
+  // Each rule of the agent's system prompt that the code can check: 2 to 12 words, Arabic, every word vocalized,
+  // and an English translation.
+  it.each([
+    { what: "too few words", sentence: "شَرِبَ", problem: /1 word; it must have 2 to 12/ },
+    { what: "too many words", sentence: "شَرِبَ الْوَلَدُ مِنْ مَاءِ النَّهْرِ الْبَارِدِ فِي الصَّبَاحِ الْبَاكِرِ قَبْلَ الذَّهَابِ إِلَى الْمَدْرَسَةِ", problem: /13 words; it must have 2 to 12/ },
+    { what: "a word without vowels", sentence: "شَرِبَ الولد مِنْ مَاءِ النَّهْرِ الْبَارِدِ", problem: /without a vowel mark: الولد\./ },
+    { what: "a word with only a shadda", sentence: "شَرِبَ الشّمس مِنْ مَاءِ النَّهْرِ الْبَارِدِ", problem: /without a vowel mark: الشّمس\./ },
+    { what: "square brackets", sentence: "شَرِبَ [الْوَلَدُ] مِنْ مَاءِ النَّهْرِ الْبَارِدِ", problem: /square brackets/ },
+    { what: "Latin letters", sentence: "شَرِبَ الْوَلَدُ مِنْ مَاءِ the النَّهْرِ الْبَارِدِ", problem: /Latin letters/ },
+    { what: "no Arabic", sentence: "The boy drank from the cold river water", problem: /no Arabic text/ },
+    { what: "no sentence", sentence: "  ", problem: /no sentence/ },
+  ])("does not save a sentence with $what", async ({ sentence, problem }) => {
+    answer = { ...river, sentence };
     const note = context().store.createNote(cardForRank(2)!);
     const saved = (await (await askFor(note.id)).json()).note;
     expect(saved.example).toBe("");
-    expect(saved.exampleError).toMatch(/no Arabic/);
+    expect(saved.exampleError).toMatch(problem);
+  });
+
+  it.each([
+    { what: "an empty translation", translation: "", problem: /no English translation/ },
+    { what: "a translation in Arabic", translation: "شَرِبَ الْوَلَدُ", problem: /translation contains Arabic/ },
+  ])("does not save $what", async ({ translation, problem }) => {
+    answer = { ...river, translation };
+    const note = context().store.createNote(cardForRank(2)!);
+    const saved = (await (await askFor(note.id)).json()).note;
+    expect(saved.exampleEn).toBe("");
+    expect(saved.exampleError).toMatch(problem);
+  });
+
+  it("says so when the agent only thought and gave no text", async () => {
+    vi.stubGlobal("fetch", async () =>
+      new Response(JSON.stringify({ outputs: [{ type: "message.output", content: [{ type: "thinking", thinking: [{ type: "text", text: "hmm" }] }] }] })));
+    const note = context().store.createNote(cardForRank(2)!);
+    const saved = (await (await askFor(note.id)).json()).note;
+    expect(saved.exampleError).toMatch(/gave no answer/);
+  });
+
+  it("does not depend on the meanings of the answer", async () => {
+    answer = { sentence: river.sentence, translation: river.translation };
+    const note = context().store.createNote(cardForRank(2)!);
+    const saved = (await (await askFor(note.id)).json()).note;
+    expect(saved.exampleError).toBeNull();
+    expect(saved.exampleEn).toBe(river.translation);
   });
 });

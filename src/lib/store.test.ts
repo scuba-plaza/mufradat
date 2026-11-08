@@ -291,7 +291,7 @@ describe("audio", () => {
   it("drops a failed example generation once you write an example yourself", () => {
     const s = openStore(":memory:");
     const n = s.createNote(kitab);
-    s.setExampleError(n.id, "Mistral's example was not saved. The example has 2 words; it must have 3 to 9.");
+    s.setExampleError(n.id, "Mistral's example was not saved. The sentence has words without a vowel mark: كِتَاب.");
     const written = s.updateNote(n.id, { example: "هٰذَا [كِتَابٌ] جَدِيدٌ" });
     expect(written.exampleError).toBeNull();
     expect(written.exampleSource).toBe("user");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { autoMark, markSelection, skeleton } from "./validate";
+import { autoMark, markSelection, sentenceProblems, skeleton, translationProblems } from "./validate";
 
 describe("marking the word of the card in an unmarked example", () => {
   it("marks the headword as it stands in the sentence, whatever its vowels", () => {
@@ -65,5 +65,38 @@ describe("marking the letters that are selected", () => {
   it("counts a lone bracket in the sentence as no mark", () => {
     const draft = "لَدَيْهِ [كِتَابٌ جَمِيلٌ";
     expect(markSelection(draft, draft.indexOf("جَمِيلٌ"), draft.length)).toBe("لَدَيْهِ كِتَابٌ [جَمِيلٌ]");
+  });
+});
+
+describe("checking the sentence of the agent's answer", () => {
+  it.each([
+    { what: "a sentence of two words", sentence: "ذَهَبَ الْوَلَدُ." },
+    { what: "words of one letter and dagger alifs", sentence: "وَذَهَبَ هٰذَا الْوَلَدُ لِيَدْرُسَ" },
+    { what: "a shadda with a vowel", sentence: "الشَّمْسُ سَاطِعَةٌ؟" },
+    { what: "punctuation and a dash between words", sentence: "ذَهَبَ الْوَلَدُ — ثُمَّ عَادَ، وَنَامَ" },
+    { what: "a year in digits", sentence: "اِحْتَفَلُوا بِالِاسْتِقْلَالِ عَامَ ١٩٦٢" },
+  ])("accepts $what", ({ sentence }) => {
+    expect(sentenceProblems(sentence)).toEqual([]);
+  });
+
+  it.each([
+    { what: "one word", sentence: "ذَهَبَ", problem: /1 word; it must have 2 to 12/ },
+    { what: "a dash that is no word", sentence: "ذَهَبَ — ", problem: /1 word/ },
+    { what: "13 words", sentence: Array(13).fill("ذَهَبَ").join(" "), problem: /13 words/ },
+    { what: "a word with a shadda only", sentence: "الشّمس سَاطِعَةٌ", problem: /without a vowel mark: الشّمس/ },
+    { what: "a word with no marks", sentence: "ذَهَبَ الولد", problem: /without a vowel mark: الولد/ },
+    { what: "Latin letters", sentence: "ذَهَبَ الْوَلَدُ school", problem: /Latin letters/ },
+    { what: "square brackets", sentence: "ذَهَبَ [الْوَلَدُ] مَعَهُ", problem: /square brackets/ },
+  ])("rejects $what", ({ sentence, problem }) => {
+    expect(sentenceProblems(sentence).join(" ")).toMatch(problem);
+  });
+
+  it("does not take a tatweel for a word without a vowel mark", () => {
+    expect(sentenceProblems("ذَهَبَ ـ الْوَلَدُ")).toEqual([]);
+  });
+
+  it("rejects a translation in Arabic and accepts one in English", () => {
+    expect(translationProblems("The boy went.")).toEqual([]);
+    expect(translationProblems("ذَهَبَ الْوَلَدُ")).toHaveLength(1);
   });
 });
