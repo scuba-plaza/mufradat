@@ -7,7 +7,6 @@ import { POST } from "./route";
 import { context } from "@/lib/server";
 
 const river = {
-  meanings: ["from", "of"],
   sentence: "شَرِبَ الْوَلَدُ مِنْ مَاءِ النَّهْرِ الْبَارِدِ",
   translation: "The boy drank from the cold river water.",
 };
@@ -45,12 +44,67 @@ describe("asking Mistral for an example", () => {
     vi.unstubAllGlobals();
   });
 
-  it("sends the card and no list of allowed words", async () => {
+  it("sends the card as a JSON object of its fields", async () => {
     const note = context().store.createNote(cardForRank(2000)!);
     await askFor(note.id);
-    const user = requests[0].inputs;
-    expect(user).not.toMatch(/vocabulary/i);
-    expect(user.length).toBeLessThan(500);
+    expect(JSON.parse(requests[0].inputs)).toEqual({
+      headword: "اِحْتَفَلَ",
+      pos: "verb",
+      english: "to celebrate",
+      verb_form: "VIII",
+      forms: [
+        { label: "pres.", arabic: "يَحْتَفِلُ" },
+        { label: "masdar", arabic: "اِحْتِفَال" },
+      ],
+    });
+  });
+
+  it("leaves out what the card does not have, and trims what it has", async () => {
+    const store = context().store;
+    const note = store.createNote(cardForRank(2000)!);
+    store.updateNote(note.id, {
+      pos: "adj",
+      gender: "m+f",
+      hint: "  ",
+      forms: [{ label: " ", arabic: " يَحْتَفِلُ " }, { label: "masdar", arabic: "  " }],
+    });
+    await askFor(note.id);
+    expect(JSON.parse(requests[0].inputs)).toEqual({
+      headword: "اِحْتَفَلَ",
+      pos: "adjective",
+      english: "to celebrate",
+      gender: "m+f",
+      verb_form: "VIII",
+      forms: [{ arabic: "يَحْتَفِلُ" }],
+    });
+    store.updateNote(note.id, { forms: [] });
+    await askFor(note.id);
+    expect(JSON.parse(requests[1].inputs)).not.toHaveProperty("forms");
+  });
+
+  it("does not ask Mistral for a card with no English meaning", async () => {
+    const store = context().store;
+    const note = store.createNote(cardForRank(2)!);
+    store.updateNote(note.id, { english: "  " });
+    const saved = (await (await askFor(note.id)).json()).note;
+    expect(saved.exampleError).toMatch(/no English meaning/);
+    expect(requests).toHaveLength(0);
+  });
+
+  it("sends the gender, the root and the hint of the card when it has them", async () => {
+    const store = context().store;
+    const note = store.createNote(cardForRank(115)!);
+    store.updateNote(note.id, { hint: "the parent, not the title" });
+    await askFor(note.id);
+    expect(JSON.parse(requests[0].inputs)).toEqual({
+      headword: "أَب",
+      pos: "noun",
+      english: "father",
+      gender: "m",
+      root: "ء ب و",
+      forms: [{ label: "pl.", arabic: "آبَاء" }],
+      hint: "the parent, not the title",
+    });
   });
 
   it("asks the agent, in its version, for the example", async () => {
@@ -191,11 +245,4 @@ describe("asking Mistral for an example", () => {
     expect(saved.exampleError).toMatch(/gave no answer/);
   });
 
-  it("does not depend on the meanings of the answer", async () => {
-    answer = { sentence: river.sentence, translation: river.translation };
-    const note = context().store.createNote(cardForRank(2)!);
-    const saved = (await (await askFor(note.id)).json()).note;
-    expect(saved.exampleError).toBeNull();
-    expect(saved.exampleEn).toBe(river.translation);
-  });
 });

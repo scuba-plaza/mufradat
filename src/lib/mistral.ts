@@ -7,19 +7,22 @@ import { autoMark, sentenceProblems, translationProblems } from "./validate";
 const ENDPOINT = "https://api.mistral.ai/v1/conversations";
 // The agent holds the model, the instructions and the sampling settings; the app sends only the card.
 
+/** The card as the agent takes it: a JSON object of the fields the card has, trimmed, and no field that is empty. */
 function userPrompt(n: Note): string {
-  const forms = n.forms.map((f) => `${f.label} ${f.arabic}`).join("; ");
-  return [
-    `Word: ${n.lemma}`,
-    `Part of speech: ${POS_LABELS[n.pos]}`,
-    `Meaning: ${n.english}`,
-    n.root ? `Root: ${n.root}` : "",
-    n.verbForm ? `Verb form: ${n.verbForm}` : "",
-    forms ? `Forms: ${forms}` : "",
-    n.hint ? `Hint: ${n.hint}` : "",
-    "",
-    "Write one example sentence for this word in this meaning.",
-  ].filter((l, i, a) => l !== "" || a[i - 1] !== "").join("\n");
+  const filled = (v: string) => v.trim() || undefined;
+  const forms = n.forms
+    .filter((f) => f.arabic.trim() !== "")
+    .map((f) => ({ label: filled(f.label), arabic: f.arabic.trim() }));
+  return JSON.stringify({
+    headword: n.lemma.trim(),
+    pos: POS_LABELS[n.pos],
+    english: filled(n.english),
+    gender: filled(n.gender),
+    root: filled(n.root),
+    verb_form: filled(n.verbForm),
+    forms: forms.length > 0 ? forms : undefined,
+    hint: filled(n.hint),
+  });
 }
 
 function httpProblem(status: number): string {
@@ -44,17 +47,19 @@ export async function generateExample(
   if (!cfg.mistralApiKey) throw new ApiError("There is no Mistral API key. Set mistral_api_key in config.toml or MISTRAL_API_KEY.");
   if (!cfg.mistralAgentId) throw new ApiError("There is no Mistral agent id. Set mistral_agent_id in config.toml.");
   if (cfg.mistralAgentVersion === null) throw new ApiError("There is no Mistral agent version. Set mistral_agent_version in config.toml.");
+  const body = JSON.stringify({
+    agent_id: cfg.mistralAgentId,
+    agent_version: cfg.mistralAgentVersion,
+    store: false,
+    inputs: userPrompt(note),
+  });
+  if (note.english.trim() === "") throw new ApiError("The card has no English meaning. Add one before generating an example.");
   let res: Response;
   try {
     res = await fetchImpl(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.mistralApiKey}` },
-      body: JSON.stringify({
-        agent_id: cfg.mistralAgentId,
-        agent_version: cfg.mistralAgentVersion,
-        store: false,
-        inputs: userPrompt(note),
-      }),
+      body,
     });
   } catch {
     throw new ApiError("Could not reach Mistral. Check the network connection and try again.");
@@ -96,7 +101,7 @@ function messageText(body: unknown): string {
   return typeof content === "string" ? content : "";
 }
 
-/** The agent answers with {meanings, sentence, translation}; the card keeps the sentence and its translation. */
+/** The agent answers with {sentence, translation}; the card keeps both. */
 function answerParts(answer: unknown): { sentence: string; translation: string } {
   const field = (key: string) => {
     const v = typeof answer === "object" && answer !== null ? (answer as Record<string, unknown>)[key] : undefined;
