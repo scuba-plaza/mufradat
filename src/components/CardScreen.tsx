@@ -185,9 +185,9 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
       <div className="mt-4 text-center">
         <Clip note={note} slot="word" name="the word" text={note.lemma} onNote={setNote} onMessage={setWordMessage}>
           <InlineText label="Arabic headword" value={note.lemma} arabic className="text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
-          <InlineText label="Hint Arabic" placeholder="Add a hint for the Arabic side" value={note.hintAr} arabic className="mt-2 text-center text-[1rem] text-quiet" onSave={(hintAr) => save({ hintAr })} />
+          <InlineText label="Hint Arabic" placeholder="Add a hint for the Arabic side" value={note.hintAr} arabic className="mt-1.5 text-center text-[1rem] text-quiet min-[1024px]:mt-2" onSave={(hintAr) => save({ hintAr })} />
         </Clip>
-        <section aria-label="Forms" className={`panel mx-auto mt-4 flex items-center border px-2 py-2 ${formsTone}`}>
+        <section aria-label="Forms" className={`panel mx-auto mt-3 flex items-center border px-2 py-2 min-[1024px]:mt-4 ${formsTone}`}>
           <div className="flex flex-1 flex-wrap items-center justify-center gap-x-6 gap-y-2 pl-[var(--control-h-sm)]">
             {note.forms.length === 0 && <span className="text-sm text-quiet">No forms</span>}
             {note.forms.map((f) => (
@@ -205,11 +205,11 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
           </button>
           {formsState && <span className="sr-only">{formsState}</span>}
         </section>
-        <InlineText label="English meaning" placeholder="Add the English meaning" value={note.english} className="mt-3 text-center text-2xl font-medium tracking-title" onSave={(english) => save({ english })} />
-        <InlineText label="Hint English" placeholder="Add a hint for the English side" value={note.hint} className="mt-1 text-center text-[1rem] text-quiet" onSave={(hint) => save({ hint })} />
+        <InlineText label="English meaning" placeholder="Add the English meaning" value={note.english} className="mt-2 text-center text-2xl font-medium tracking-title min-[1024px]:mt-3" onSave={(english) => save({ english })} />
+        <InlineText label="Hint English" placeholder="Add a hint for the English side" value={note.hint} className="mt-0.5 text-center text-[1rem] text-quiet min-[1024px]:mt-1" onSave={(hint) => save({ hint })} />
       </div>
 
-      <div className="mt-5 text-center">
+      <div className="mt-3 text-center min-[1024px]:mt-5">
         <Clip
           note={note}
           slot="example"
