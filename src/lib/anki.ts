@@ -14,12 +14,12 @@ const FONT_MEDIA_NAME = "_" + FONT_FILE;
 const PRODUCTION_TOP = 1000;
 const PRODUCTION_DELAY = 20;
 const UNRANKED_BASE = 5000;
-const TEMPLATES_REVISED = Date.UTC(2026, 9, 9, 12, 0, 0);
+const TEMPLATES_REVISED = Date.UTC(2026, 11, 11, 12, 0, 0);
 const DESCRIPTION =
   "The most common Modern Standard Arabic words in frequency order, with fully vowelled examples.";
 
 const FIELDS = [
-  "Arabic", "English", "Hint", "Forms", "Example", "ExampleEnglish", "WordAudio", "FormsAudio",
+  "Arabic", "English", "Hint", "HintArabic", "Forms", "Example", "ExampleEnglish", "WordAudio", "FormsAudio",
   "ExampleAudio", "Pos", "Details", "Production", "Check", "Rank", "NoteID",
 ] as const;
 type Field = (typeof FIELDS)[number];
@@ -167,6 +167,7 @@ export function buildApkg(notes: Note[], readAudio: (key: string, place: ClipPla
     v.Arabic = escapeHtml(n.lemma);
     v.English = escapeHtml(n.english);
     v.Hint = markArabic(n.hint);
+    v.HintArabic = markArabic(n.hintAr);
     v.Forms = formsHtml(n);
     v.Example = n.example.trim() ? exampleHtml(n) : "";
     v.ExampleEnglish = escapeHtml(n.exampleEn);
