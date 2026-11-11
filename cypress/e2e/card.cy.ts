@@ -20,7 +20,7 @@ const unplayable = { contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2
 /** Opens the card of a word, once the page is ready to take input. */
 function openWord(rank: number) {
   cy.visit(`/open?rank=${rank}`);
-  cy.hydrated(by("Hint"));
+  cy.hydrated(by("Hint English"));
 }
 
 describe("a word", () => {
@@ -44,7 +44,7 @@ describe("a word", () => {
       res.setDelay(600);
     }));
     openWord(8);
-    cy.get(by("Hint")).type("a hint").blur();
+    cy.get(by("Hint English")).type("a hint").blur();
     cy.get(status).should("contain", "Saving…");
     cy.get(status).should("contain", "Saved");
   });
@@ -52,7 +52,7 @@ describe("a word", () => {
   it("says when a change was not saved, and why", () => {
     cy.intercept("PUT", "/api/notes/*", { statusCode: 500, body: { error: "The disk is full." } });
     openWord(9);
-    cy.get(by("Hint")).type("a hint").blur();
+    cy.get(by("Hint English")).type("a hint").blur();
     cy.get(status).should("contain", "Not saved");
     cy.get(alert).should("contain", "The disk is full.");
   });
@@ -63,6 +63,16 @@ describe("a word", () => {
     cy.get(status).should("contain", "Saved");
     cy.reload();
     cy.get(by("English meaning")).should("have.value", "a test meaning");
+  });
+
+  it("keeps a separate hint for each side of the card", () => {
+    openWord(30);
+    cy.get(by("Hint Arabic")).type("ليس عَنْ").blur();
+    cy.get(by("Hint English")).type("not about").blur();
+    cy.get(status).should("contain", "Saved");
+    cy.reload();
+    cy.get(by("Hint Arabic")).should("have.value", "ليس عَنْ");
+    cy.get(by("Hint English")).should("have.value", "not about");
   });
 
   it("shows the example with its target word marked, and edits it where it is shown", () => {
@@ -231,7 +241,7 @@ describe("a word", () => {
           Object.assign(win, { Audio: Stub, sounds });
         },
       });
-      cy.hydrated(by("Hint"));
+      cy.hydrated(by("Hint English"));
       const sounds = () => cy.window().its("sounds");
       cy.get(`${word} input[type="file"]`).selectFile(mine, { force: true });
       sounds().should("have.length", 1);
@@ -281,13 +291,13 @@ describe("a word", () => {
         cy.location("pathname").then((path) => {
           cy.request("PUT", `/api/notes/${path.split("/").pop()}`, { example: "الْكِتَابُ [فِي] الْحَقِيبَةِ", exampleEn: "The book is in the bag." });
           cy.reload();
-          cy.hydrated(by("Hint"));
+          cy.hydrated(by("Hint English"));
         });
         cy.document().should((doc) => {
           const rect = (selector: string) => doc.querySelector(selector)!.getBoundingClientRect();
           const middle = (selector: string) => rect(selector).left + rect(selector).width / 2;
           const meaning = middle(by("English meaning"));
-          for (const field of [by("Arabic headword"), by("Hint"), by("Example in English")]) {
+          for (const field of [by("Arabic headword"), by("Hint English"), by("Example in English")]) {
             expect(Math.abs(middle(field) - meaning), `${field} against the meaning`).to.be.at.most(1);
           }
           const fields = [[word, by("Arabic headword")], [example, `div${by("Example")}`]];
@@ -346,11 +356,11 @@ describe("a word", () => {
 
     it("keeps the Hint where it is when the audio of the word fails", () => {
       openWord(45);
-      cy.get(by("Hint")).then(($hint) => {
+      cy.get(by("Hint English")).then(($hint) => {
         const before = at($hint[0])[1];
         cy.get(inGroup(word, "Generate")).click();
         cy.contains("There are no Google credentials");
-        cy.get(by("Hint")).should(($now) => expect(at($now[0])[1]).to.equal(before));
+        cy.get(by("Hint English")).should(($now) => expect(at($now[0])[1]).to.equal(before));
       });
     });
 
@@ -420,7 +430,7 @@ describe("a word", () => {
 
   it("approves the card and goes on to the next word", () => {
     cy.visit("/open?rank=60");
-    cy.hydrated(by("Hint"));
+    cy.hydrated(by("Hint English"));
     cy.location("pathname").then((card) => {
       cy.contains("button", /^Approve$/).click();
       cy.location("pathname").should("not.eq", card).and("match", /^\/cards\/[0-9a-f-]{36}$/);
@@ -453,7 +463,7 @@ describe("resetting a word", () => {
 
   const editByMistake = (rank: number) => {
     openWord(rank);
-    cy.get(by("Hint")).type("by mistake").blur();
+    cy.get(by("Hint English")).type("by mistake").blur();
     cy.contains(status, "Saved");
   };
   const askToReset = () => {
@@ -484,7 +494,7 @@ describe("resetting a word", () => {
       cy.get("dialog[open]").contains("button", "Cancel").click();
       cy.get("dialog[open]").should("not.exist");
       cy.location("pathname").should("eq", card);
-      cy.get(by("Hint")).should("have.value", "by mistake");
+      cy.get(by("Hint English")).should("have.value", "by mistake");
     });
   });
 
@@ -492,7 +502,7 @@ describe("resetting a word", () => {
     const query = "rank:207-208";
     cy.visit(`/?q=${encodeURIComponent(query)}`);
     cy.wordRow(207).click();
-    cy.hydrated(by("Hint"));
+    cy.hydrated(by("Hint English"));
     askToReset();
     cy.get("dialog[open]").contains("button", "Reset").click();
     cy.location("search").should("eq", `?q=${encodeURIComponent(query)}`);

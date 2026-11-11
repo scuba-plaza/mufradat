@@ -9,7 +9,7 @@ const tagged: string[] = [];
 
 function openWord(rank: number) {
   cy.visit(`/open?rank=${rank}`);
-  cy.hydrated(by("Hint"));
+  cy.hydrated(by("Hint English"));
   cy.location("pathname").then((path) => tagged.push(path.split("/").pop()!));
 }
 
@@ -19,7 +19,7 @@ function setTags(tags: string[]) {
 
 function reopen() {
   cy.reload();
-  cy.hydrated(by("Hint"));
+  cy.hydrated(by("Hint English"));
   cy.get(tagsButton).click();
 }
 
@@ -81,7 +81,7 @@ describe("the tags and details of a card", () => {
     cy.location("pathname").then((path) => cy.request("POST", `/api${path.replace("/cards", "/notes")}/approve`, {}));
     cy.request("/api/backups").its("body.check.approved").then((before) => {
       cy.reload();
-      cy.hydrated(by("Hint"));
+      cy.hydrated(by("Hint English"));
       cy.get(tagsButton).click();
       cy.get(addTag).type("lesson_1{enter}");
       cy.get(chips).should("contain", "lesson_1");
