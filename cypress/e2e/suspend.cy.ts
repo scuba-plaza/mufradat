@@ -77,6 +77,7 @@ describe("suspending a word", () => {
   it("keeps the keyboard arrows off the suspended card", () => {
     openWord(33);
     cy.get(suspendButton).click();
+    cy.get(unsuspendButton).should("be.visible");
     cy.visit(`/open?rank=34`);
     cy.hydrated('[aria-label="Arabic headword"]');
     cy.get("body").type("{ctrl}{leftarrow}");
