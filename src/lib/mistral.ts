@@ -25,6 +25,7 @@ function userPrompt(n: Note): string {
     verb_form: filled(n.verbForm),
     forms: forms.length > 0 ? forms : undefined,
     hint: filled(n.hint),
+    hint_ar: filled(n.hintAr),
     current_example: filled(plainExample(n.example)),
   });
 }
