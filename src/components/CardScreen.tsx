@@ -11,6 +11,7 @@ import FormsDialog from "./FormsDialog";
 import InlineText from "./InlineText";
 import { keyPressed } from "./keys";
 import ResetDialog from "./ResetDialog";
+import SuspendDialog from "./SuspendDialog";
 import TagsAndDetailsDialog from "./TagsAndDetailsDialog";
 
 const SAVE_TEXT = { idle: "", saving: "Saving…", saved: "Saved", failed: "Not saved" };
@@ -24,6 +25,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
   const [exampleProblem, setExampleProblem] = useState("");
   const [formsOpen, setFormsOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const [suspendOpen, setSuspendOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [tagProblem, setTagProblem] = useState("");
   const [wordMessage, setWordMessage] = useState("");
@@ -121,6 +123,27 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
     });
   }
 
+  function suspend() {
+    later(async () => {
+      setSuspendOpen(false);
+      try {
+        setNote((await post<{ note: Note }>(`/api/notes/${note.id}/suspend`, {})).note);
+      } catch (e) {
+        setProblems([(e as Error).message]);
+      }
+    });
+  }
+
+  function unsuspend() {
+    later(async () => {
+      try {
+        setNote((await api<{ note: Note }>(`/api/notes/${note.id}/suspend`, { method: "DELETE" })).note);
+      } catch (e) {
+        setProblems([(e as Error).message]);
+      }
+    });
+  }
+
   useEffect(() => {
     const play = (name: string) => document.querySelector<HTMLButtonElement>(`button[title="Play ${name}"], button[title="Playing ${name}"]`)?.click();
     const go = (direction: "previous" | "next") =>
@@ -166,6 +189,22 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" />
             </svg>
+          </button>
+          <button
+            className="action-quiet min-w-control-sm px-2"
+            title={note.suspended ? "Unsuspend word" : "Suspend word"}
+            aria-haspopup={!note.suspended && note.status === "approved" ? "dialog" : undefined}
+            onClick={note.suspended ? unsuspend : () => (note.status === "approved" ? setSuspendOpen(true) : suspend())}
+          >
+            {note.suspended ? (
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="currentColor" stroke="none">
+                <path d="M8 5l11 7-11 7z" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M9 5v14M15 5v14" />
+              </svg>
+            )}
           </button>
           <button className="action-quiet min-w-control-sm px-2" title="Tags and details" aria-haspopup="dialog" onClick={() => {
             setTagProblem("");
@@ -226,6 +265,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
       <TagsAndDetailsDialog note={note} open={tagsOpen} onClose={() => setTagsOpen(false)} save={save} saveTags={saveTags} tagProblem={tagProblem} clearTagProblem={() => setTagProblem("")} problems={problems} />
       <FormsDialog note={note} open={formsOpen} onClose={() => setFormsOpen(false)} save={save} onNote={setNote} />
       <ResetDialog note={note} open={resetOpen} busy={leaving} onClose={() => setResetOpen(false)} onReset={reset} />
+      <SuspendDialog open={suspendOpen} onClose={() => setSuspendOpen(false)} onSuspend={suspend} />
       <ActionBar note={note} problems={problems} leaving={leaving} onApprove={approve} />
     </div>
   );
