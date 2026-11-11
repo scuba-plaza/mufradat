@@ -125,7 +125,6 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
 
   function suspend() {
     later(async () => {
-      setSuspendOpen(false);
       try {
         setNote((await post<{ note: Note }>(`/api/notes/${note.id}/suspend`, {})).note);
       } catch (e) {
@@ -265,8 +264,8 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
       <TagsAndDetailsDialog note={note} open={tagsOpen} onClose={() => setTagsOpen(false)} save={save} saveTags={saveTags} tagProblem={tagProblem} clearTagProblem={() => setTagProblem("")} problems={problems} />
       <FormsDialog note={note} open={formsOpen} onClose={() => setFormsOpen(false)} save={save} onNote={setNote} />
       <ResetDialog note={note} open={resetOpen} busy={leaving} onClose={() => setResetOpen(false)} onReset={reset} />
-      <SuspendDialog open={suspendOpen} onClose={() => setSuspendOpen(false)} onSuspend={suspend} />
-      <ActionBar note={note} problems={problems} leaving={leaving} onApprove={approve} />
+      <SuspendDialog note={note} open={suspendOpen} onClose={() => setSuspendOpen(false)} onSuspend={() => { setSuspendOpen(false); suspend(); }} />
+      <ActionBar note={note} problems={problems} leaving={leaving} onApprove={approve} onUnsuspend={unsuspend} />
     </div>
   );
 }

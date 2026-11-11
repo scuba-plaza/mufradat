@@ -10,6 +10,7 @@ export default function ActionBar(props: {
   problems: string[];
   leaving: boolean;
   onApprove: () => void;
+  onUnsuspend: () => void;
 }) {
   const { note } = props;
   const box = useRef<HTMLDivElement>(null);
@@ -32,6 +33,7 @@ export default function ActionBar(props: {
   }, []);
 
   const approved = note.status === "approved";
+  const suspended = note.suspended;
   const missing = missingParts(note);
   return (
     <div ref={box} className="fixed inset-x-0 bottom-0 border-t border-rule bg-paper">
@@ -44,10 +46,13 @@ export default function ActionBar(props: {
         <div role="toolbar" aria-label="Card actions" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2">
           <p className="flex min-w-0 flex-1 items-center gap-2 text-sm text-quiet">
             <StatusMark status={wordStatus(note)} />
-            {!approved && <span>{missing.length > 0 ? `Still needs ${missing.join(", ")}` : "Ready to approve"}</span>}
+            {suspended && <span>Found only by the search status:suspended</span>}
+            {!approved && !suspended && <span>{missing.length > 0 ? `Still needs ${missing.join(", ")}` : "Ready to approve"}</span>}
           </p>
           <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto">
-            {approved ? (
+            {suspended ? (
+              <button className="action-main col-start-2 w-full sm:w-44" onClick={props.onUnsuspend}>Unsuspend</button>
+            ) : approved ? (
               <a href="/next" className="action-main col-start-2 w-full sm:w-44">Next</a>
             ) : (
               <button className="action-main col-start-2 w-full sm:w-44" disabled={props.leaving} onClick={props.onApprove}>Approve</button>

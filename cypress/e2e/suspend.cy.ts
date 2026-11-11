@@ -57,7 +57,9 @@ describe("suspending a word", () => {
       cy.get(suspendButton).click();
       cy.get(dialog).contains("button", "Suspend").click();
       cy.get(unsuspendButton).should("be.visible");
-      cy.get(bar).should("contain", "suspended").and("contain", "button", /^Approve$/);
+      cy.get(bar).should("contain", "suspended");
+      cy.get(bar).contains("button", "Unsuspend").should("be.visible");
+      cy.get(bar).contains("button", "Approve").should("not.exist");
     });
   });
 
