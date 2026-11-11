@@ -10,7 +10,7 @@ export const POS_LABELS: Record<POS, string> = {
 };
 
 export type CardStatus = "draft" | "approved";
-export type WordStatus = "todo" | "progress" | "ready" | "approved";
+export type WordStatus = "todo" | "progress" | "ready" | "approved" | "suspended";
 export type AudioSource = "tts" | "user";
 
 /** "word", "example", or a form id. */

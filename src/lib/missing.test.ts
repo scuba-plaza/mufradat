@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { missingKinds, missingParts } from "./missing";
+import { missingKinds, missingParts, wordStatus } from "./missing";
 import type { Clip, Note } from "./types";
 
 const clip = (over: Partial<Clip> = {}): Clip => ({ key: "abc", source: "tts", text: "", error: null, outdated: false, ...over });
@@ -9,6 +9,13 @@ const bare: Note = {
   example: "", exampleEn: "", exampleError: null, rank: 120, status: "draft", suspended: false, lemmaSource: "wiktionary",
   exampleSource: "", createdAt: "", updatedAt: "", forms: [], audio: {}, tags: [],
 };
+
+describe("what a card is", () => {
+  it("calls a suspended card suspended, whatever it still lacks", () => {
+    expect(wordStatus({ ...bare, suspended: true })).toBe("suspended");
+    expect(wordStatus({ ...bare, suspended: true, example: "\u0647\u0670\u0630\u064e\u0627 [\u0643\u0650\u062a\u064e\u0627\u0628\u064c]", exampleEn: "this is a book", audio: { word: clip() } })).toBe("suspended");
+  });
+});
 
 describe("what a card still lacks", () => {
   it("names the example and the audio of the word on a bare card", () => {

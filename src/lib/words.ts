@@ -56,7 +56,9 @@ function listRows(notes: Note[], withEntries: boolean): WordRow[] {
   ];
 }
 
-export const wordRows = (store: Store): WordRow[] => listRows(store.allNotes(), false);
+const notSuspended = (r: WordRow) => r.status !== "suspended";
+
+export const wordRows = (store: Store): WordRow[] => listRows(store.allNotes(), false).filter(notSuspended);
 
 const working = (r: WordRow) => r.status === "progress" || r.status === "ready";
 const group = (r: WordRow) => (working(r) ? 0 : r.status === "todo" ? 1 : 2);
@@ -97,7 +99,8 @@ export interface View {
 function evaluate(store: Store, text: string, now: Date): { error: string } | { query: Query; start: WordRow[]; rows: WordRow[] } {
   const parsed = parseQuery(text);
   if ("error" in parsed) return { error: parsed.error };
-  const all = listRows(store.allNotes(), parsed.query.texts.length > 0);
+  const every = listRows(store.allNotes(), parsed.query.texts.length > 0);
+  const all = parsed.query.suspended ? every : every.filter(notSuspended);
   const start = text.trim() === "" ? defaultOrder(all) : all;
   return { query: parsed.query, start, rows: runQuery(start, parsed.query, now) };
 }
