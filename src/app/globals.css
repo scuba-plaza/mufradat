@@ -36,7 +36,7 @@
   --ar-sm: 1.5rem;
   --ar-md: 2.25rem;
   --ar-lg: clamp(1.75rem, 7vw, 2.5rem);
-  --ar-xl: clamp(3rem, 14vw, 4.5rem);
+  --ar-xl: clamp(2.75rem, 13vw, 4.0625rem);
   --column: 44rem;
   --topbar-h: 48px;
   --control-h: 36px;
@@ -88,7 +88,6 @@
     --ar-sm: 1.8125rem;
     --ar-md: 2.6875rem;
     --ar-lg: clamp(1.75rem, 7vw, 3rem);
-    --ar-xl: clamp(3rem, 14vw, 5.375rem);
     --column: 58rem;
     --topbar-h: 56px;
     --control-h: 44px;

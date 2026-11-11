@@ -5,7 +5,7 @@ import { POS_VALUES, type NoteEdit, type POS } from "@/lib/types";
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
 
-const TEXT_FIELDS = ["lemma", "english", "gender", "root", "verbForm", "hint", "example", "exampleEn"] as const;
+const TEXT_FIELDS = ["lemma", "english", "gender", "root", "verbForm", "hint", "hintAr", "example", "exampleEn"] as const;
 
 export const PUT = (req: Request, { params }: Ctx) =>
   handle(async () => {

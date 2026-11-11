@@ -8,7 +8,7 @@ import { unzip } from "./testing/deck";
 import type { Note } from "./types";
 
 const FIELDS = [
-  "Arabic", "English", "Hint", "Forms", "Example", "ExampleEnglish", "WordAudio", "FormsAudio",
+  "Arabic", "English", "Hint", "HintArabic", "Forms", "Example", "ExampleEnglish", "WordAudio", "FormsAudio",
   "ExampleAudio", "Pos", "Details", "Production", "Check", "Rank", "NoteID",
 ];
 const clip = (n: number) => Buffer.from([0xff, 0xfb, 0x90, 0x00, n, n, n, n]);
@@ -34,7 +34,7 @@ function approvedStore() {
     lemma: "كِتَاب", english: "book & more", pos: "noun", gender: "m", root: "ك ت ب", rank: 120,
     forms: [{ label: "pl.", arabic: "كُتُب" }, { label: "dual", arabic: "كِتَابَانِ" }],
   });
-  s.updateNote(n.id, { hint: "not كتابة", example: "هٰذَا [كِتَابٌ] جَمِيلٌ", exampleEn: "this is a <nice> book" });
+  s.updateNote(n.id, { hint: "not كتابة", hintAr: "ليس قِراءة", example: "هٰذَا [كِتَابٌ] جَمِيلٌ", exampleEn: "this is a <nice> book" });
   s.setAudio(n.id, "word", clip(1), "tts");
   s.setAudio(n.id, n.forms[0].id, clip(2), "tts");
   s.setAudio(n.id, n.forms[1].id, clip(3), "user");
@@ -57,6 +57,7 @@ describe("exporting approved cards", () => {
       Arabic: "كِتَاب",
       English: "book &amp; more",
       Hint: 'not <span class="ar" lang="ar" dir="rtl">كتابة</span>',
+      HintArabic: '<span class="ar" lang="ar" dir="rtl">ليس قِراءة</span>',
       Forms:
         '<span class="form"><span class="lbl">pl.</span><span class="ar" lang="ar" dir="rtl">كُتُب</span></span> ' +
         '<span class="form"><span class="lbl">dual</span><span class="ar" lang="ar" dir="rtl">كِتَابَانِ</span></span>',
@@ -92,6 +93,20 @@ describe("exporting approved cards", () => {
     const first = buildApkg([s.getNote(id)!], read(s), options);
     s.setTags(id, ["grammar", "lesson_1"]);
     expect(buildApkg([s.getNote(id)!], read(s), options).equals(first)).toBe(true);
+  });
+
+  it("shows the Arabic hint on the front of the recognition card and the English hint on the English sides", () => {
+    const { s, id } = approvedStore();
+    const apkg = buildApkg([s.getNote(id)!], read(s), options);
+    const c = collection(apkg);
+    const byName = Object.fromEntries(c.model.tmpls.map((t) => [t.name, t]));
+    expect(byName.Recognition.qfmt).toContain('{{#HintArabic}}<div class="hint">{{HintArabic}}</div>{{/HintArabic}}');
+    expect(byName.Recognition.afmt).not.toContain('HintArabic');
+    expect(byName.Production.qfmt).not.toContain('HintArabic');
+    expect(byName.Production.afmt).not.toContain('HintArabic');
+    expect(byName.Recognition.qfmt).not.toContain('{{Hint}}');
+    expect(byName.Recognition.afmt).toContain('{{#Hint}}<div class="hint">{{Hint}}</div>{{/Hint}}');
+    expect(byName.Production.qfmt).toContain('{{#Hint}}<div class="hint">{{Hint}}</div>{{/Hint}}');
   });
 
   it("keeps the card templates and styling of the existing note type", () => {

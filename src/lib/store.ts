@@ -7,7 +7,7 @@ import { audioFiles, audioKey, audioPath, mp3Problem, slotLabel, type AudioFile 
 import { approvalProblems, plainExample } from "./validate";
 import type { AudioSource, Clip, Form, Note, NoteEdit, NewNote, POS, Slot, WorkspaceCheck } from "./types";
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS notes (
@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS notes (
   root TEXT NOT NULL DEFAULT '',
   verb_form TEXT NOT NULL DEFAULT '',
   hint TEXT NOT NULL DEFAULT '',
+  hint_ar TEXT NOT NULL DEFAULT '',
   example TEXT NOT NULL DEFAULT '',
   example_en TEXT NOT NULL DEFAULT '',
   example_error TEXT,
@@ -60,7 +61,7 @@ CREATE TABLE IF NOT EXISTS note_tags (
 
 interface NoteRow {
   id: string; lemma: string; english: string; pos: POS; gender: string; root: string;
-  verb_form: string; hint: string; example: string; example_en: string; example_error: string | null;
+  verb_form: string; hint: string; hint_ar: string; example: string; example_en: string; example_error: string | null;
   rank: number; status: Note["status"]; suspended: number; created_at: string; updated_at: string;
   lemma_source: Note["lemmaSource"]; example_source: Note["exampleSource"];
 }
@@ -81,11 +82,10 @@ export function openStore(dir: string) {
   }
   db.pragma("foreign_keys = ON");
   db.exec(SCHEMA);
-  if (found < SCHEMA_VERSION) {
-    const columns = db.prepare("PRAGMA table_info(notes)").all() as { name: string }[];
-    if (!columns.some((c) => c.name === "suspended")) db.exec("ALTER TABLE notes ADD COLUMN suspended INTEGER NOT NULL DEFAULT 0");
-    db.pragma(`user_version = ${SCHEMA_VERSION}`);
-  }
+  const columns = (db.pragma("table_info(notes)") as { name: string }[]).map((c) => c.name);
+  if (!columns.includes("hint_ar")) db.exec("ALTER TABLE notes ADD COLUMN hint_ar TEXT NOT NULL DEFAULT ''");
+  if (!columns.includes("suspended")) db.exec("ALTER TABLE notes ADD COLUMN suspended INTEGER NOT NULL DEFAULT 0");
+  if (found < SCHEMA_VERSION) db.pragma(`user_version = ${SCHEMA_VERSION}`);
 
   const now = () => new Date().toISOString();
 
@@ -99,7 +99,7 @@ export function openStore(dir: string) {
     }
     return {
       id: row.id, lemma: row.lemma, english: row.english, pos: row.pos, gender: row.gender,
-      root: row.root, verbForm: row.verb_form, hint: row.hint, example: row.example,
+      root: row.root, verbForm: row.verb_form, hint: row.hint, hintAr: row.hint_ar, example: row.example,
       exampleEn: row.example_en, exampleError: row.example_error, rank: row.rank,
       status: row.status, suspended: row.suspended === 1, lemmaSource: row.lemma_source, exampleSource: row.example_source,
       createdAt: row.created_at, updatedAt: row.updated_at, forms, audio, tags,
@@ -186,6 +186,7 @@ export function openStore(dir: string) {
       if (edit.root !== undefined) set("root", edit.root);
       if (edit.verbForm !== undefined) set("verb_form", edit.verbForm);
       if (edit.hint !== undefined) set("hint", edit.hint);
+      if (edit.hintAr !== undefined) set("hint_ar", edit.hintAr);
       const exampleChanged =
         (edit.example !== undefined && edit.example !== before.example) ||
         (edit.exampleEn !== undefined && edit.exampleEn !== before.exampleEn);

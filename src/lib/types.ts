@@ -40,6 +40,7 @@ export interface Note {
   root: string;
   verbForm: string;
   hint: string;
+  hintAr: string;
   example: string;
   exampleEn: string;
   exampleError: string | null;
@@ -75,6 +76,7 @@ export interface NoteEdit {
   root?: string;
   verbForm?: string;
   hint?: string;
+  hintAr?: string;
   example?: string;
   exampleEn?: string;
   /** Entries with an id keep their audio; entries without one are new. Omitted entries are removed. */

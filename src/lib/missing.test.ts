@@ -5,7 +5,7 @@ import type { Clip, Note } from "./types";
 const clip = (over: Partial<Clip> = {}): Clip => ({ key: "abc", source: "tts", text: "", error: null, outdated: false, ...over });
 
 const bare: Note = {
-  id: "1", lemma: "كِتَاب", english: "book", pos: "noun", gender: "", root: "", verbForm: "", hint: "",
+  id: "1", lemma: "كِتَاب", english: "book", pos: "noun", gender: "", root: "", verbForm: "", hint: "", hintAr: "",
   example: "", exampleEn: "", exampleError: null, rank: 120, status: "draft", suspended: false, lemmaSource: "wiktionary",
   exampleSource: "", createdAt: "", updatedAt: "", forms: [], audio: {}, tags: [],
 };

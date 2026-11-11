@@ -105,10 +105,10 @@ describe("asking Mistral for an example", () => {
     expect(requests).toHaveLength(0);
   });
 
-  it("sends the gender, the root and the hint of the card when it has them", async () => {
+  it("sends the gender, the root and the hints of the card when it has them", async () => {
     const store = context().store;
     const note = store.createNote(cardForRank(115)!);
-    store.updateNote(note.id, { hint: "the parent, not the title" });
+    store.updateNote(note.id, { hint: "the parent, not the title", hintAr: "وليس عمّ" });
     await askFor(note.id);
     expect(JSON.parse(requests[0].inputs)).toEqual({
       headword: "أَب",
@@ -118,6 +118,7 @@ describe("asking Mistral for an example", () => {
       root: "ء ب و",
       forms: [{ label: "pl.", arabic: "آبَاء" }],
       hint: "the parent, not the title",
+      hint_ar: "وليس عمّ",
     });
   });
 

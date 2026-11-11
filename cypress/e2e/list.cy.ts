@@ -135,8 +135,8 @@ describe("continuing", () => {
   it("goes back to the card you edited last, not on to a word you have not started", () => {
     cy.visit("/open?rank=150");
     cy.location("pathname").then((card) => {
-      cy.hydrated('[aria-label="Hint"]');
-      cy.get('[aria-label="Hint"]').type("edited last").blur();
+      cy.hydrated('[aria-label="Hint English"]');
+      cy.get('[aria-label="Hint English"]').type("edited last").blur();
       cy.contains('[role="status"]', "Saved");
       cy.visit("/next");
       cy.location("pathname").should("eq", card);
@@ -157,7 +157,7 @@ describe("a card made outside the list", () => {
 
   it("has Reset word without a word counter, says the word leaves the list, and resets it", () => {
     cy.visit(`/open?lemma=${encodeURIComponent("آجَرَ")}&pos=verb`);
-    cy.hydrated('[aria-label="Hint"]');
+    cy.hydrated('[aria-label="Hint English"]');
     cy.contains("Word ").should("not.exist");
     cy.get('[title="Reset word"]').click();
     cy.get("dialog[open]").should("contain", "The word leaves your list; search for it to add it again.");

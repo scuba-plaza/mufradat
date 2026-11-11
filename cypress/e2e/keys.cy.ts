@@ -5,7 +5,7 @@ const unplayable = { contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2
 
 function openWord(rank: number) {
   cy.visit(`/open?rank=${rank}`);
-  cy.hydrated(by("Hint"));
+  cy.hydrated(by("Hint English"));
   cy.get("html[data-keys]");
 }
 
@@ -69,11 +69,11 @@ describe("the keys of a card", () => {
     cy.intercept("/api/step*").as("step");
     openWord(96);
     cy.location("pathname").then((card) => {
-      cy.get(by("Hint")).type("a hint{ctrl}{rightarrow}");
+      cy.get(by("Hint English")).type("a hint{ctrl}{rightarrow}");
       cy.wait(300);
       cy.get("@step.all").should("have.length", 0);
       cy.location("pathname").should("eq", card);
-      cy.get(by("Hint")).should("have.value", "a hint");
+      cy.get(by("Hint English")).should("have.value", "a hint");
     });
   });
 
@@ -111,7 +111,7 @@ describe("the keys of a card opened from a list", () => {
   function openFrom(query: string, rank: number) {
     cy.visit(`/?q=${encodeURIComponent(query)}`);
     cy.wordRow(rank).click();
-    cy.hydrated(by("Hint"));
+    cy.hydrated(by("Hint English"));
   }
 
   it("walks the list it was opened from instead of the frequency list", () => {
@@ -119,7 +119,7 @@ describe("the keys of a card opened from a list", () => {
     cy.contains("Word 184 of 5000");
     cy.get("body").type("{ctrl}{rightarrow}");
     cy.contains("Word 183 of 5000");
-    cy.hydrated(by("Hint"));
+    cy.hydrated(by("Hint English"));
     cy.get("body").type("{ctrl}{leftarrow}");
     cy.contains("Word 184 of 5000");
   });

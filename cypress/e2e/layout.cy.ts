@@ -6,7 +6,7 @@ const screens = [[1920, 1100], [1280, 800], [390, 844]];
 
 function openWord(rank: number) {
   cy.visit(`/open?rank=${rank}`);
-  cy.hydrated(by("Hint"));
+  cy.hydrated(by("Hint English"));
 }
 
 const bar = '[role="toolbar"]';
@@ -38,7 +38,7 @@ describe("the layout of a card", () => {
         cy.location("pathname").then((path) => {
           cy.request("PUT", `/api/notes/${path.split("/").pop()}`, { example: "لَدَيْهِ سَيَّارَةٌ [خَاصَّةٌ]", exampleEn: "He has a private car." });
           cy.visit(path);
-          cy.hydrated(by("Hint"));
+          cy.hydrated(by("Hint English"));
         });
         cy.get("main").should(($main) => expect($main[0].getBoundingClientRect().height).to.be.at.most(880));
       });
@@ -53,10 +53,10 @@ describe("the layout of a card", () => {
 
     for (const [width, height] of [[1920, 1100], [390, 844]]) {
       for (const { rank, what } of cards) {
-        it(`shows the headword, the hint, the forms, the English meaning and the example in that order at ${width}px with ${what}`, () => {
+        it(`shows the headword, the Arabic hint, the forms, the English meaning, the English hint and the example in that order at ${width}px with ${what}`, () => {
           cy.viewport(width, height);
           openWord(rank);
-          const order = [by("Arabic headword"), by("Hint"), by("Forms"), by("English meaning"), `div${by("Example")}`];
+          const order = [by("Arabic headword"), by("Hint Arabic"), by("Forms"), by("English meaning"), by("Hint English"), `div${by("Example")}`];
           cy.document().should((doc) => {
             const boxes = order.map((selector) => {
               const element = doc.querySelector(selector);
@@ -84,8 +84,8 @@ describe("the layout of a card", () => {
       above: (doc: Document) => Element | null;
       below: (doc: Document) => Element | null;
     }[] = [
-      { what: "the hint and the empty forms", rank: 7, above: (doc) => doc.querySelector(by("Hint")), below: (doc) => doc.querySelector(by("Forms")) },
-      { what: "the hint and the forms", rank: 6, above: (doc) => doc.querySelector(by("Hint")), below: (doc) => doc.querySelector(by("Forms")) },
+      { what: "the Arabic hint and the empty forms", rank: 7, above: (doc) => doc.querySelector(by("Hint Arabic")), below: (doc) => doc.querySelector(by("Forms")) },
+      { what: "the Arabic hint and the forms", rank: 6, above: (doc) => doc.querySelector(by("Hint Arabic")), below: (doc) => doc.querySelector(by("Forms")) },
       { what: "the English meaning and the example", rank: 7, above: (doc) => doc.querySelector(by("English meaning")), below: (doc) => doc.querySelector(`${example} button`) },
       { what: "an empty example and the English translation", rank: 7, above: (doc) => doc.querySelector(example), below: (doc) => doc.querySelector(by("Example in English")) },
       { what: "the example and its translation", rank: 110, written: true, above: (doc) => doc.querySelector(example), below: (doc) => doc.querySelector(by("Example in English")) },
@@ -100,7 +100,7 @@ describe("the layout of a card", () => {
             cy.location("pathname").then((path) => {
               cy.request("PUT", `/api/notes/${path.split("/").pop()}`, { example: "كَانَ [الْكِتَابُ] جَمِيلًا جِدًّا", exampleEn: "The book was very beautiful." });
               cy.visit(path);
-              cy.hydrated(by("Hint"));
+              cy.hydrated(by("Hint English"));
             });
           }
           cy.document().should((doc) => {

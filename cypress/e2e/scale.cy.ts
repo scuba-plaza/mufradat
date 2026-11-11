@@ -21,7 +21,7 @@ function openFullCard(rank: number) {
       });
     });
     cy.visit(path);
-    cy.hydrated('[aria-label="Hint"]');
+    cy.hydrated('[aria-label="Hint English"]');
   });
 }
 
