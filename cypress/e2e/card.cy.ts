@@ -85,9 +85,11 @@ describe("a word", () => {
     cy.get(`${by("Example")} mark`).should("have.text", "فِي");
   });
 
-  it("lets Tab move on from the example to its English translation", () => {
+  it("lets Tab move on from the meaning through the hints and the example to its English translation", () => {
     openWord(24);
     cy.get(by("English meaning")).focus();
+    cy.press(Cypress.Keyboard.Keys.TAB);
+    cy.focused().should("have.attr", "aria-label", "Hint English");
     cy.press(Cypress.Keyboard.Keys.TAB);
     cy.focused().should("match", `textarea${by("Example")}`);
     cy.press(Cypress.Keyboard.Keys.TAB);
