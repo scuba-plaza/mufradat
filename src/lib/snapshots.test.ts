@@ -76,19 +76,16 @@ describe("restoring a snapshot", () => {
   });
 });
 
-describe("undoing a restore", () => {
-  it("saves the current state first, and restoring that undoes the restore", () => {
+describe("a restore", () => {
+  it("brings the workspace back and takes no snapshot of the state it replaces", () => {
     const { root, store } = workspace();
-    const first = store.createNote(kitab);
+    store.createNote(kitab);
     const snapshot = createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
     const second = store.createNote({ ...kitab, lemma: "قَلَم", english: "pen", forms: [] });
     restoreSnapshot(store, snapshot.id, at("2026-11-06T11:00:00Z"));
     const afterRestore = openStore(root);
     expect(afterRestore.getNote(second.id)).toBeNull();
-    const saved = listSnapshots(root).find((s) => s.reason === "before-restore")!;
-    restoreSnapshot(afterRestore, saved.id, at("2026-11-06T12:00:00Z"));
-    const undone = openStore(root);
-    expect([first.id, second.id].map((id) => undone.getNote(id)?.lemma)).toEqual(["كِتَاب", "قَلَم"]);
+    expect(listSnapshots(root).map((s) => s.reason)).toEqual(["manual"]);
   });
 });
 
@@ -200,19 +197,6 @@ describe("snapshots made within the same second", () => {
     expect(listSnapshots(root).map((s) => s.id)).toEqual([second.id, first.id]);
     restoreSnapshot(store, first.id, at("2026-11-06T15:00:00Z"));
     expect(openStore(root).allNotes()).toHaveLength(1);
-  });
-
-  it("lets a restore be undone within the same second", () => {
-    const { root, store } = workspace();
-    const first = store.createNote(kitab);
-    const snapshot = createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
-    const second = store.createNote({ ...kitab, lemma: "قَلَم", english: "pen", forms: [] });
-    restoreSnapshot(store, snapshot.id, at("2026-11-06T11:00:00Z"));
-    const afterRestore = openStore(root);
-    const saved = listSnapshots(root).find((s) => s.reason === "before-restore")!;
-    restoreSnapshot(afterRestore, saved.id, at("2026-11-06T11:00:00Z"));
-    const undone = openStore(root);
-    expect([first.id, second.id].map((id) => undone.getNote(id)?.lemma)).toEqual(["كِتَاب", "قَلَم"]);
   });
 
   it("leaves nothing behind when a snapshot cannot be taken", () => {

@@ -19,7 +19,7 @@ export type SortKey = keyof typeof SORT_KEYS;
 export const listed = (words: readonly string[]) =>
   words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} or ${words[words.length - 1]}`;
 
-const STATUSES = ["todo", "progress", "ready", "approved"] as const;
+const STATUSES = ["todo", "progress", "ready", "approved", "suspended"] as const;
 const GENDERS = ["m", "f", "m+f"] as const;
 const VERB_FORMS = [
   "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "Iq", "IIq", "IIIq", "IVq",

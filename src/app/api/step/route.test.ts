@@ -44,6 +44,20 @@ describe("stepping from a card to the next word of its list", () => {
     expect(await step(id, "next")).toEqual({ status: 200, body: { href: null } });
   });
 
+  it("steps over a suspended card, and walks the cards of a status:suspended queue", async () => {
+    const { store } = context();
+    const tenth = openCard(store, { rank: 10 })!;
+    const eleventh = openCard(store, { rank: 11 })!;
+    const thirteenth = openCard(store, { rank: 13 })!;
+    store.suspend(eleventh);
+    store.suspend(thirteenth);
+    expect((await step(tenth, "next")).body).toEqual({ href: "/open?rank=12" });
+    expect((await step(tenth, "previous")).body).toEqual({ href: "/open?rank=9" });
+    expect((await step(eleventh, "next", "status:suspended")).body).toEqual({ href: `/cards/${thirteenth}?q=status%3Asuspended` });
+    expect((await step(thirteenth, "previous", "status:suspended")).body).toEqual({ href: `/cards/${eleventh}?q=status%3Asuspended` });
+    expect((await step(tenth, "next", "rank:<14")).body).toEqual({ href: "/open?rank=12&q=rank%3A%3C14" });
+  });
+
   it("refuses a direction that is neither previous nor next", async () => {
     const id = openCard(context().store, { rank: 10 })!;
     expect((await step(id, "sideways")).status).toBe(400);

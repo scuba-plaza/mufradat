@@ -106,6 +106,19 @@ describe("exporting through the API", () => {
     });
   });
 
+  it("never exports a card that was suspended after it was approved", async () => {
+    const { store } = context();
+    const kept = card(store, 1, [], true);
+    const suspended = card(store, 2, [], true);
+    store.suspend(suspended);
+    const res = await GET(request());
+    expect(res.status).toBe(200);
+    expect(deckGuids(Buffer.from(await res.arrayBuffer()))).toEqual([kept]);
+    const refused = await GET(request("status:suspended"));
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toEqual({ error: "No approved card matches this search." });
+  });
+
   it("refuses a search no approved card matches, also when a draft matches", async () => {
     const { store } = context();
     card(store, 1, ["lesson_1"], true);

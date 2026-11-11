@@ -11,7 +11,7 @@ export const GET = (req: Request) =>
     const { cfg, store } = context();
     const q = new URL(req.url).searchParams.get("q") ?? "";
     const everyCard = store.allNotes();
-    let notes = everyCard.filter((n) => n.status === "approved");
+    let notes = everyCard.filter((n) => n.status === "approved" && !n.suspended);
     if (q.trim() !== "") {
       const found = view(store, q);
       if (found.error) return fail(found.error);

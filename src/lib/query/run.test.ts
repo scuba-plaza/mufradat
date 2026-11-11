@@ -123,6 +123,19 @@ describe("filtering by field", () => {
     expect(find("example:mine")).toEqual(["to write"]);
     expect(find("-example:mistral -example:mine status:progress")).toEqual(["indeed"]);
   });
+
+  it("matches a suspended row only for status:suspended", () => {
+    const parked = row({ rank: 7, lemma: "\u0645\u064e\u0648\u0642\u0648\u0641", english: "parked", status: "suspended", edited: at(2), id: "s" });
+    const among = [...rows, parked];
+    const ask = (text: string) => {
+      const parsed = parseQuery(text);
+      if ("error" in parsed) throw new Error(parsed.error);
+      return runQuery(among, parsed.query, now).map((r) => r.english);
+    };
+    expect(ask("status:suspended")).toEqual(["parked"]);
+    expect(ask("status:progress,ready,approved")).toEqual(["book", "to write", "school", "indeed"]);
+    expect(ask("-status:suspended")).toEqual(["book", "to write", "school", "that", "indeed", "library, bookshop"]);
+  });
 });
 
 describe("filtering by when a card was last edited", () => {
