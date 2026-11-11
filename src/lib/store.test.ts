@@ -20,6 +20,7 @@ describe("creating a bare card", () => {
     expect(n.status).toBe("draft");
     expect(n.lemmaSource).toBe("wiktionary");
     expect(n.hint).toBe("");
+    expect(n.hintAr).toBe("");
     expect(n.forms.map((f) => [f.label, f.arabic])).toEqual([["pl.", "كُتُب"]]);
     expect(s.getNote(n.id)).toEqual(n);
   });
@@ -82,7 +83,8 @@ describe("editing a card", () => {
   it("keeps a card that is not approved a draft, whatever it still lacks", () => {
     const s = openStore(":memory:");
     const n = s.createNote({ ...kitab, forms: [] });
-    expect(s.updateNote(n.id, { hint: "paper" }).status).toBe("draft");
+    expect(s.updateNote(n.id, { hint: "paper", hintAr: "ليس كَتَب" }).status).toBe("draft");
+    expect(s.getNote(n.id)!.hintAr).toBe("ليس كَتَب");
     s.updateNote(n.id, { example: "هٰذَا [كِتَابٌ]", exampleEn: "this is a book" });
     s.setAudio(n.id, "word", mp3, "tts");
     expect(s.setAudio(n.id, "example", mp3, "user").status).toBe("draft");
@@ -333,12 +335,12 @@ describe("deleting a card", () => {
   it("lets the same word be started again from nothing", () => {
     const s = openStore(":memory:");
     const first = s.createNote(kitab);
-    s.updateNote(first.id, { hint: "paper", example: "هٰذَا [كِتَابٌ]", exampleEn: "this is a book" });
+    s.updateNote(first.id, { hint: "paper", hintAr: "ليس كَتَب", example: "هٰذَا [كِتَابٌ]", exampleEn: "this is a book" });
     s.setAudio(first.id, "word", mp3, "tts");
     s.deleteNote(first.id);
     const again = s.createNote(kitab);
     expect(again.id).not.toBe(first.id);
-    expect(again).toMatchObject({ hint: "", example: "", exampleEn: "", status: "draft", audio: {} });
+    expect(again).toMatchObject({ hint: "", hintAr: "", example: "", exampleEn: "", status: "draft", audio: {} });
   });
 
   it("does nothing for a card that is already gone", () => {
@@ -487,6 +489,22 @@ describe("the workspace version", () => {
       setVersion(dir, 0);
       const again = openStore(dir);
       expect(again.getNote(card.id)?.lemma).toBe("كِتَاب");
+      again.close();
+    });
+  });
+
+  it("opens a database made before the Arabic hint and gives its cards an empty one", () => {
+    inDir((dir) => {
+      const first = openStore(dir);
+      const card = first.createNote(kitab);
+      first.close();
+      const raw = new Database(path.join(dir, "vocabulary.db"));
+      raw.exec("ALTER TABLE notes DROP COLUMN hint_ar");
+      raw.pragma("user_version = 2");
+      raw.close();
+      const again = openStore(dir);
+      expect(again.getNote(card.id)!.hintAr).toBe("");
+      expect(again.updateNote(card.id, { hintAr: "ليس كَتَب" }).hintAr).toBe("ليس كَتَب");
       again.close();
     });
   });

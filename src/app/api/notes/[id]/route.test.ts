@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { context } from "@/lib/server";
 import { listSnapshots, restoreSnapshot } from "@/lib/snapshots";
 import { openCard, wordRows } from "@/lib/words";
-import { DELETE } from "./route";
+import { DELETE, PUT } from "./route";
 
 const remove = (id: string) => DELETE(new Request(`http://127.0.0.1/api/notes/${id}`, { method: "DELETE" }), { params: Promise.resolve({ id }) });
 
@@ -47,6 +47,16 @@ describe("deleting a card through the API", () => {
     expect(store.getNote(id)).toBeNull();
     restoreSnapshot(store, saved[0].id);
     expect(context().store.getNote(id)).not.toBeNull();
+  });
+
+  it("saves the Arabic hint of the card", async () => {
+    const { store } = context();
+    const id = openCard(store, { rank: 10 })!;
+    const edit = (body: Record<string, unknown>) =>
+      PUT(new Request(`http://127.0.0.1/api/notes/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }), { params: Promise.resolve({ id }) });
+    const res = await edit({ hintAr: "ليس كَتَب" });
+    expect(res.status).toBe(200);
+    expect(store.getNote(id)!.hintAr).toBe("ليس كَتَب");
   });
 
   it("takes no snapshot for a card that is already gone", async () => {
