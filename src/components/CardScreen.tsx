@@ -12,6 +12,7 @@ import InlineText from "./InlineText";
 import { keyPressed } from "./keys";
 import ResetDialog from "./ResetDialog";
 import TagsAndDetailsDialog from "./TagsAndDetailsDialog";
+import { HintArabic, HintEnglish, HintsSideBySide, useProposal } from "./HintsPrototype"; // PROTOTYPE (Task 1)
 
 const SAVE_TEXT = { idle: "", saving: "Saving…", saved: "Saved", failed: "Not saved" };
 
@@ -29,6 +30,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
   const [wordMessage, setWordMessage] = useState("");
   const [leaving, setLeaving] = useState(false);
   const queue = useRef<Promise<void>>(Promise.resolve());
+  const { proposal, hintAr } = useProposal(); // PROTOTYPE (Task 1)
   const tags = useRef(initial.tags);
   const tagsOpenRef = useRef(false);
   tagsOpenRef.current = tagsOpen;
@@ -185,9 +187,13 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
       <div className="mt-4 text-center">
         <Clip note={note} slot="word" name="the word" text={note.lemma} onNote={setNote} onMessage={setWordMessage}>
           <InlineText label="Arabic headword" value={note.lemma} arabic className="text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
-          <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-2 text-center text-quiet" onSave={(hint) => save({ hint })} />
+          {proposal === "b"
+            ? <div className="mt-1"><HintArabic value={hintAr} /></div> // PROTOTYPE (Task 1)
+            : proposal === "none"
+              ? <InlineText label="Hint" placeholder="Add a hint" value={note.hint} className="mt-2 text-center text-quiet" onSave={(hint) => save({ hint })} />
+              : <HintsSideBySide hintEn={note.hint} saveHintEn={(hint) => save({ hint })} hintAr={hintAr} tagged={proposal === "a"} />}
         </Clip>
-        <section aria-label="Forms" className={`panel mx-auto mt-4 flex items-center border px-2 py-2 ${formsTone}`}>
+        <section aria-label="Forms" className={`panel mx-auto ${proposal === "b" ? "mt-2" : "mt-4"} flex items-center border px-2 py-2 ${formsTone}`}>
           <div className="flex flex-1 flex-wrap items-center justify-center gap-x-6 gap-y-2 pl-[var(--control-h-sm)]">
             {note.forms.length === 0 && <span className="text-sm text-quiet">No forms</span>}
             {note.forms.map((f) => (
@@ -205,10 +211,11 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
           </button>
           {formsState && <span className="sr-only">{formsState}</span>}
         </section>
-        <InlineText label="English meaning" placeholder="Add the English meaning" value={note.english} className="mt-3 text-center text-2xl font-medium tracking-title" onSave={(english) => save({ english })} />
+        <InlineText label="English meaning" placeholder="Add the English meaning" value={note.english} className={`${proposal === "b" ? "mt-1" : "mt-3"} text-center text-2xl font-medium tracking-title`} onSave={(english) => save({ english })} />
+        {proposal === "b" && <div className="mt-1"><HintEnglish value={note.hint} onSave={(hint) => save({ hint })} /></div>}
       </div>
 
-      <div className="mt-6 text-center">
+      <div className={`${proposal === "b" ? "mt-4" : "mt-6"} text-center`}>
         <Clip
           note={note}
           slot="example"
