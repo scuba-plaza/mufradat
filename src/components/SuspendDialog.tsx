@@ -26,7 +26,7 @@ export default function SuspendDialog(props: { open: boolean; onClose: () => voi
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <button className="action" onClick={props.onClose}>Cancel</button>
-          <button className="action" onClick={props.onSuspend}>Suspend</button>
+          <button className="action-danger" onClick={props.onSuspend}>Suspend</button>
         </div>
       </div>
     </dialog>
