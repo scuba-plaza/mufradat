@@ -349,8 +349,6 @@ export function importBackup(root: string, file: string, options: SnapshotOption
 
 export function restoreSnapshot(store: Store, id: string, options: SnapshotOptions = {}): void {
   const manifest = verifiedManifest(store.root, id);
-  const now = options.now ?? new Date();
-  writeSnapshot(store, "before-restore", now, freeId(store.root, now, "before-restore"));
   for (const key of manifest.audioKeys) {
     copyClip(snapshotAudioPath(store.root, key), audioPath(store.root, key), key);
   }

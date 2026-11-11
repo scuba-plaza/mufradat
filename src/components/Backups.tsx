@@ -146,7 +146,7 @@ export default function Backups({ open, onClose }: { open: boolean; onClose: () 
               <div className="mt-4">
                 <p role="status">
                   {confirming.action === "restore"
-                    ? `Restore the backup from ${when(confirming.snapshot)}? It has ${confirming.snapshot.cards} ${plural(confirming.snapshot.cards, "card")} (${confirming.snapshot.approved} approved); the workspace has ${data.check.cards} (${data.check.approved} approved) now. Your current state is saved first.`
+                    ? `Restore the backup from ${when(confirming.snapshot)}? It has ${confirming.snapshot.cards} ${plural(confirming.snapshot.cards, "card")} (${confirming.snapshot.approved} approved); the workspace has ${data.check.cards} (${data.check.approved} approved) now. This cannot be undone.`
                     : `Delete the backup from ${when(confirming.snapshot)}? It cannot be brought back.`}
                 </p>
                 <div className="mt-4 flex justify-end gap-3">
