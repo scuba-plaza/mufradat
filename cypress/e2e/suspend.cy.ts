@@ -75,12 +75,12 @@ describe("suspending a word", () => {
   });
 
   it("keeps the keyboard arrows off the suspended card", () => {
-    openWord(33);
+    openWord(133);
     cy.get(suspendButton).click();
     cy.get(unsuspendButton).should("be.visible");
-    cy.visit(`/open?rank=34`);
+    cy.visit(`/open?rank=134`);
     cy.hydrated('[aria-label="Arabic headword"]');
     cy.get("body").type("{ctrl}{leftarrow}");
-    cy.contains("Word 32 of 5000");
+    cy.contains("Word 132 of 5000");
   });
 });
