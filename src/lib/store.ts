@@ -7,7 +7,7 @@ import { audioFiles, audioKey, audioPath, mp3Problem, slotLabel, type AudioFile 
 import { approvalProblems, plainExample } from "./validate";
 import type { AudioSource, Clip, Form, Note, NoteEdit, NewNote, POS, Slot, WorkspaceCheck } from "./types";
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS notes (
@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS notes (
   example_error TEXT,
   rank INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL,
+  suspended INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   lemma_source TEXT NOT NULL DEFAULT 'wiktionary',
@@ -60,7 +61,7 @@ CREATE TABLE IF NOT EXISTS note_tags (
 interface NoteRow {
   id: string; lemma: string; english: string; pos: POS; gender: string; root: string;
   verb_form: string; hint: string; example: string; example_en: string; example_error: string | null;
-  rank: number; status: Note["status"]; created_at: string; updated_at: string;
+  rank: number; status: Note["status"]; suspended: number; created_at: string; updated_at: string;
   lemma_source: Note["lemmaSource"]; example_source: Note["exampleSource"];
 }
 
@@ -80,7 +81,11 @@ export function openStore(dir: string) {
   }
   db.pragma("foreign_keys = ON");
   db.exec(SCHEMA);
-  if (found < SCHEMA_VERSION) db.pragma(`user_version = ${SCHEMA_VERSION}`);
+  if (found < SCHEMA_VERSION) {
+    const columns = db.prepare("PRAGMA table_info(notes)").all() as { name: string }[];
+    if (!columns.some((c) => c.name === "suspended")) db.exec("ALTER TABLE notes ADD COLUMN suspended INTEGER NOT NULL DEFAULT 0");
+    db.pragma(`user_version = ${SCHEMA_VERSION}`);
+  }
 
   const now = () => new Date().toISOString();
 
@@ -96,7 +101,7 @@ export function openStore(dir: string) {
       id: row.id, lemma: row.lemma, english: row.english, pos: row.pos, gender: row.gender,
       root: row.root, verbForm: row.verb_form, hint: row.hint, example: row.example,
       exampleEn: row.example_en, exampleError: row.example_error, rank: row.rank,
-      status: row.status, lemmaSource: row.lemma_source, exampleSource: row.example_source,
+      status: row.status, suspended: row.suspended === 1, lemmaSource: row.lemma_source, exampleSource: row.example_source,
       createdAt: row.created_at, updatedAt: row.updated_at, forms, audio, tags,
     };
   }
@@ -277,10 +282,25 @@ export function openStore(dir: string) {
   }
 
   function approve(id: string): { ok: true; note: Note } | { ok: false; errors: string[] } {
-    const errors = approvalProblems(need(id));
+    const before = need(id);
+    if (before.suspended) return { ok: false, errors: ["Unsuspend the card before approving it."] };
+    const errors = approvalProblems(before);
     if (errors.length > 0) return { ok: false, errors };
     db.prepare("UPDATE notes SET status = 'approved', updated_at = ? WHERE id = ?").run(now(), id);
     return { ok: true, note: getNote(id)! };
+  }
+
+  /** Parks a card: it takes the approval back and is found only by status:suspended. */
+  function suspend(id: string): Note {
+    need(id);
+    db.prepare("UPDATE notes SET suspended = 1, status = 'draft', updated_at = ? WHERE id = ?").run(now(), id);
+    return getNote(id)!;
+  }
+
+  function unsuspend(id: string): Note {
+    need(id);
+    db.prepare("UPDATE notes SET suspended = 0, updated_at = ? WHERE id = ?").run(now(), id);
+    return getNote(id)!;
   }
 
   function deleteNote(id: string): void {
@@ -339,7 +359,7 @@ export function openStore(dir: string) {
 
   return {
     root, findNote, allNotes, counts, check, exportDatabase, audioKeys, isOpen: () => db.open, close: () => db.close(), getNote, deleteNote, unusedAudio, deleteUnusedAudio, createNote, updateNote, setTags, setAudio, removeAudio, setAudioError, setExampleError,
-    applyGeneratedExample, approve,
+    applyGeneratedExample, approve, suspend, unsuspend,
   };
 }
 

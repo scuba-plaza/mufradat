@@ -6,7 +6,7 @@ const clip = (over: Partial<Clip> = {}): Clip => ({ key: "abc", source: "tts", t
 
 const bare: Note = {
   id: "1", lemma: "كِتَاب", english: "book", pos: "noun", gender: "", root: "", verbForm: "", hint: "",
-  example: "", exampleEn: "", exampleError: null, rank: 120, status: "draft", lemmaSource: "wiktionary",
+  example: "", exampleEn: "", exampleError: null, rank: 120, status: "draft", suspended: false, lemmaSource: "wiktionary",
   exampleSource: "", createdAt: "", updatedAt: "", forms: [], audio: {}, tags: [],
 };
 
