@@ -12,9 +12,10 @@ navigation never lands on it unless the search that produced the queue asked for
   suspended words is searching `status:suspended`.
 - **Approval**: suspending a card **takes its approval back** (like removing audio
   does). Unsuspending does not re-approve; the card returns to `progress`/`ready`.
-- **Scope**: any word can be suspended, including one that is Not started — opening
-  it creates its bare card as usual, and the Suspend action on that card suspends
-  the word.
+- **Scope**: only words that have a card can be suspended **for now**. A future
+  "list actions" feature will add suspension of not-started words straight from the
+  list, so the suspend logic must be designed to migrate easily (see
+  "List-actions-ready shape" below).
 - **Export**: suspended cards are never in an exported package, even if a search
   with `status:suspended` is the last search made (the export button exports
   *approved* cards; a suspended card is never approved, and the export route also
@@ -28,14 +29,23 @@ navigation never lands on it unless the search that produced the queue asked for
   search skip suspended cards automatically; a queue from a `status:suspended`
   search walks them. The Continue flow (`/next`) never targets a suspended word.
 
-### Open questions (confirm before or during Task 1)
+### List-actions-ready shape
 
-1. **Reset word on a suspended card**: this plan assumes Reset deletes the card and
-   the word returns to Not started **unsuspended** (suspension is a property of the
-   card). The alternative — suspension sticking to the word across a reset — needs
-   a separate word-keyed table and more migration risk.
-2. **Confirm** that suspending from the card page of a not-started word (bare card
-   created on open) is the intended way to suspend such a word.
+A "list actions" feature is planned, which will add a Suspend action to the rows
+of the word list — including not-started words. To make that migration easy:
+
+- The suspend/unsuspend logic lives in **one server-side place** — the store
+  method plus one API route that takes a card id — and never inside the card
+  editor's component tree. The editor UI only calls that route.
+- The API route takes the card id as its only parameter, so a future list action
+  for a not-started word can first open the card (the existing `openCard` flow
+  creates the bare card) and then call the same route. No second endpoint later.
+- No card-editor-only state is derived from the suspend action (no local flags,
+  no editor-specific bookkeeping): the UI reads `note.suspended` from the note it
+  already has, so a list row can render the same state the same way later.
+- **Reset word unsuspends**: Reset deletes the card and the word returns to Not
+  started unsuspended — suspension is a property of the card and disappears with
+  it. (Confirmed; needs no extra code, since the flag lives on the card.)
 
 ## Required skills
 
