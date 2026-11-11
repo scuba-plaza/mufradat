@@ -4,6 +4,8 @@ export interface Query {
   texts: { term: string; phrase: boolean }[];
   tests: Test[];
   sort: { key: SortKey; descending: boolean } | null;
+  /** True when the query asks for suspended words with a positive status:suspended term. */
+  suspended: boolean;
 }
 
 export type Parsed = { query: Query } | { error: string };
@@ -43,7 +45,7 @@ function tokenize(text: string): { tokens: Token[]; unclosed: boolean } {
 const SORT_NAMES = Object.keys(SORT_KEYS);
 
 export function parseQuery(text: string): Parsed {
-  const query: Query = { texts: [], tests: [], sort: null };
+  const query: Query = { texts: [], tests: [], sort: null, suspended: false };
   const { tokens, unclosed } = tokenize(text);
   if (unclosed) return { error: "A quote is not closed." };
   if (tokens.length > MAX_TERMS) return { error: `At most ${MAX_TERMS} terms.` };
@@ -82,6 +84,7 @@ export function parseQuery(text: string): Parsed {
     }
     const anyOf: Test = (row, now) => tests.some((t) => t(row, now));
     query.tests.push(minus ? (row, now) => !anyOf(row, now) : anyOf);
+    if (key === "status" && !minus && parts.some((p) => p.trim().toLowerCase() === "suspended")) query.suspended = true;
   }
   return { query };
 }

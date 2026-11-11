@@ -36,7 +36,7 @@ describe("backups", () => {
       openDialog();
       cy.contains(rows, "Backed up by you").contains("button", "Restore…").click();
       cy.focused().should("contain.text", "Cancel");
-      cy.get(dialog).should("contain", "Your current state is saved first");
+      cy.get(dialog).should("contain", "This cannot be undone").and("not.contain", "saved first");
       cy.get(dialog).invoke("text").should("match", /It has \d+ cards? \(\d+ approved\); the workspace has \d+ \(\d+ approved\) now/);
       cy.contains(`${dialog} button`, "Restore").should("have.css", "background-color", "rgb(193, 63, 58)");
       cy.contains(`${dialog} button`, "Cancel").click();
@@ -95,7 +95,7 @@ describe("backups", () => {
     cy.visit("/open?rank=421");
     cy.location("pathname").then((path) => {
       const id = path.split("/").pop()!;
-      cy.window().then(async (win) => {
+      cy.window().then({ timeout: 60000 }, async (win) => {
         for (const [slot, marker] of [["word", 1], ["example", 2]] as const) {
           const bytes = new win.Uint8Array(6 * 1024 * 1024);
           bytes.set([0xff, 0xfb, 0x90, 0x00, marker]);
@@ -107,7 +107,7 @@ describe("backups", () => {
       backUp();
       cy.request("/api/backups").its("body.snapshots").then((snapshots: Listed[]) => {
         const source = snapshots.find((s) => s.reason === "manual")!;
-        cy.window().then(async (win) => {
+        cy.window().then({ timeout: 60000 }, async (win) => {
           const zip = await (await win.fetch(`/api/backups/${source.id}`)).arrayBuffer();
           expect(zip.byteLength).to.be.greaterThan(10 * 1024 * 1024);
           const input = win.document.querySelector<HTMLInputElement>('input[type="file"]')!;

@@ -10,6 +10,7 @@ declare global {
       pressEscape(): Chainable<void>;
       pressEnter(): Chainable<void>;
       clickBackdrop(): Chainable<void>;
+      /** Sets the colour scheme and waits out the colour transitions, so a check that follows sees the settled colours. */
       colorScheme(scheme: "light" | "dark"): Chainable<void>;
       axe(context?: string): Chainable<void>;
       menuItem(name: string): Chainable<void>;
@@ -42,6 +43,7 @@ Cypress.Commands.add("colorScheme", (scheme: "light" | "dark") => {
     command: "Emulation.setEmulatedMedia",
     params: { features: [{ name: "prefers-color-scheme", value: scheme }] },
   }));
+  cy.wait(200);
 });
 
 Cypress.Commands.add("clickBackdrop", () => {

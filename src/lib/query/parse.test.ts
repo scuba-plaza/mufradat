@@ -40,7 +40,7 @@ describe("what the bar says about a term it cannot use", () => {
   });
 
   it("names the field and what it allows for a value it does not know", () => {
-    expect(failure("status:done")).toBe('status: expects todo, progress, ready or approved, not "done".');
+    expect(failure("status:done")).toBe('status: expects todo, progress, ready, approved or suspended, not "done".');
     expect(failure("pos:animal")).toBe(
       'pos: expects noun, verb, adj, adv, prep, conj, particle, pron, num, intj, phrase or det, not "animal".',
     );
@@ -81,7 +81,7 @@ describe("what the bar says about a term it cannot use", () => {
   it("reads field names and sort keys in any case, and values with a space in quotes", () => {
     expect(failure("POS:noun")).toBeNull();
     expect(failure("Sort:-RANK")).toBeNull();
-    expect(failure('status:"in progress"')).toBe('status: expects todo, progress, ready or approved, not "in progress".');
+    expect(failure('status:"in progress"')).toBe('status: expects todo, progress, ready, approved or suspended, not "in progress".');
     expect(failure('root:"ك ت ب"')).toBeNull();
   });
 
@@ -105,7 +105,26 @@ describe("what the bar says about a term it cannot use", () => {
   });
 
   it("reports the first term it cannot use", () => {
-    expect(failure("status:done pos:animal")).toBe('status: expects todo, progress, ready or approved, not "done".');
+    expect(failure("status:done pos:animal")).toBe('status: expects todo, progress, ready, approved or suspended, not "done".');
+  });
+});
+
+describe("a query that asks for suspended words", () => {
+  const flag = (text: string) => {
+    const parsed = parseQuery(text);
+    return "query" in parsed ? parsed.query.suspended : null;
+  };
+
+  it("is marked when the query has a positive status:suspended term", () => {
+    expect(flag("status:suspended")).toBe(true);
+    expect(flag("status:suspended,progress")).toBe(true);
+    expect(flag("tag:x status:suspended")).toBe(true);
+  });
+
+  it("is not marked by a minus or by the other statuses", () => {
+    expect(flag("")).toBe(false);
+    expect(flag("status:progress,ready")).toBe(false);
+    expect(flag("-status:suspended")).toBe(false);
   });
 });
 

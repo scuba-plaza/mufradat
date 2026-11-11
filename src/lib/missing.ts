@@ -2,6 +2,7 @@ import type { MissingKind, Note, WordStatus } from "./types";
 import { splitExample } from "./validate";
 
 export function wordStatus(n: Note): Exclude<WordStatus, "todo"> {
+  if (n.suspended) return "suspended";
   if (n.status === "approved") return "approved";
   return gaps(n).length === 0 ? "ready" : "progress";
 }

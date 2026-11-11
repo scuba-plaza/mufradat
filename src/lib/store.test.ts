@@ -458,6 +458,76 @@ describe("audio files that no clip uses", () => {
   });
 });
 
+describe("suspending a card", () => {
+  const withExample = (s: ReturnType<typeof openStore>) => {
+    const n = s.createNote(kitab);
+    return s.updateNote(n.id, { example: "\u0647\u0670\u0630\u064e\u0627 [\u0643\u0650\u062a\u064e\u0627\u0628\u064c] \u062c\u064e\u0645\u0650\u064a\u0644\u064c", exampleEn: "this is a nice book" });
+  };
+
+  it("marks the card suspended and takes its approval back", () => {
+    const s = openStore(":memory:");
+    const n = withExample(s);
+    s.approve(n.id);
+    const suspended = s.suspend(n.id);
+    expect(suspended.suspended).toBe(true);
+    expect(suspended.status).toBe("draft");
+    expect(s.getNote(n.id)).toMatchObject({ suspended: true, status: "draft" });
+  });
+
+  it("unsuspends the card and leaves it a draft that still lacks nothing", () => {
+    const s = openStore(":memory:");
+    const n = withExample(s);
+    s.suspend(n.id);
+    const back = s.unsuspend(n.id);
+    expect(back.suspended).toBe(false);
+    expect(back.status).toBe("draft");
+    expect(s.getNote(n.id)!.suspended).toBe(false);
+  });
+
+  it("says there is no such card", () => {
+    const s = openStore(":memory:");
+    expect(() => s.suspend("no-such-card")).toThrow(/no such card/i);
+    expect(() => s.unsuspend("no-such-card")).toThrow(/no such card/i);
+  });
+
+  it("refuses to approve a suspended card", () => {
+    const s = openStore(":memory:");
+    const n = withExample(s);
+    s.suspend(n.id);
+    const r = s.approve(n.id);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.join(" ")).toMatch(/suspend/i);
+    expect(s.getNote(n.id)!.status).toBe("draft");
+  });
+
+  it("keeps a card suspended while it is edited", () => {
+    const s = openStore(":memory:");
+    const n = s.createNote(kitab);
+    s.suspend(n.id);
+    expect(s.updateNote(n.id, { english: "a book" }).suspended).toBe(true);
+    expect(s.setTags(n.id, ["a"]).suspended).toBe(true);
+  });
+
+  it("gives a database made before suspension cards that are not suspended", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-suspend-"));
+    try {
+      const first = openStore(dir);
+      const card = first.createNote(kitab);
+      first.close();
+      const raw = new Database(path.join(dir, "vocabulary.db"));
+      raw.exec("ALTER TABLE notes DROP COLUMN suspended");
+      raw.pragma("user_version = 2");
+      raw.close();
+      const again = openStore(dir);
+      expect(again.getNote(card.id)!.suspended).toBe(false);
+      expect(again.suspend(card.id).suspended).toBe(true);
+      again.close();
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("the workspace version", () => {
   function inDir(run: (dir: string) => void) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-version-"));

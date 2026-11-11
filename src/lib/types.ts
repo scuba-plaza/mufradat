@@ -10,7 +10,7 @@ export const POS_LABELS: Record<POS, string> = {
 };
 
 export type CardStatus = "draft" | "approved";
-export type WordStatus = "todo" | "progress" | "ready" | "approved";
+export type WordStatus = "todo" | "progress" | "ready" | "approved" | "suspended";
 export type AudioSource = "tts" | "user";
 
 /** "word", "example", or a form id. */
@@ -46,6 +46,8 @@ export interface Note {
   exampleError: string | null;
   rank: number;
   status: CardStatus;
+  /** A suspended card is parked: never exported and found only by status:suspended. */
+  suspended: boolean;
   lemmaSource: "wiktionary" | "user";
   exampleSource: "mistral" | "user" | "";
   createdAt: string;

@@ -318,6 +318,56 @@ describe("the words a query asks for", () => {
   });
 });
 
+describe("a suspended word", () => {
+  const now = new Date("2026-11-06T12:00:00Z");
+
+  it("is in no list and no text search, only status:suspended finds it", () => {
+    const s = openStore(":memory:");
+    const id = openCard(s, { rank: 1 })!;
+    expect(view(s, "\u0641\u0650\u064a", now).rows[0]).toMatchObject({ rank: 1 });
+    s.suspend(id);
+    expect(wordRows(s).some((r) => r.rank === 1)).toBe(false);
+    expect(view(s, "", now).rows.some((r) => r.rank === 1)).toBe(false);
+    expect(view(s, "\u0641\u0650\u064a", now).rows.some((r) => r.rank === 1)).toBe(false);
+    expect(view(s, "status:progress,ready,approved", now).rows).toEqual([]);
+    expect(view(s, "status:suspended", now).rows.map((r) => r.id)).toEqual([id]);
+  });
+
+  it("is found as suspended, and status:suspended combines with other terms", () => {
+    const s = openStore(":memory:");
+    const id = openCard(s, { rank: 1 })!;
+    s.suspend(id);
+    const found = view(s, "status:suspended", now).rows;
+    expect(found[0]).toMatchObject({ id, status: "suspended" });
+    expect(view(s, "status:suspended pos:verb", now).rows).toEqual([]);
+    expect(view(s, "status:suspended pos:prep", now).rows.map((r) => r.id)).toEqual([id]);
+  });
+
+  it("hides a suspended card you added yourself, and its Wiktionary entry does not return", () => {
+    const s = openStore(":memory:");
+    const id = openCard(s, { lemma: "\u0639\u064e\u0644\u064e\u0649", pos: "verb" })!;
+    s.suspend(id);
+    expect(view(s, "\u0639\u0644\u0649", now).rows.some((r) => r.pos === "verb" && r.lemma === "\u0639\u064e\u0644\u064e\u0649")).toBe(false);
+    expect(view(s, "status:suspended", now).rows.map((r) => r.id)).toEqual([id]);
+  });
+
+  it("is not what Continue opens", () => {
+    const s = openStore(":memory:");
+    s.suspend(openCard(s, { rank: 1 })!);
+    const next = openCard(s, { rank: 2 })!;
+    expect(continueTarget(s)).toMatchObject({ id: next });
+  });
+
+  it("is back everywhere once it is unsuspended", () => {
+    const s = openStore(":memory:");
+    const id = openCard(s, { rank: 1 })!;
+    s.suspend(id);
+    s.unsuspend(id);
+    expect(view(s, "", now).rows[0]).toMatchObject({ id, status: "progress" });
+    expect(view(s, "status:suspended", now).rows).toEqual([]);
+  });
+});
+
 describe("finding words by tag", () => {
   const tagged = () => {
     const s = openStore(":memory:");
