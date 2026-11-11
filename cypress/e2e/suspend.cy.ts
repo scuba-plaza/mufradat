@@ -4,6 +4,7 @@ const rows = '[aria-label="Word list"] > li';
 const bar = '[role="toolbar"]';
 const suspendButton = '[title="Suspend word"]';
 const unsuspendButton = '[title="Unsuspend word"]';
+const dialog = 'dialog[open]';
 const mp3 = [0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4];
 
 /** Opens the card of a word, once the page is ready to take input. */
@@ -50,11 +51,11 @@ describe("suspending a word", () => {
       cy.visit(card);
       cy.hydrated(suspendButton);
       cy.get(suspendButton).click();
-      cy.contains("h2", "Suspend this word?").should("be.visible");
-      cy.contains("button", "Cancel").click();
+      cy.get(dialog).contains("h2", "Suspend this word?").should("be.visible");
+      cy.get(dialog).contains("button", "Cancel").click();
       cy.get(suspendButton).should("be.visible");
       cy.get(suspendButton).click();
-      cy.contains("button", "Suspend").click();
+      cy.get(dialog).contains("button", "Suspend").click();
       cy.get(unsuspendButton).should("be.visible");
       cy.get(bar).should("contain", "suspended").and("contain", "button", /^Approve$/);
     });
