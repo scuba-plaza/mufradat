@@ -1,3 +1,5 @@
+import { fold } from "./fuzzy";
+import { compilePattern, type Pattern } from "./pattern";
 import { FIELDS, SORT_KEYS, listed, type SortKey, type Test } from "./fields";
 
 export interface Query {
@@ -60,11 +62,17 @@ export function parseQuery(text: string): Parsed {
     }
     const [, minus, name, value] = field;
     const key = name.toLowerCase();
-    const parts = value.split(",");
-    if (parts.some((p) => p.trim() === "")) return { error: `${key}: needs a value.` };
-    if (parts.length > MAX_VALUES) return { error: `${key}: at most ${MAX_VALUES} values.` };
+    if (key === "re") {
+      if (minus) return { error: "A minus goes in front of a field term, such as -pos:verb." };
+      if (value === "") return { error: "re: needs a pattern." };
+      const found = compilePattern(value);
+      if (typeof found === "string") return { error: `re: ${found}` };
+      query.tests.push(freeText(found));
+      continue;
+    }
     if (key === "sort") {
       if (minus) return { error: "sort: takes its minus inside the value, as in sort:-edited." };
+      if (value.startsWith("re:")) return { error: "sort: takes rank, edited, arabic or english, not a pattern." };
       if (query.sort) return { error: "Only one sort: is allowed." };
       const descending = value.startsWith("-");
       const sortKey = (descending ? value.slice(1) : value).toLowerCase();
@@ -77,16 +85,37 @@ export function parseQuery(text: string): Parsed {
     const def = FIELDS[key];
     if (!def) return { error: `Unknown field "${name}". Fields: ${[...Object.keys(FIELDS), "sort"].join(", ")}.` };
     const tests: Test[] = [];
-    for (const part of parts) {
-      const test = def.parse(part.trim());
-      if (typeof test === "string") return { error: `${key}: ${test}` };
+    let parts: string[] | null = null;
+    if (value.startsWith("re:")) {
+      const test = patternValue(key, def, value);
+      if (typeof test === "string") return { error: test };
       tests.push(test);
+    } else {
+      parts = value.split(",");
+      if (parts.some((p) => p.trim() === "")) return { error: `${key}: needs a value.` };
+      if (parts.length > MAX_VALUES) return { error: `${key}: at most ${MAX_VALUES} values.` };
+      for (const part of parts) {
+        const test = part.startsWith("re:") ? patternValue(key, def, part) : def.parse(part.trim());
+        if (typeof test === "string") return { error: `${key}: ${test}` };
+        tests.push(test);
+      }
     }
     const anyOf: Test = (row, now) => tests.some((t) => t(row, now));
     query.tests.push(minus ? (row, now) => !anyOf(row, now) : anyOf);
-    if (key === "status" && !minus && parts.some((p) => p.trim().toLowerCase() === "suspended")) query.suspended = true;
+    if (key === "status" && !minus && parts !== null && parts.some((p) => p.trim().toLowerCase() === "suspended")) query.suspended = true;
   }
   return { query };
+}
+
+const freeText = (pattern: Pattern): Test => (row) => pattern.matches(fold(row.lemma)) || pattern.matches(fold(row.english));
+
+function patternValue(key: string, def: { pattern?: (p: Pattern) => Test }, value: string): Test | string {
+  const body = value.slice(3);
+  if (body === "") return `${key}:re: needs a pattern.`;
+  if (!def.pattern) return `${key}: takes fixed values, not a pattern.`;
+  const found = compilePattern(body);
+  if (typeof found === "string") return `${key}:re: ${found}`;
+  return def.pattern(found);
 }
 
 export function withSort(text: string, sort: string | null): string {

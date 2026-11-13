@@ -158,3 +158,34 @@ describe("what a click on a column header sorts by", () => {
     expect(nextSort(sortOf("sort:-english"), "arabic")).toBe("arabic");
   });
 });
+
+describe("the one way in, re:", () => {
+  it("takes re: in front of free text as a pattern, not as text", () => {
+    expect(failure("re:kitab.*")).toBeNull();
+    expect(texts("re:kitab.*")).toEqual([]);
+  });
+
+  it("takes re: after a field that holds free-form text", () => {
+    expect(failure("tag:re:lesson_[0-9]+")).toBeNull();
+    expect(failure("root:re:ك.تب")).toBeNull();
+  });
+
+  it("names the pattern's own error under the field it was written in", () => {
+    expect(failure("re:")).toBe("re: needs a pattern.");
+    expect(failure("re:[a")).toContain("not closed");
+    expect(failure("tag:re:[a")).toContain("not closed");
+    expect(failure("tag:re:")).toContain("needs a pattern");
+  });
+
+  it("refuses re: on a field that takes fixed values", () => {
+    expect(failure("status:re:.*")).toBe("status: takes fixed values, not a pattern.");
+    expect(failure("pos:re:.*")).toBe("pos: takes fixed values, not a pattern.");
+    expect(failure("rank:re:.*")).toBe("rank: takes fixed values, not a pattern.");
+    expect(failure("edited:re:.*")).toBe("edited: takes fixed values, not a pattern.");
+    expect(failure("sort:re:.*")).toContain("sort:");
+  });
+
+  it("keeps a comma in a re: value inside the pattern", () => {
+    expect(failure("tag:re:a{1,2}")).toBeNull();
+  });
+});

@@ -190,3 +190,35 @@ describe("matching a tag", () => {
     expect(ask("-tag:lesson_10")).toEqual(["one", "none"]);
   });
 });
+
+describe("matching with a pattern", () => {
+  it("finds free text with re: against the arabic and the english, folded", () => {
+    expect(find("re:^book$")).toEqual(["book"]);
+    expect(find("re:writ(e|en|ing)")).toEqual(["to write"]);
+    expect(find("re:كتاب")).toEqual(["book"]);
+    expect(find("re:ك.*ب")).toEqual(["book", "to write", "library, bookshop"]);
+    expect(find("re:librar.")).toEqual(["library, bookshop"]);
+  });
+
+  it("keeps the order of the list for a pattern, and ranks only fuzzy text", () => {
+    expect(find("re:o")).toEqual(["book", "to write", "school", "library, bookshop"]);
+    expect(find("re:^book$ book")).toEqual(["book"]);
+  });
+
+  it("matches tags and roots with re:", () => {
+    const tagged = [
+      row({ rank: 1, lemma: "واحد", english: "one", tags: ["lesson_1"], id: "t1" }),
+      row({ rank: 2, lemma: "عشرة", english: "ten", tags: ["lesson_10"], id: "t2" }),
+      row({ rank: 3, lemma: "مدرسة", english: "school", root: "د ر س", id: "t3" }),
+    ];
+    const ask = (text: string) => {
+      const parsed = parseQuery(text);
+      if ("error" in parsed) throw new Error(parsed.error);
+      return runQuery(tagged, parsed.query, now).map((r) => r.english);
+    };
+    expect(ask("tag:re:lesson_[0-9]+")).toEqual(["one", "ten"]);
+    expect(ask("tag:re:^lesson_1$")).toEqual(["one"]);
+    expect(ask("-tag:re:.*")).toEqual(["school"]);
+    expect(ask("root:re:.ر.")).toEqual(["school"]);
+  });
+});
