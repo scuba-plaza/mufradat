@@ -35,8 +35,8 @@ describe("stepping from a card to the next word of its list", () => {
     const { store } = context();
     const [, second] = [1, 2, 3].map((rank) => openCard(store, { rank })!);
     const third = store.findNote("عَلَى", "prep")!;
-    const { body } = await step(second, "next", "pos:prep rank:<12");
-    expect(body).toEqual({ href: `/cards/${third}?q=pos%3Aprep+rank%3A%3C12` });
+    const { body } = await step(second, "next", "pos:prep rank:1-11");
+    expect(body).toEqual({ href: `/cards/${third}?q=pos%3Aprep+rank%3A1-11` });
   });
 
   it("answers with no address at the end of the list", async () => {
@@ -55,7 +55,7 @@ describe("stepping from a card to the next word of its list", () => {
     expect((await step(tenth, "previous")).body).toEqual({ href: "/open?rank=9" });
     expect((await step(eleventh, "next", "status:suspended")).body).toEqual({ href: `/cards/${thirteenth}?q=status%3Asuspended` });
     expect((await step(thirteenth, "previous", "status:suspended")).body).toEqual({ href: `/cards/${eleventh}?q=status%3Asuspended` });
-    expect((await step(tenth, "next", "rank:<14")).body).toEqual({ href: "/open?rank=12&q=rank%3A%3C14" });
+    expect((await step(tenth, "next", "rank:1-13")).body).toEqual({ href: "/open?rank=12&q=rank%3A1-13" });
   });
 
   it("refuses a direction that is neither previous nor next", async () => {

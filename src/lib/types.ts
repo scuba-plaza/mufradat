@@ -96,9 +96,6 @@ export interface WordRow {
   root: string;
   verbForm: string;
   status: WordStatus;
-  missing: MissingKind[];
-  error: boolean;
-  exampleBy: "mistral" | "user" | "";
   edited: string | null;
   tags: string[];
 }

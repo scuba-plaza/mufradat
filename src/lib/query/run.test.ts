@@ -7,16 +7,15 @@ const now = new Date(2026, 10, 6, 12, 0, 0);
 const at = (day: number, hour = 12) => new Date(2026, 10, day, hour, 0, 0).toISOString();
 
 const row = (over: Partial<WordRow>): WordRow => ({
-  id: null, rank: null, lemma: "", english: "", pos: "noun", gender: "", root: "", verbForm: "", status: "todo",
-  missing: ["example", "translation", "target", "audio"], error: false, exampleBy: "", edited: null, tags: [], ...over,
+  id: null, rank: null, lemma: "", english: "", pos: "noun", gender: "", root: "", verbForm: "", status: "todo", edited: null, tags: [], ...over,
 });
 
 const rows: WordRow[] = [
-  row({ rank: 1, lemma: "كِتَاب", english: "book", gender: "m", root: "ك ت ب", status: "approved", missing: [], exampleBy: "mistral", edited: at(1), id: "a" }),
-  row({ rank: 2, lemma: "كَتَبَ", english: "to write", pos: "verb", verbForm: "I", root: "ك ت ب", status: "progress", missing: ["audio"], error: true, exampleBy: "user", edited: at(5), id: "b" }),
-  row({ rank: 3, lemma: "مَدْرَسَة", english: "school", gender: "f", root: "د ر س", status: "ready", missing: [], exampleBy: "mistral", edited: at(6, 9), id: "c" }),
+  row({ rank: 1, lemma: "كِتَاب", english: "book", gender: "m", root: "ك ت ب", status: "approved", edited: at(1), id: "a" }),
+  row({ rank: 2, lemma: "كَتَبَ", english: "to write", pos: "verb", verbForm: "I", root: "ك ت ب", status: "progress", edited: at(5), id: "b" }),
+  row({ rank: 3, lemma: "مَدْرَسَة", english: "school", gender: "f", root: "د ر س", status: "ready", edited: at(6, 9), id: "c" }),
   row({ rank: 4, lemma: "أَنَّ", english: "that", pos: "conj" }),
-  row({ rank: null, lemma: "إِنَّ", english: "indeed", pos: "particle", status: "progress", missing: ["example", "translation", "target", "audio"], edited: at(6, 10), id: "d" }),
+  row({ rank: null, lemma: "إِنَّ", english: "indeed", pos: "particle", status: "progress", edited: at(6, 10), id: "d" }),
   row({ rank: 2500, lemma: "مَكْتَبَة", english: "library, bookshop", gender: "f", root: "ك ت ب" }),
 ];
 
@@ -85,13 +84,13 @@ describe("filtering by field", () => {
   it("reads rank as a number, a range, a comparison, none, or a list of them", () => {
     expect(find("rank:2")).toEqual(["to write"]);
     expect(find("rank:1-3")).toEqual(["book", "to write", "school"]);
-    expect(find("rank:>3")).toEqual(["that", "library, bookshop"]);
-    expect(find("rank:>=4")).toEqual(["that", "library, bookshop"]);
-    expect(find("rank:<2")).toEqual(["book"]);
-    expect(find("rank:<=2")).toEqual(["book", "to write"]);
     expect(find("rank:none")).toEqual(["indeed"]);
     expect(find("rank:1,none")).toEqual(["book", "indeed"]);
-    expect(find("-rank:none rank:>0")).toEqual(["book", "to write", "school", "that", "library, bookshop"]);
+    expect(find("-rank:none rank:1-2500")).toEqual(["book", "to write", "school", "that", "library, bookshop"]);
+    expect(() => find("rank:>3")).toThrow(/rank: expects/);
+    expect(() => find("rank:>=4")).toThrow(/rank: expects/);
+    expect(() => find("rank:<2")).toThrow(/rank: expects/);
+    expect(() => find("rank:<=2")).toThrow(/rank: expects/);
   });
 
   it("compares a root without vowels, hamza forms or spaces", () => {
@@ -107,21 +106,10 @@ describe("filtering by field", () => {
     expect(find("verbform:i")).toEqual(["to write"]);
   });
 
-  it("filters by what a card lacks, a word with no card lacking all of it", () => {
-    expect(find("missing:audio")).toEqual(["to write", "that", "indeed", "library, bookshop"]);
-    expect(find("missing:example status:progress")).toEqual(["indeed"]);
-    expect(find("-missing:audio")).toEqual(["book", "school"]);
-  });
-
-  it("filters by an error that is still shown", () => {
-    expect(find("has:error")).toEqual(["to write"]);
-    expect(find("-has:error status:progress")).toEqual(["indeed"]);
-  });
-
-  it("filters by who wrote the example", () => {
-    expect(find("example:mistral")).toEqual(["book", "school"]);
-    expect(find("example:mine")).toEqual(["to write"]);
-    expect(find("-example:mistral -example:mine status:progress")).toEqual(["indeed"]);
+  it("no longer knows the fields that were cut", () => {
+    expect(() => find("missing:audio")).toThrow(/Unknown field/);
+    expect(() => find("has:error")).toThrow(/Unknown field/);
+    expect(() => find("example:mine")).toThrow(/Unknown field/);
   });
 
   it("matches a suspended row only for status:suspended", () => {
@@ -147,11 +135,11 @@ describe("filtering by when a card was last edited", () => {
     expect(find("edited:1h")).toEqual([]);
   });
 
-  it("reads a date as that day and a range as from or until a day, both included", () => {
-    expect(find("edited:2026-11-05")).toEqual(["to write"]);
-    expect(find("edited:2026-11-05..")).toEqual(["to write", "school", "indeed"]);
-    expect(find("edited:..2026-11-05")).toEqual(["book", "to write"]);
-    expect(find("edited:2026-11-02..2026-11-05")).toEqual(["to write"]);
+  it("no longer knows a calendar date for edits", () => {
+    expect(() => find("edited:2026-11-05")).toThrow(/edited: expects/);
+    expect(() => find("edited:2026-11-05..")).toThrow(/edited: expects/);
+    expect(() => find("edited:..2026-11-05")).toThrow(/edited: expects/);
+    expect(() => find("edited:2026-11-02..2026-11-05")).toThrow(/edited: expects/);
   });
 
   it("finds the words never edited with none", () => {
@@ -179,5 +167,26 @@ describe("sorting", () => {
   it("sorts what the filters kept and puts the sort before the closeness of a text", () => {
     expect(find("pos:noun sort:-rank")).toEqual(["library, bookshop", "school", "book"]);
     expect(find("book sort:-rank")).toEqual(["library, bookshop", "book"]);
+  });
+});
+
+describe("matching a tag", () => {
+  const tagged = [
+    row({ rank: 1, lemma: "واحد", english: "one", tags: ["lesson_1"], id: "t1" }),
+    row({ rank: 2, lemma: "عشرة", english: "ten", tags: ["lesson_10", "extra"], id: "t2" }),
+    row({ rank: 3, lemma: "بدون", english: "none", tags: [], id: "t3" }),
+  ];
+  const ask = (text: string) => {
+    const parsed = parseQuery(text);
+    if ("error" in parsed) throw new Error(parsed.error);
+    return runQuery(tagged, parsed.query, now).map((r) => r.english);
+  };
+
+  it("matches a tag by its whole name only, with no glob", () => {
+    expect(ask("tag:lesson_1")).toEqual(["one"]);
+    expect(ask("tag:lesson_*")).toEqual([]);
+    expect(ask("tag:LESSON_10")).toEqual(["ten"]);
+    expect(ask("tag:lesson_1,extra")).toEqual(["one", "ten"]);
+    expect(ask("-tag:lesson_10")).toEqual(["one", "none"]);
   });
 });

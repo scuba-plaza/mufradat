@@ -1,9 +1,9 @@
-import { cardForRank, lookup, rankedWords, wiktionaryWords } from "./lexicon";
-import { missingKinds, wordStatus } from "./missing";
+import { cardForRank, lookup, rankingSize, rankedWords, wiktionaryWords } from "./lexicon";
+import { wordStatus } from "./missing";
 import { parseQuery, type Query } from "./query/parse";
 import { runQuery } from "./query/run";
 import type { Store } from "./store";
-import { MISSING_KINDS, POS_VALUES, type Note, type POS, type WordRow } from "./types";
+import { POS_VALUES, type Note, type POS, type WordRow } from "./types";
 
 const fromCard = (n: Note): WordRow => ({
   id: n.id,
@@ -15,9 +15,6 @@ const fromCard = (n: Note): WordRow => ({
   root: n.root,
   verbForm: n.verbForm,
   status: wordStatus(n),
-  missing: missingKinds(n),
-  error: n.exampleError !== null || Object.values(n.audio).some((clip) => clip.error !== null),
-  exampleBy: n.exampleSource,
   edited: n.updatedAt,
   tags: n.tags,
 });
@@ -26,9 +23,6 @@ const notStarted = (row: Pick<WordRow, "rank" | "lemma" | "english" | "pos" | "g
   ...row,
   id: null,
   status: "todo",
-  missing: [...MISSING_KINDS],
-  error: false,
-  exampleBy: "",
   edited: null,
   tags: [],
 });
@@ -129,11 +123,11 @@ export function nextCardPath(store: Store): string {
   return id ? `/cards/${id}` : "/";
 }
 
-const WALK_ALL = "rank:>0 sort:rank";
+const WALK_ALL = () => `rank:1-${rankingSize()} sort:rank`;
 
 export function neighbour(store: Store, id: string, q: string, direction: "previous" | "next", now: Date = new Date()): WordRow | null {
   const walkingAll = q.trim() === "";
-  const found = evaluate(store, walkingAll ? WALK_ALL : q, now);
+  const found = evaluate(store, walkingAll ? WALK_ALL() : q, now);
   if ("error" in found) return null;
   const { rows } = found;
   const at = rows.findIndex((r) => r.id === id);
