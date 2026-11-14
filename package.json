@@ -19,6 +19,7 @@
     "e2e:open": "node scripts/e2e.mjs open"
   },
   "dependencies": {
+    "@mufradat/regex": "workspace:*",
     "better-sqlite3": "^13.0.3",
     "next": "^15.5.29",
     "react": "^19.3.1",

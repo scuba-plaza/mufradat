@@ -9,6 +9,7 @@ stdenv.mkDerivation (finalAttrs: {
     fileset = lib.fileset.unions [
       ../bin
       ../data
+      ../packages
       ../public
       ../src
       ../next.config.mjs
@@ -39,7 +40,7 @@ stdenv.mkDerivation (finalAttrs: {
   installPhase = ''
     runHook preInstall
     mkdir -p $out/lib/mufradat $out/bin
-    cp -r .next bin data public node_modules package.json next.config.mjs $out/lib/mufradat/
+    cp -r .next bin data packages public node_modules package.json next.config.mjs $out/lib/mufradat/
     makeWrapper ${nodejs}/bin/node $out/bin/mufradat \
       --chdir $out/lib/mufradat \
       --add-flags node_modules/next/dist/bin/next \

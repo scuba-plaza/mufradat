@@ -1,0 +1,7 @@
+{
+  "name": "@mufradat/regex",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
