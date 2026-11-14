@@ -20,6 +20,8 @@ export type ErrorCode =
   | "reversed_repeat"
   | "repeat_too_large"
   | "nested_repeat"
+  | "trailing_backslash"
+  | "invalid_escape"
   | "unsupported";
 
 export interface RegexError {

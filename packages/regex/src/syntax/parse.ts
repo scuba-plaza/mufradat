@@ -1,6 +1,10 @@
 import type { ClassItem, ErrorCode, Limits, Node, RegexError } from "./types";
 
 const NEWLINE = 10;
+const MAX_CODE_POINT = 0x10ffff;
+const CONTROL: Record<string, number> = { n: 10, t: 9, r: 13, f: 12, v: 11 };
+const isHex = (char: string | undefined): char is string => char !== undefined && /^[0-9a-fA-F]$/.test(char);
+const isPunctuation = (char: string) => char < "\u0080" && !/[0-9A-Za-z]/.test(char);
 
 export const DEFAULT_LIMITS: Limits = { maxLength: 200, maxRepeat: 100, maxDepth: 1000 };
 
@@ -109,7 +113,47 @@ class Parser {
     if (char === "(") return this.group(start);
     if (char === "[") return this.characterClass(start);
     if (char === ".") return { kind: "class", negated: true, items: [{ kind: "range", from: NEWLINE, to: NEWLINE }] };
+    if (char === "\\") return { kind: "literal", code: this.escape() };
     return { kind: "literal", code: char.codePointAt(0)! };
+  }
+
+  private escape(): number {
+    const start = this.at - 1;
+    const char = this.chars[this.at++];
+    if (char === undefined) return refuse("trailing_backslash", start);
+    if (char in CONTROL) return CONTROL[char];
+    if (char === "x") return this.chars[this.at] === "{" ? this.bracedHex(start) : this.hexDigits(start, 2);
+    if (char === "u") return this.hexDigits(start, 4);
+    if (isPunctuation(char)) return char.codePointAt(0)!;
+    return this.badEscape(start);
+  }
+
+  private hexDigits(start: number, count: number): number {
+    let value = 0;
+    for (let k = 0; k < count; k++) {
+      const digit = this.chars[this.at];
+      if (!isHex(digit)) return this.badEscape(start);
+      value = value * 16 + parseInt(digit, 16);
+      this.at++;
+    }
+    return value;
+  }
+
+  private bracedHex(start: number): number {
+    this.at++;
+    let value = 0;
+    let digits = 0;
+    while (isHex(this.chars[this.at]) && value <= MAX_CODE_POINT) {
+      value = value * 16 + parseInt(this.chars[this.at++], 16);
+      digits++;
+    }
+    if (digits === 0 || value > MAX_CODE_POINT || this.chars[this.at] !== "}") return this.badEscape(start);
+    this.at++;
+    return value;
+  }
+
+  private badEscape(start: number): never {
+    return refuse("invalid_escape", start, this.chars.slice(start, this.at).join(""));
   }
 
   private characterClass(start: number): Node {
@@ -138,7 +182,8 @@ class Parser {
   }
 
   private classCode(): number {
-    return this.chars[this.at++].codePointAt(0)!;
+    const char = this.chars[this.at++];
+    return char === "\\" ? this.escape() : char.codePointAt(0)!;
   }
 
   private group(start: number): Node {
