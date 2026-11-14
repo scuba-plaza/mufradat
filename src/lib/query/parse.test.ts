@@ -189,3 +189,27 @@ describe("the one way in, re:", () => {
     expect(failure("tag:re:a{1,2}")).toBeNull();
   });
 });
+
+describe("what the bar says about a pattern among other values", () => {
+  it("names a bad pattern once, under the field it was written in", () => {
+    expect(failure("tag:a,re:[a")).toBe("tag:re: A class in [] is not closed.");
+    expect(failure("tag:a,re:")).toBe("tag:re: needs a pattern.");
+    expect(failure("pos:noun,re:x")).toBe("pos: takes fixed values, not a pattern.");
+  });
+
+  it("reads re: in any letter case", () => {
+    expect(failure("RE:[a")).toBe("re: A class in [] is not closed.");
+    expect(failure("tag:RE:[a")).toBe("tag:re: A class in [] is not closed.");
+    expect(failure("status:Re:.*")).toBe("status: takes fixed values, not a pattern.");
+  });
+
+  it("says a pattern of free text cannot be negated, and a field's can", () => {
+    expect(failure("-re:x")).toBe("re: cannot be negated; put the minus before a field, as in -tag:re:lesson_.*.");
+    expect(failure("-tag:re:x")).toBeNull();
+  });
+
+  it("names a pattern that is too big instead of failing", () => {
+    expect(failure("re:((a{100,100}){100,100}){100,100}")).toBe("re: The pattern is too big to search with.");
+    expect(failure("tag:re:((a{100,100}){100,100}){100,100}")).toBe("tag:re: The pattern is too big to search with.");
+  });
+});

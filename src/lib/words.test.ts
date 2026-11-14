@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { continueFrom, continueTarget, defaultOrder, cardPath, neighbour, nextCardPath, openCard, rowHref, view, wordRows } from "./words";
 import { openStore, type Store } from "./store";
-import { MISSING_KINDS, type WordRow } from "./types";
+import type { WordRow } from "./types";
 
 const mp3 = Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]);
 

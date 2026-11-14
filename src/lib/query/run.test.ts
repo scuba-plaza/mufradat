@@ -222,3 +222,29 @@ describe("matching with a pattern", () => {
     expect(ask("root:re:.ر.")).toEqual(["school"]);
   });
 });
+
+describe("a pattern is folded like the text it looks in", () => {
+  it("finds what was typed with a taa marbuta, a hamza, vowel marks or capitals", () => {
+    expect(find("re:مدرسة")).toEqual(["school"]);
+    expect(find("re:مَدْرَسَة")).toEqual(["school"]);
+    expect(find("re:^أن$")).toEqual(["that", "indeed"]);
+    expect(find("re:SCHOOL")).toEqual(["school"]);
+    expect(find("re:[A-C]ook")).toEqual(["book", "library, bookshop"]);
+    expect(find("re:\\D\\Dook")).toEqual(["library, bookshop"]);
+  });
+
+  it("folds a pattern for a tag or a root the same way", () => {
+    const folded = [
+      row({ rank: 1, english: "eat", root: "أ ك ل", tags: ["Lesson_1"], id: "f1" }),
+      row({ rank: 2, english: "other", root: "ك ت ب", tags: ["extra"], id: "f2" }),
+    ];
+    const ask = (text: string) => {
+      const parsed = parseQuery(text);
+      if ("error" in parsed) throw new Error(parsed.error);
+      return runQuery(folded, parsed.query, now).map((r) => r.english);
+    };
+    expect(ask("tag:re:Lesson_[0-9]")).toEqual(["eat"]);
+    expect(ask("root:re:^أ.ل$")).toEqual(["eat"]);
+    expect(ask("root:re:^ك.َ?ب$")).toEqual(["other"]);
+  });
+});

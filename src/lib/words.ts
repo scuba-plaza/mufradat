@@ -1,4 +1,4 @@
-import { cardForRank, lookup, rankingSize, rankedWords, wiktionaryWords } from "./lexicon";
+import { cardForRank, lookup, rankedWords, wiktionaryWords } from "./lexicon";
 import { wordStatus } from "./missing";
 import { parseQuery, type Query } from "./query/parse";
 import { runQuery } from "./query/run";
@@ -123,11 +123,11 @@ export function nextCardPath(store: Store): string {
   return id ? `/cards/${id}` : "/";
 }
 
-const WALK_ALL = () => `rank:1-${rankingSize()} sort:rank`;
+const WALK_ALL = "-rank:none sort:rank";
 
 export function neighbour(store: Store, id: string, q: string, direction: "previous" | "next", now: Date = new Date()): WordRow | null {
   const walkingAll = q.trim() === "";
-  const found = evaluate(store, walkingAll ? WALK_ALL() : q, now);
+  const found = evaluate(store, walkingAll ? WALK_ALL : q, now);
   if ("error" in found) return null;
   const { rows } = found;
   const at = rows.findIndex((r) => r.id === id);

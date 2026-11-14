@@ -33,49 +33,51 @@ const PERL: Record<string, CharSet> = {
 const MAX_LENGTH = 200;
 const MAX_INSTS = 20_000;
 const MAX_REPEAT = 100;
+const TOO_BIG = "The pattern is too big to search with.";
 
 const shifted = (insts: Inst[], by: number): Inst[] =>
   insts.map((inst) =>
     inst.t === "split" ? { t: "split", a: inst.a + by, b: inst.b + by } : inst.t === "jump" ? { t: "jump", a: inst.a + by } : inst,
   );
 
-const optional = (x: Inst[]): Inst[] => [{ t: "split", a: 1, b: x.length + 1 }, ...x];
-const star = (x: Inst[]): Inst[] => [{ t: "split", a: 1, b: x.length + 2 }, ...x, { t: "jump", a: 0 }];
+const optional = (x: Inst[]): Inst[] => [{ t: "split", a: 1, b: x.length + 1 }, ...shifted(x, 1)];
+const star = (x: Inst[]): Inst[] => [{ t: "split", a: 1, b: x.length + 2 }, ...shifted(x, 1), { t: "jump", a: 0 }];
 const plus = (x: Inst[]): Inst[] => [...x, { t: "split", a: 0, b: x.length + 1 }];
-
-const repeated = (x: Inst[], from: number, to: number | null): Inst[] => {
-  const out: Inst[] = [];
-  for (let k = 0; k < from; k++) out.push(...shifted(x, out.length));
-  if (to === null) out.push(...shifted(star(x), out.length));
-  else for (let k = from; k < to; k++) out.push(...shifted(optional(x), out.length));
-  return out;
-};
 
 /** Appends a self-contained piece to a program, moving its jumps to where it lands. */
 const embed = (program: Inst[], piece: Inst[]) => {
-  program.push(...shifted(piece, program.length));
+  for (const inst of shifted(piece, program.length)) program.push(inst);
+};
+
+const repeated = (x: Inst[], from: number, to: number | null): Inst[] => {
+  const out: Inst[] = [];
+  for (let k = 0; k < from; k++) embed(out, x);
+  if (to === null) embed(out, star(x));
+  else for (let k = from; k < to; k++) embed(out, optional(x));
+  return out;
 };
 
 class Compiler {
   i = 0;
+  private chars: string[];
 
-  constructor(private pattern: string) {}
+  constructor(pattern: string) {
+    this.chars = Array.from(pattern);
+  }
 
   compile(): Inst[] | string {
     const alt = this.alternation();
     if (typeof alt === "string") return alt;
-    if (this.i < this.pattern.length) {
-      return this.peek() === ")" ? "A ) has no matching (." : `The pattern has a piece it cannot read, at "${this.pattern.slice(this.i)}".`;
-    }
+    if (this.i < this.chars.length) return "A ) has no matching (.";
     return [...alt, { t: "match" }];
   }
 
   private peek(): string | undefined {
-    return this.pattern[this.i];
+    return this.chars[this.i];
   }
 
   private take(): string {
-    return this.pattern[this.i++];
+    return this.chars[this.i++];
   }
 
   private alternation(): Inst[] | string {
@@ -89,16 +91,22 @@ class Compiler {
       embed(merged, acc);
       merged.push({ t: "jump", a: acc.length + 2 + next.length });
       embed(merged, next);
+      if (merged.length > MAX_INSTS) return TOO_BIG;
       acc = merged;
     }
     return acc;
   }
 
+  private braces(): { from: number; to: number | null; length: number } | null {
+    if (this.peek() !== "{") return null;
+    const found = /^\{(\d*),(\d*)\}/.exec(this.chars.slice(this.i).join(""));
+    if (!found) return null;
+    return { from: found[1] === "" ? 0 : Number(found[1]), to: found[2] === "" ? null : Number(found[2]), length: found[0].length };
+  }
+
   private quantifierAhead(): boolean {
     const ch = this.peek();
-    if (ch === "?" || ch === "*" || ch === "+") return true;
-    if (ch !== "{") return false;
-    return /^\{\d*,\d*\}|^\{\d+,\}/.test(this.pattern.slice(this.i));
+    return ch === "?" || ch === "*" || ch === "+" || this.braces() !== null;
   }
 
   private sequence(): Inst[] | string {
@@ -108,7 +116,7 @@ class Compiler {
       const piece = this.repeat();
       if (typeof piece === "string") return piece;
       embed(out, piece);
-      if (out.length > MAX_INSTS) return "The pattern is too big to search with.";
+      if (out.length > MAX_INSTS) return TOO_BIG;
     }
     return out;
   }
@@ -129,37 +137,14 @@ class Compiler {
       this.take();
       return plus(atom);
     }
-    if (this.quantifierAhead()) {
-      const save = this.i;
-      this.take();
-      const first = this.digits();
-      if (this.peek() !== ",") {
-        this.i = save;
-        return atom;
-      }
-      this.take();
-      const last = this.digits();
-      if (this.peek() !== "}") {
-        this.i = save;
-        return atom;
-      }
-      this.take();
-      const from = first ?? 0;
-      if (from > MAX_REPEAT || (last !== null && last > MAX_REPEAT)) return "A quantifier repeats more than 100 times.";
-      if (last !== null && last < from) return "A quantifier goes from the smaller to the larger number.";
-      return repeated(atom, from, last);
-    }
-    return atom;
-  }
-
-  private digits(): number | null {
-    let n = 0;
-    let seen = false;
-    for (let ch = this.peek(); ch !== undefined && ch >= "0" && ch <= "9"; ch = this.peek()) {
-      n = n * 10 + Number(this.take());
-      seen = true;
-    }
-    return seen ? n : null;
+    const braces = this.braces();
+    if (!braces) return atom;
+    this.i += braces.length;
+    const { from, to } = braces;
+    if (from > MAX_REPEAT || (to !== null && to > MAX_REPEAT)) return "A quantifier repeats more than 100 times.";
+    if (to !== null && to < from) return "A quantifier goes from the smaller to the larger number.";
+    if (atom.length * ((to ?? from) + 1) > MAX_INSTS) return TOO_BIG;
+    return repeated(atom, from, to);
   }
 
   private classItem(): { set: CharSet; code: number | null } | string {
@@ -181,7 +166,7 @@ class Compiler {
       if (this.peek() === undefined) return "A class in [] is not closed.";
       const first = this.classItem();
       if (typeof first === "string") return first;
-      const after = this.pattern[this.i + 1];
+      const after = this.chars[this.i + 1];
       const dash = this.peek() === "-" && after !== "]" && after !== undefined;
       if (first.code !== null && dash) {
         this.take();
@@ -203,7 +188,6 @@ class Compiler {
 
   private atom(): Inst[] | string {
     const ch = this.take();
-    if (ch === undefined) return "The pattern ends where a piece is missing.";
     if (ch === "[") {
       const set = this.charClass();
       if (typeof set === "string") return set;
@@ -237,22 +221,26 @@ export function compilePattern(pattern: string): Pattern | string {
   ];
   embed(insts, compiled);
 
+  const seen = new Float64Array(insts.length).fill(-1);
+  let epoch = 0;
+
   const matches = (text: string): boolean => {
-    const codes = [...text].map((ch) => ch.codePointAt(0)!);
-    const seen = new Int32Array(insts.length).fill(-1);
+    const codes = Array.from(text, (ch) => ch.codePointAt(0)!);
+    const base = epoch;
+    epoch += codes.length + 1;
     let current: number[] = [];
-    const closure = (pc: number, stamp: number, list: number[]): boolean => {
+    const closure = (pc: number, at: number, list: number[]): boolean => {
       const stack = [pc];
       while (stack.length > 0) {
         const p = stack.pop()!;
-        if (seen[p] === stamp) continue;
-        seen[p] = stamp;
+        if (seen[p] === base + at) continue;
+        seen[p] = base + at;
         const inst = insts[p];
         if (inst.t === "char") list.push(p);
         else if (inst.t === "split") stack.push(inst.b, inst.a);
         else if (inst.t === "jump") stack.push(inst.a);
         else if (inst.t === "assert") {
-          if (inst.kind === "start" ? stamp === 0 : stamp === codes.length) stack.push(p + 1);
+          if (inst.kind === "start" ? at === 0 : at === codes.length) stack.push(p + 1);
         } else if (inst.t === "match") return true;
       }
       return false;

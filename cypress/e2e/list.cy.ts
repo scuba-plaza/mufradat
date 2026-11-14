@@ -206,8 +206,8 @@ describe("the search bar", () => {
       tag(4302, ["listspec_two"]);
       tag(4303, ["other"]);
       cy.visit("/");
-      cy.get(bar).type("tag:listspec_*{enter}");
-      cy.location("search").should("eq", `?q=${encodeURIComponent("tag:listspec_*")}`);
+      cy.get(bar).type("tag:re:listspec_.*{enter}");
+      cy.location("search").should("eq", `?q=${encodeURIComponent("tag:re:listspec_.*")}`);
       cy.get(rows).should("have.length", 2);
       cy.wordRow(4301).should("exist");
       cy.wordRow(4302).should("exist");

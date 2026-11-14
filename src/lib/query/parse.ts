@@ -1,6 +1,6 @@
 import { fold } from "./fuzzy";
 import { compilePattern, type Pattern } from "./pattern";
-import { FIELDS, SORT_KEYS, listed, type SortKey, type Test } from "./fields";
+import { FIELDS, SORT_KEYS, listed, type Field, type SortKey, type Test } from "./fields";
 
 export interface Query {
   texts: { term: string; phrase: boolean }[];
@@ -63,16 +63,14 @@ export function parseQuery(text: string): Parsed {
     const [, minus, name, value] = field;
     const key = name.toLowerCase();
     if (key === "re") {
-      if (minus) return { error: "A minus goes in front of a field term, such as -pos:verb." };
-      if (value === "") return { error: "re: needs a pattern." };
-      const found = compilePattern(value);
-      if (typeof found === "string") return { error: `re: ${found}` };
-      query.tests.push(freeText(found));
+      if (minus) return { error: "re: cannot be negated; put the minus before a field, as in -tag:re:lesson_.*." };
+      const test = patternTest(key, { pattern: freeText }, value);
+      if (typeof test === "string") return { error: test };
+      query.tests.push(test);
       continue;
     }
     if (key === "sort") {
       if (minus) return { error: "sort: takes its minus inside the value, as in sort:-edited." };
-      if (value.startsWith("re:")) return { error: "sort: takes rank, edited, arabic or english, not a pattern." };
       if (query.sort) return { error: "Only one sort: is allowed." };
       const descending = value.startsWith("-");
       const sortKey = (descending ? value.slice(1) : value).toLowerCase();
@@ -84,38 +82,44 @@ export function parseQuery(text: string): Parsed {
     }
     const def = FIELDS[key];
     if (!def) return { error: `Unknown field "${name}". Fields: ${[...Object.keys(FIELDS), "sort"].join(", ")}.` };
+    const parts = isPattern(value) ? [value] : value.split(",");
+    if (parts.some((p) => p.trim() === "")) return { error: `${key}: needs a value.` };
+    if (parts.length > MAX_VALUES) return { error: `${key}: at most ${MAX_VALUES} values.` };
     const tests: Test[] = [];
-    let parts: string[] | null = null;
-    if (value.startsWith("re:")) {
-      const test = patternValue(key, def, value);
-      if (typeof test === "string") return { error: test };
+    for (const part of parts) {
+      const text = part.trim();
+      const pattern = isPattern(text);
+      const test = pattern ? patternTest(key, def, text.slice(RE.length)) : def.parse(text);
+      if (typeof test === "string") return { error: pattern ? test : `${key}: ${test}` };
       tests.push(test);
-    } else {
-      parts = value.split(",");
-      if (parts.some((p) => p.trim() === "")) return { error: `${key}: needs a value.` };
-      if (parts.length > MAX_VALUES) return { error: `${key}: at most ${MAX_VALUES} values.` };
-      for (const part of parts) {
-        const test = part.startsWith("re:") ? patternValue(key, def, part) : def.parse(part.trim());
-        if (typeof test === "string") return { error: `${key}: ${test}` };
-        tests.push(test);
-      }
     }
     const anyOf: Test = (row, now) => tests.some((t) => t(row, now));
     query.tests.push(minus ? (row, now) => !anyOf(row, now) : anyOf);
-    if (key === "status" && !minus && parts !== null && parts.some((p) => p.trim().toLowerCase() === "suspended")) query.suspended = true;
+    if (key === "status" && !minus && parts.some((p) => p.trim().toLowerCase() === "suspended")) query.suspended = true;
   }
   return { query };
 }
 
+const RE = "re:";
+
+const isPattern = (text: string) => text.slice(0, RE.length).toLowerCase() === RE;
+
 const freeText = (pattern: Pattern): Test => (row) => pattern.matches(fold(row.lemma)) || pattern.matches(fold(row.english));
 
-function patternValue(key: string, def: { pattern?: (p: Pattern) => Test }, value: string): Test | string {
-  const body = value.slice(3);
-  if (body === "") return `${key}:re: needs a pattern.`;
+const foldPattern = (source: string): string =>
+  source.replace(/\\([^])|[^\\]+/gu, (piece: string, escaped?: string) => {
+    if (escaped === undefined) return fold(piece);
+    if (/[DWS]/.test(escaped)) return piece;
+    const folded = fold(escaped);
+    return folded === "" ? "" : `\\${folded}`;
+  });
+
+function patternTest(key: string, def: Pick<Field, "pattern">, body: string): Test | string {
+  const label = key === "re" ? RE : `${key}:${RE}`;
+  if (body === "") return `${label} needs a pattern.`;
   if (!def.pattern) return `${key}: takes fixed values, not a pattern.`;
-  const found = compilePattern(body);
-  if (typeof found === "string") return `${key}:re: ${found}`;
-  return def.pattern(found);
+  const found = compilePattern(foldPattern(body));
+  return typeof found === "string" ? `${label} ${found}` : def.pattern(found);
 }
 
 export function withSort(text: string, sort: string | null): string {

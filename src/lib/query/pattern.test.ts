@@ -187,3 +187,48 @@ describe("the review pass", () => {
     expect(finds("[a|b]c", "c")).toBe(false);
   });
 });
+
+describe("a quantifier over a group that holds a choice or a quantifier", () => {
+  it("repeats the whole group, not only its first piece", () => {
+    expect(finds("^(a|b)*c$", "abbac")).toBe(true);
+    expect(finds("^(a|b)*c$", "abxc")).toBe(false);
+    expect(finds("^(a?b)*$", "abbab")).toBe(true);
+    expect(finds("^(a?b)*$", "abba")).toBe(false);
+    expect(finds("^(ab|cd)+$", "abcdab")).toBe(true);
+    expect(finds("^(ab|cd){1,3}$", "abcdab")).toBe(true);
+    expect(finds("^(ab|cd){1,3}$", "abcdabcd")).toBe(false);
+    expect(finds("^(a|b){2,}$", "abab")).toBe(true);
+    expect(finds("^(a|b){2,}$", "a")).toBe(false);
+    expect(finds("^x(a|b)?y$", "xy")).toBe(true);
+    expect(finds("^x(a|b)?y$", "xby")).toBe(true);
+    expect(finds("^x(a|b)?y$", "xaby")).toBe(false);
+    expect(finds("^((a|b)c)*$", "acbcac")).toBe(true);
+  });
+});
+
+describe("a pattern that would grow too big", () => {
+  it("is refused with a message, however the size is reached", () => {
+    expect(error("(a{100,100}){100,100}")).toBeNull();
+    expect(error("((a{100,100}){100,100}){100,100}")).toMatch(/too big/);
+    expect(error("(((a{100,100}){100,100}){100,100}){100,100}")).toMatch(/too big/);
+    expect(error("(a{100,100}){100,100}|(a{100,100}){100,100}")).toMatch(/too big/);
+  });
+});
+
+describe("characters outside the basic plane", () => {
+  it("takes one such character as one literal, one class member and one any character", () => {
+    expect(finds("a\u{1F600}b", "a\u{1F600}b")).toBe(true);
+    expect(finds("[\u{1F600}]", "\u{1F600}")).toBe(true);
+    expect(finds("^a.b$", "a\u{1F600}b")).toBe(true);
+    expect(finds("^\u{1F600}{1,2}$", "\u{1F600}\u{1F600}")).toBe(true);
+  });
+});
+
+describe("a compiled pattern used on many texts", () => {
+  it("answers each text on its own", () => {
+    const compiled = compilePattern("^a(b|c)*d$");
+    if (typeof compiled === "string") throw new Error(compiled);
+    const answers = ["abcd", "ad", "abx", "abcd", "", "abbbd", "ad"].map((text) => compiled.matches(text));
+    expect(answers).toEqual([true, true, false, true, false, true, true]);
+  });
+});

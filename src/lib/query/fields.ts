@@ -83,7 +83,7 @@ const tag: Field = {
     const wanted = part.toLowerCase();
     return (row) => row.tags.some((t) => t.toLowerCase() === wanted);
   },
-  pattern: (p) => (row) => row.tags.some((t) => p.matches(t.toLowerCase())),
+  pattern: (p) => (row) => row.tags.some((t) => p.matches(fold(t))),
 };
 
 export const FIELDS: Record<string, Field> = {
