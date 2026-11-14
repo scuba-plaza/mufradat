@@ -3,9 +3,12 @@ export type ClassItem =
   | { kind: "perl"; name: "d" | "w" | "s"; negated: boolean }
   | { kind: "property"; name: string; negated: boolean };
 
+export type Assertion = "start" | "end" | "wordBoundary" | "notWordBoundary";
+
 export type Node =
   | { kind: "literal"; code: number }
   | { kind: "class"; negated: boolean; items: ClassItem[] }
+  | { kind: "assert"; assertion: Assertion }
   | { kind: "concat"; items: Node[] }
   | { kind: "alternate"; branches: Node[] }
   | { kind: "repeat"; body: Node; min: number; max: number | null };

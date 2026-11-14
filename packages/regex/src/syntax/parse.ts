@@ -114,6 +114,11 @@ class Parser {
     if (char === "(") return this.group(start);
     if (char === "[") return this.characterClass(start);
     if (char === ".") return { kind: "class", negated: true, items: [{ kind: "range", from: NEWLINE, to: NEWLINE }] };
+    if (char === "^") return { kind: "assert", assertion: "start" };
+    if (char === "$") return { kind: "assert", assertion: "end" };
+    if (char === "\\" && (this.chars[this.at] === "b" || this.chars[this.at] === "B")) {
+      return { kind: "assert", assertion: this.chars[this.at++] === "b" ? "wordBoundary" : "notWordBoundary" };
+    }
     if (char === "\\") {
       const escaped = this.escape();
       return typeof escaped === "number" ? { kind: "literal", code: escaped } : { kind: "class", negated: false, items: [escaped] };
@@ -187,11 +192,19 @@ class Parser {
     for (;;) {
       if (this.at >= this.chars.length) refuse("missing_bracket", start);
       if (this.chars[this.at] === "]") break;
+      this.refusePosixClass();
       items.push(this.classItem());
     }
     this.at++;
     if (items.length === 0) refuse("empty_class", start);
     return { kind: "class", negated, items };
+  }
+
+  private refusePosixClass(): void {
+    if (this.chars[this.at] !== "[" || this.chars[this.at + 1] !== ":") return;
+    for (let end = this.at + 2; end + 1 < this.chars.length; end++) {
+      if (this.chars[end] === ":" && this.chars[end + 1] === "]") refuse("unsupported", this.at, this.chars.slice(this.at, end + 2).join(""));
+    }
   }
 
   private classItem(): ClassItem {
@@ -213,6 +226,7 @@ class Parser {
   }
 
   private group(start: number): Node {
+    if (this.chars[this.at] === "?") refuse("unsupported", start, this.chars.slice(start, start + 3).join(""));
     if (++this.depth > this.limits.maxDepth) refuse("nesting_depth", start);
     const inner = this.alternation();
     if (this.chars[this.at] !== ")") refuse("missing_paren", start);

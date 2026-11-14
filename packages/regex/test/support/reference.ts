@@ -1,4 +1,4 @@
-import type { ClassItem, Node } from "../../src/syntax/types";
+import type { Assertion, ClassItem, Node } from "../../src/syntax/types";
 
 type Side = "edge" | "word" | "other";
 
@@ -6,6 +6,7 @@ type R = { id: number } & (
   | { kind: "none" }
   | { kind: "empty" }
   | { kind: "set"; test: (code: number) => boolean }
+  | { kind: "assert"; assertion: Assertion }
   | { kind: "cat"; left: R; right: R }
   | { kind: "alt"; parts: R[] }
   | { kind: "rep"; body: R; min: number; max: number | null }
@@ -22,6 +23,19 @@ function property(name: string): RegExp {
     properties.set(name, found);
   }
   return found;
+}
+
+function holds(assertion: Assertion, before: Side, after: Side): boolean {
+  switch (assertion) {
+    case "start":
+      return before === "edge";
+    case "end":
+      return after === "edge";
+    case "wordBoundary":
+      return (before === "word") !== (after === "word");
+    case "notWordBoundary":
+      return (before === "word") === (after === "word");
+  }
 }
 
 function itemHolds(item: ClassItem, code: number): boolean {
@@ -46,6 +60,8 @@ export function referenceMatcher(tree: Node): (text: string) => boolean {
   const NONE = intern("none", (id) => ({ id, kind: "none" }));
   const EMPTY = intern("empty", (id) => ({ id, kind: "empty" }));
   const set = (key: string, test: (code: number) => boolean) => intern(`set:${key}`, (id) => ({ id, kind: "set", test }));
+
+  const assertion = (kind: Assertion) => intern(`assert:${kind}`, (id) => ({ id, kind: "assert", assertion: kind }));
 
   const cat = (left: R, right: R): R => {
     if (left === NONE || right === NONE) return NONE;
@@ -76,6 +92,8 @@ export function referenceMatcher(tree: Node): (text: string) => boolean {
         return set(`lit:${node.code}`, (code) => code === node.code);
       case "class":
         return set(`class:${JSON.stringify(node)}`, (code) => node.items.some((item) => itemHolds(item, code)) !== node.negated);
+      case "assert":
+        return assertion(node.assertion);
       case "concat":
         return node.items.reduceRight((rest, item) => cat(lower(item), rest), EMPTY);
       case "alternate":
@@ -92,6 +110,8 @@ export function referenceMatcher(tree: Node): (text: string) => boolean {
         return false;
       case "empty":
         return true;
+      case "assert":
+        return holds(r.assertion, before, after);
       case "cat":
         return nullable(r.left, before, after) && nullable(r.right, before, after);
       case "alt":
@@ -105,6 +125,7 @@ export function referenceMatcher(tree: Node): (text: string) => boolean {
     switch (r.kind) {
       case "none":
       case "empty":
+      case "assert":
         return NONE;
       case "set":
         return r.test(code) ? EMPTY : NONE;
