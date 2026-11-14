@@ -57,6 +57,8 @@ export function referenceMatcher(tree: Node): (text: string) => boolean {
     switch (node.kind) {
       case "literal":
         return set(`lit:${node.code}`, (code) => code === node.code);
+      case "class":
+        return set(`class:${JSON.stringify(node)}`, (code) => node.items.some((item) => code >= item.from && code <= item.to) !== node.negated);
       case "concat":
         return node.items.reduceRight((rest, item) => cat(lower(item), rest), EMPTY);
       case "alternate":

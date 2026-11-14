@@ -36,3 +36,21 @@ describe("the syntax tree of literals, alternation and groups", () => {
     expect(tree("a(b|c)")).toEqual(concat(lit("a"), alternate(lit("b"), lit("c"))));
   });
 });
+
+describe("the syntax tree of the dot and character classes", () => {
+  it("takes the dot as a class that holds everything but the newline", () => {
+    expect(tree(".")).toEqual({ kind: "class", negated: true, items: [{ kind: "range", from: 10, to: 10 }] });
+  });
+
+  it("keeps a class as its negation flag and its members, a single character being a one-character range", () => {
+    expect(tree("[^a-c_]")).toEqual({
+      kind: "class",
+      negated: true,
+      items: [
+        { kind: "range", from: 97, to: 99 },
+        { kind: "range", from: 95, to: 95 },
+      ],
+    });
+  });
+});
+

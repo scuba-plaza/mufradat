@@ -1,4 +1,6 @@
-import type { ErrorCode, Limits, Node, RegexError } from "./types";
+import type { ClassItem, ErrorCode, Limits, Node, RegexError } from "./types";
+
+const NEWLINE = 10;
 
 export const DEFAULT_LIMITS: Limits = { maxLength: 200, maxDepth: 1000 };
 
@@ -48,7 +50,38 @@ class Parser {
     const start = this.at++;
     const char = this.chars[start];
     if (char === "(") return this.group(start);
+    if (char === "[") return this.characterClass(start);
+    if (char === ".") return { kind: "class", negated: true, items: [{ kind: "range", from: NEWLINE, to: NEWLINE }] };
     return { kind: "literal", code: char.codePointAt(0)! };
+  }
+
+  private characterClass(start: number): Node {
+    const negated = this.chars[this.at] === "^";
+    if (negated) this.at++;
+    const items: ClassItem[] = [];
+    for (;;) {
+      if (this.at >= this.chars.length) refuse("missing_bracket", start);
+      if (this.chars[this.at] === "]") break;
+      items.push(this.classItem());
+    }
+    this.at++;
+    if (items.length === 0) refuse("empty_class", start);
+    return { kind: "class", negated, items };
+  }
+
+  private classItem(): ClassItem {
+    const start = this.at;
+    const from = this.classCode();
+    const dash = this.chars[this.at] === "-" && this.at + 1 < this.chars.length && this.chars[this.at + 1] !== "]";
+    if (!dash) return { kind: "range", from, to: from };
+    this.at++;
+    const to = this.classCode();
+    if (to < from) refuse("reversed_char_range", start);
+    return { kind: "range", from, to };
+  }
+
+  private classCode(): number {
+    return this.chars[this.at++].codePointAt(0)!;
   }
 
   private group(start: number): Node {
