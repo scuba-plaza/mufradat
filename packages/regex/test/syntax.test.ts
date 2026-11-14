@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parse } from "../src/syntax/parse";
+import { DEFAULT_LIMITS, parse } from "../src/syntax/parse";
 import type { Node } from "../src/syntax/types";
 
 const lit = (char: string): Node => ({ kind: "literal", code: char.codePointAt(0)! });
@@ -94,6 +94,21 @@ describe("the syntax tree of perl classes and properties", () => {
 
   it("keeps the sets of a class among its members, and the negation of the class apart from theirs", () => {
     expect(tree("[^\\D_]")).toEqual(set(true, { kind: "perl", name: "d", negated: true }, { kind: "range", from: 95, to: 95 }));
+  });
+});
+
+describe("the depth limit, with the length limit raised so that it is the one that applies", () => {
+  const deep = (levels: number) => "(".repeat(levels) + "a" + ")".repeat(levels);
+  const roomy = { ...DEFAULT_LIMITS, maxLength: 10_000 };
+
+  it("accepts the deepest nesting it allows and refuses one level more, without running out of stack", () => {
+    expect(parse(deep(DEFAULT_LIMITS.maxDepth), roomy)).toEqual({ tree: lit("a") });
+    expect(parse(deep(DEFAULT_LIMITS.maxDepth + 1), roomy)).toEqual({ error: { code: "nesting_depth", position: DEFAULT_LIMITS.maxDepth, detail: undefined } });
+  });
+
+  it("holds for nesting through repeats and alternation too", () => {
+    const wrapped = "(a|".repeat(DEFAULT_LIMITS.maxDepth + 1) + "b" + ")+".repeat(DEFAULT_LIMITS.maxDepth + 1);
+    expect(parse(wrapped, roomy)).toMatchObject({ error: { code: "nesting_depth" } });
   });
 });
 

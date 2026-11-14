@@ -116,14 +116,18 @@ class Parser {
     if (char === ".") return { kind: "class", negated: true, items: [{ kind: "range", from: NEWLINE, to: NEWLINE }] };
     if (char === "^") return { kind: "assert", assertion: "start" };
     if (char === "$") return { kind: "assert", assertion: "end" };
-    if (char === "\\" && (this.chars[this.at] === "b" || this.chars[this.at] === "B")) {
-      return { kind: "assert", assertion: this.chars[this.at++] === "b" ? "wordBoundary" : "notWordBoundary" };
-    }
-    if (char === "\\") {
-      const escaped = this.escape();
-      return typeof escaped === "number" ? { kind: "literal", code: escaped } : { kind: "class", negated: false, items: [escaped] };
-    }
+    if (char === "\\") return this.escapedAtom();
     return { kind: "literal", code: char.codePointAt(0)! };
+  }
+
+  private escapedAtom(): Node {
+    const next = this.chars[this.at];
+    if (next === "b" || next === "B") {
+      this.at++;
+      return { kind: "assert", assertion: next === "b" ? "wordBoundary" : "notWordBoundary" };
+    }
+    const escaped = this.escape();
+    return typeof escaped === "number" ? { kind: "literal", code: escaped } : { kind: "class", negated: false, items: [escaped] };
   }
 
   private escape(): number | ClassItem {
