@@ -93,7 +93,7 @@ export interface View {
 function evaluate(store: Store, text: string, now: Date): { error: string } | { query: Query; start: WordRow[]; rows: WordRow[] } {
   const parsed = parseQuery(text);
   if ("error" in parsed) return { error: parsed.error };
-  const every = listRows(store.allNotes(), parsed.query.texts.length > 0);
+  const every = listRows(store.allNotes(), parsed.query.searchesText);
   const all = parsed.query.suspended ? every : every.filter(notSuspended);
   const start = text.trim() === "" ? defaultOrder(all) : all;
   return { query: parsed.query, start, rows: runQuery(start, parsed.query, now) };

@@ -4,6 +4,7 @@ import { FIELDS, SORT_KEYS, listed, type Field, type SortKey, type Test } from "
 
 export interface Query {
   texts: { term: string; phrase: boolean }[];
+  searchesText: boolean;
   tests: Test[];
   sort: { key: SortKey; descending: boolean } | null;
   /** True when the query asks for suspended words with a positive status:suspended term. */
@@ -47,7 +48,7 @@ function tokenize(text: string): { tokens: Token[]; unclosed: boolean } {
 const SORT_NAMES = Object.keys(SORT_KEYS);
 
 export function parseQuery(text: string): Parsed {
-  const query: Query = { texts: [], tests: [], sort: null, suspended: false };
+  const query: Query = { texts: [], searchesText: false, tests: [], sort: null, suspended: false };
   const { tokens, unclosed } = tokenize(text);
   if (unclosed) return { error: "A quote is not closed." };
   if (tokens.length > MAX_TERMS) return { error: `At most ${MAX_TERMS} terms.` };
@@ -58,6 +59,7 @@ export function parseQuery(text: string): Parsed {
         return { error: `A minus goes in front of a field term, such as -pos:verb. To find text that starts with one, put it in quotes: "${token.value}".` };
       }
       query.texts.push({ term: token.value, phrase: token.quoted || /\s/.test(token.value) });
+      query.searchesText = true;
       continue;
     }
     const [, minus, name, value] = field;
@@ -67,6 +69,7 @@ export function parseQuery(text: string): Parsed {
       const test = patternTest(key, { pattern: freeText }, value);
       if (typeof test === "string") return { error: test };
       query.tests.push(test);
+      query.searchesText = true;
       continue;
     }
     if (key === "sort") {

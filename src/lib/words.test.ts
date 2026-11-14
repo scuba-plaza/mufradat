@@ -284,6 +284,24 @@ describe("the words a query asks for", () => {
     expect(view(openStore(":memory:"), "status:todo pos:verb", now).rows.every((r) => r.rank !== null)).toBe(true);
   });
 
+  it("finds a word in Wiktionary that is not in the list when the query has a re: pattern, as it does for text", () => {
+    const s = openStore(":memory:");
+    const found = view(s, "re:^على$", now).rows.filter((r) => r.lemma === "عَلَى");
+    expect(found).toEqual([
+      { ...blank, rank: 3, lemma: "عَلَى", english: "on, over", pos: "prep" },
+      { ...blank, lemma: "عَلَى", english: "to climb", pos: "verb", verbForm: "I" },
+    ]);
+    const verbs = view(s, "re:^على$ verbform:I rank:none", now).rows;
+    expect(verbs.map((r) => r.english)).toContain("to climb");
+    expect(verbs.every((r) => r.verbForm === "I" && r.rank === null && r.status === "todo")).toBe(true);
+  });
+
+  it("does not look in Wiktionary for a pattern inside a field, as it does not for the plain field", () => {
+    const s = openStore(":memory:");
+    expect(view(s, "root:re:.*", now).rows.every((r) => r.rank !== null)).toBe(true);
+    expect(view(s, "tag:re:.*", now).rows.every((r) => r.rank !== null)).toBe(true);
+  });
+
   it("shows the card instead of the Wiktionary entry once it was opened", () => {
     const s = openStore(":memory:");
     const id = openCard(s, { lemma: "عَلَى", pos: "verb" })!;
