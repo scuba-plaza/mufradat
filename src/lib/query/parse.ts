@@ -1,5 +1,5 @@
 import { fold } from "./fuzzy";
-import { compilePattern, type Pattern } from "./pattern";
+import { compilePattern, type Pattern } from "@mufradat/regex";
 import { FIELDS, SORT_KEYS, listed, type Field, type SortKey, type Test } from "./fields";
 
 export interface Query {

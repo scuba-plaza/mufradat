@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compilePattern } from "./pattern";
+import { compilePattern } from "../src";
 
 const finds = (pattern: string, text: string): boolean | null => {
   const compiled = compilePattern(pattern);

@@ -1,6 +1,6 @@
 import { POS_VALUES, type WordRow } from "../types";
 import { fold } from "./fuzzy";
-import type { Pattern } from "./pattern";
+import type { Pattern } from "@mufradat/regex";
 
 export type Test = (row: WordRow, now: Date) => boolean;
 
