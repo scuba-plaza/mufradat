@@ -223,7 +223,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
       <div className="mt-4 text-center">
         <Clip note={note} slot="word" name="the word" text={note.lemma} onNote={setNote} onMessage={setWordMessage}>
           <InlineText label="Arabic headword" value={note.lemma} arabic className="text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
-          <InlineText label="Hint Arabic" placeholder="Add a hint for the Arabic side" value={note.hintAr} arabic className="mt-1.5 text-center text-[1rem] text-quiet min-[1024px]:mt-2" onSave={(hintAr) => save({ hintAr })} />
+          <InlineText label="Hint Arabic" placeholder="Add a hint for the Arabic side" value={note.hintAr} className="mt-1.5 text-center text-[1rem] text-quiet min-[1024px]:mt-2" onSave={(hintAr) => save({ hintAr })} />
         </Clip>
         <section aria-label="Forms" className={`panel mx-auto mt-3 flex items-center border px-2 py-2 min-[1024px]:mt-4 ${formsTone}`}>
           <div className="flex flex-1 flex-wrap items-center justify-center gap-x-6 gap-y-2 pl-[var(--control-h-sm)]">

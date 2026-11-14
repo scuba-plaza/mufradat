@@ -1,9 +1,9 @@
 import { cardForRank, lookup, rankedWords, wiktionaryWords } from "./lexicon";
-import { missingKinds, wordStatus } from "./missing";
+import { wordStatus } from "./missing";
 import { parseQuery, type Query } from "./query/parse";
 import { runQuery } from "./query/run";
 import type { Store } from "./store";
-import { MISSING_KINDS, POS_VALUES, type Note, type POS, type WordRow } from "./types";
+import { POS_VALUES, type Note, type POS, type WordRow } from "./types";
 
 const fromCard = (n: Note): WordRow => ({
   id: n.id,
@@ -15,9 +15,6 @@ const fromCard = (n: Note): WordRow => ({
   root: n.root,
   verbForm: n.verbForm,
   status: wordStatus(n),
-  missing: missingKinds(n),
-  error: n.exampleError !== null || Object.values(n.audio).some((clip) => clip.error !== null),
-  exampleBy: n.exampleSource,
   edited: n.updatedAt,
   tags: n.tags,
 });
@@ -26,9 +23,6 @@ const notStarted = (row: Pick<WordRow, "rank" | "lemma" | "english" | "pos" | "g
   ...row,
   id: null,
   status: "todo",
-  missing: [...MISSING_KINDS],
-  error: false,
-  exampleBy: "",
   edited: null,
   tags: [],
 });
@@ -99,7 +93,7 @@ export interface View {
 function evaluate(store: Store, text: string, now: Date): { error: string } | { query: Query; start: WordRow[]; rows: WordRow[] } {
   const parsed = parseQuery(text);
   if ("error" in parsed) return { error: parsed.error };
-  const every = listRows(store.allNotes(), parsed.query.texts.length > 0);
+  const every = listRows(store.allNotes(), parsed.query.searchesText);
   const all = parsed.query.suspended ? every : every.filter(notSuspended);
   const start = text.trim() === "" ? defaultOrder(all) : all;
   return { query: parsed.query, start, rows: runQuery(start, parsed.query, now) };
@@ -129,7 +123,7 @@ export function nextCardPath(store: Store): string {
   return id ? `/cards/${id}` : "/";
 }
 
-const WALK_ALL = "rank:>0 sort:rank";
+const WALK_ALL = "-rank:none sort:rank";
 
 export function neighbour(store: Store, id: string, q: string, direction: "previous" | "next", now: Date = new Date()): WordRow | null {
   const walkingAll = q.trim() === "";

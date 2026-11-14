@@ -83,8 +83,7 @@ export interface NoteEdit {
   forms?: { id?: string; label: string; arabic: string }[];
 }
 
-export const MISSING_KINDS = ["example", "translation", "target", "audio"] as const;
-export type MissingKind = (typeof MISSING_KINDS)[number];
+export type MissingKind = "example" | "translation" | "target" | "audio";
 
 export interface WordRow {
   id: string | null;
@@ -96,9 +95,6 @@ export interface WordRow {
   root: string;
   verbForm: string;
   status: WordStatus;
-  missing: MissingKind[];
-  error: boolean;
-  exampleBy: "mistral" | "user" | "";
   edited: string | null;
   tags: string[];
 }

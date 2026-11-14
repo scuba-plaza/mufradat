@@ -15,7 +15,7 @@ export default function WordBar({ q, error, children }: { q: string; error: stri
             autoComplete="off"
             spellCheck={false}
             className="field"
-            placeholder="Search, or filter: status:progress pos:noun rank:<500 sort:-edited"
+            placeholder="Search, or filter: status:progress pos:noun rank:1-500 sort:-edited"
           />
           <button type="submit" className="action min-h-control">Search</button>
         </form>

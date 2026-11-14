@@ -30,5 +30,3 @@ function gaps(n: Note): { kind: MissingKind; text: string }[] {
 
 /** What a card still lacks, in words for the person making it; empty once it has all of it. */
 export const missingParts = (n: Note): string[] => gaps(n).map((g) => g.text);
-
-export const missingKinds = (n: Note): MissingKind[] => [...new Set(gaps(n).map((g) => g.kind))];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { missingKinds, missingParts, wordStatus } from "./missing";
+import { missingParts, wordStatus } from "./missing";
 import type { Clip, Note } from "./types";
 
 const clip = (over: Partial<Clip> = {}): Clip => ({ key: "abc", source: "tts", text: "", error: null, outdated: false, ...over });
@@ -49,22 +49,5 @@ describe("what a card still lacks", () => {
       audio: { word: clip(), f1: clip(), example: clip() },
     };
     expect(missingParts(n)).toEqual([]);
-  });
-});
-
-describe("what a card lacks, by kind", () => {
-  it("lists each kind once, in the order of the card", () => {
-    const n = { ...bare, forms: [{ id: "f1", label: "pl.", arabic: "كُتُب" }] };
-    expect(missingKinds(n)).toEqual(["example", "audio"]);
-  });
-
-  it("names the translation and the target of a written example, and audio that is outdated", () => {
-    const n = { ...bare, example: "هٰذَا كِتَابٌ", audio: { word: clip({ outdated: true }), example: clip() } };
-    expect(missingKinds(n)).toEqual(["translation", "target", "audio"]);
-  });
-
-  it("is empty for a card that has everything", () => {
-    const n = { ...bare, example: "هٰذَا [كِتَابٌ]", exampleEn: "This is a book.", audio: { word: clip(), example: clip() } };
-    expect(missingKinds(n)).toEqual([]);
   });
 });

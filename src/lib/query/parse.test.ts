@@ -35,7 +35,7 @@ describe("reading what was typed in the bar", () => {
 describe("what the bar says about a term it cannot use", () => {
   it("names a field that does not exist and lists the ones that do", () => {
     expect(failure("colour:red")).toBe(
-      'Unknown field "colour". Fields: status, pos, rank, root, gender, verbform, missing, has, example, edited, tag, sort.',
+      'Unknown field "colour". Fields: status, pos, rank, root, gender, verbform, edited, tag, sort.',
     );
   });
 
@@ -44,20 +44,21 @@ describe("what the bar says about a term it cannot use", () => {
     expect(failure("pos:animal")).toBe(
       'pos: expects noun, verb, adj, adv, prep, conj, particle, pron, num, intj, phrase or det, not "animal".',
     );
-    expect(failure("missing:colour")).toBe('missing: expects example, translation, target or audio, not "colour".');
-    expect(failure("has:colour")).toBe('has: expects error, not "colour".');
-    expect(failure("example:both")).toBe('example: expects mistral or mine, not "both".');
+    expect(failure("missing:colour")).toBe('Unknown field "missing". Fields: status, pos, rank, root, gender, verbform, edited, tag, sort.');
+    expect(failure("has:colour")).toBe('Unknown field "has". Fields: status, pos, rank, root, gender, verbform, edited, tag, sort.');
+    expect(failure("example:both")).toBe('Unknown field "example". Fields: status, pos, rank, root, gender, verbform, edited, tag, sort.');
     expect(failure("gender:x")).toBe('gender: expects m, f or m+f, not "x".');
     expect(failure("verbform:XIV")).toBe(
       'verbform: expects I, II, III, IV, V, VI, VII, VIII, IX, X, XI, XII, XIII, Iq, IIq, IIIq or IVq, not "XIV".',
     );
   });
 
-  it("says what a rank or a date has to look like", () => {
-    expect(failure("rank:abc")).toBe('rank: expects a number, a range such as 1-500, >2000, <=100 or none, not "abc".');
-    expect(failure("rank:500-1")).toBe('rank: expects a number, a range such as 1-500, >2000, <=100 or none, not "500-1".');
-    expect(failure("edited:soon")).toBe('edited: expects 7d, 12h, 2w, a date such as 2026-11-01, a range such as 2026-11-01.. or ..2026-11-01, or none, not "soon".');
-    expect(failure("edited:2026-13-40")).toContain("edited: expects");
+  it("says what a rank or a span has to look like", () => {
+    expect(failure("rank:abc")).toBe('rank: expects a number, a range such as 1-500 or none, not "abc".');
+    expect(failure("rank:500-1")).toBe('rank: expects a number, a range such as 1-500 or none, not "500-1".');
+    expect(failure("rank:>2000")).toBe('rank: expects a number, a range such as 1-500 or none, not ">2000".');
+    expect(failure("edited:soon")).toBe('edited: expects a span such as 7d, 12h or 2w, or none, not "soon".');
+    expect(failure("edited:2026-13-40")).toBe('edited: expects a span such as 7d, 12h or 2w, or none, not "2026-13-40".');
   });
 
   it("asks for a value after the colon", () => {
@@ -85,10 +86,11 @@ describe("what the bar says about a term it cannot use", () => {
     expect(failure('root:"ك ت ب"')).toBeNull();
   });
 
-  it("refuses a date range that ends before it starts", () => {
-    expect(failure("edited:2026-11-05..2026-11-01")).toContain("edited: expects");
-    expect(failure("edited:2026-11-01..2026-11-05")).toBeNull();
-    expect(failure("edited:2026-11-01..2026-11-01")).toBeNull();
+  it("refuses a calendar date, which is no longer a way to ask about edits", () => {
+    expect(failure("edited:2026-11-01")).toContain("edited: expects");
+    expect(failure("edited:2026-11-01..")).toContain("edited: expects");
+    expect(failure("edited:..2026-11-01")).toContain("edited: expects");
+    expect(failure("edited:2026-11-01..2026-11-05")).toContain("edited: expects");
   });
 
   it("allows at most 12 terms and 12 values in a field", () => {
@@ -154,5 +156,60 @@ describe("what a click on a column header sorts by", () => {
 
   it("starts ascending on a column when another column is sorted", () => {
     expect(nextSort(sortOf("sort:-english"), "arabic")).toBe("arabic");
+  });
+});
+
+describe("the one way in, re:", () => {
+  it("takes re: in front of free text as a pattern, not as text", () => {
+    expect(failure("re:kitab.*")).toBeNull();
+    expect(texts("re:kitab.*")).toEqual([]);
+  });
+
+  it("takes re: after a field that holds free-form text", () => {
+    expect(failure("tag:re:lesson_[0-9]+")).toBeNull();
+    expect(failure("root:re:ك.تب")).toBeNull();
+  });
+
+  it("names the pattern's own error under the field it was written in", () => {
+    expect(failure("re:")).toBe("re: needs a pattern.");
+    expect(failure("re:[a")).toContain("not closed");
+    expect(failure("tag:re:[a")).toContain("not closed");
+    expect(failure("tag:re:")).toContain("needs a pattern");
+  });
+
+  it("refuses re: on a field that takes fixed values", () => {
+    expect(failure("status:re:.*")).toBe("status: takes fixed values, not a pattern.");
+    expect(failure("pos:re:.*")).toBe("pos: takes fixed values, not a pattern.");
+    expect(failure("rank:re:.*")).toBe("rank: takes fixed values, not a pattern.");
+    expect(failure("edited:re:.*")).toBe("edited: takes fixed values, not a pattern.");
+    expect(failure("sort:re:.*")).toContain("sort:");
+  });
+
+  it("keeps a comma in a re: value inside the pattern", () => {
+    expect(failure("tag:re:a{1,2}")).toBeNull();
+  });
+});
+
+describe("what the bar says about a pattern among other values", () => {
+  it("names a bad pattern once, under the field it was written in", () => {
+    expect(failure("tag:a,re:[a")).toBe("tag:re: A class in [] is not closed.");
+    expect(failure("tag:a,re:")).toBe("tag:re: needs a pattern.");
+    expect(failure("pos:noun,re:x")).toBe("pos: takes fixed values, not a pattern.");
+  });
+
+  it("reads re: in any letter case", () => {
+    expect(failure("RE:[a")).toBe("re: A class in [] is not closed.");
+    expect(failure("tag:RE:[a")).toBe("tag:re: A class in [] is not closed.");
+    expect(failure("status:Re:.*")).toBe("status: takes fixed values, not a pattern.");
+  });
+
+  it("says a pattern of free text cannot be negated, and a field's can", () => {
+    expect(failure("-re:x")).toBe("re: cannot be negated; put the minus before a field, as in -tag:re:lesson_.*.");
+    expect(failure("-tag:re:x")).toBeNull();
+  });
+
+  it("names a pattern that is too big instead of failing", () => {
+    expect(failure("re:((a{100,100}){100,100}){100,100}")).toBe("re: The pattern is too big to search with.");
+    expect(failure("tag:re:((a{100,100}){100,100}){100,100}")).toBe("tag:re: The pattern is too big to search with.");
   });
 });
