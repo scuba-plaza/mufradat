@@ -1,4 +1,4 @@
-import type { Node } from "../../src/syntax/types";
+import type { ClassItem, Node } from "../../src/syntax/types";
 
 type Side = "edge" | "word" | "other";
 
@@ -12,6 +12,23 @@ type R = { id: number } & (
 );
 
 const WORD = /[\p{L}\p{N}_]/u;
+const PERL = { d: /\p{Nd}/u, w: WORD, s: /\s/u };
+const properties = new Map<string, RegExp>();
+
+function property(name: string): RegExp {
+  let found = properties.get(name);
+  if (!found) {
+    found = new RegExp(`\\p{${/^[A-Z][a-z]?$/.test(name) ? "" : "Script="}${name}}`, "u");
+    properties.set(name, found);
+  }
+  return found;
+}
+
+function itemHolds(item: ClassItem, code: number): boolean {
+  if (item.kind === "range") return code >= item.from && code <= item.to;
+  const base = item.kind === "perl" ? PERL[item.name] : property(item.name);
+  return base.test(String.fromCodePoint(code)) !== item.negated;
+}
 
 const sideOf = (code: number | null): Side => (code === null ? "edge" : WORD.test(String.fromCodePoint(code)) ? "word" : "other");
 
@@ -58,7 +75,7 @@ export function referenceMatcher(tree: Node): (text: string) => boolean {
       case "literal":
         return set(`lit:${node.code}`, (code) => code === node.code);
       case "class":
-        return set(`class:${JSON.stringify(node)}`, (code) => node.items.some((item) => code >= item.from && code <= item.to) !== node.negated);
+        return set(`class:${JSON.stringify(node)}`, (code) => node.items.some((item) => itemHolds(item, code)) !== node.negated);
       case "concat":
         return node.items.reduceRight((rest, item) => cat(lower(item), rest), EMPTY);
       case "alternate":

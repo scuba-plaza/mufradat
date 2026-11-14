@@ -78,3 +78,22 @@ describe("the syntax tree of repeats", () => {
   });
 });
 
+describe("the syntax tree of perl classes and properties", () => {
+  const set = (negated: boolean, ...items: Extract<Node, { kind: "class" }>["items"]): Node => ({ kind: "class", negated, items });
+
+  it("takes a perl class outside a class as a class of one set, the capital form negating that set", () => {
+    expect(tree("\\d")).toEqual(set(false, { kind: "perl", name: "d", negated: false }));
+    expect(tree("\\W")).toEqual(set(false, { kind: "perl", name: "w", negated: true }));
+    expect(tree("\\s")).toEqual(set(false, { kind: "perl", name: "s", negated: false }));
+  });
+
+  it("takes a property by its name, \\P negating it", () => {
+    expect(tree("\\p{Arabic}")).toEqual(set(false, { kind: "property", name: "Arabic", negated: false }));
+    expect(tree("\\P{Lu}")).toEqual(set(false, { kind: "property", name: "Lu", negated: true }));
+  });
+
+  it("keeps the sets of a class among its members, and the negation of the class apart from theirs", () => {
+    expect(tree("[^\\D_]")).toEqual(set(true, { kind: "perl", name: "d", negated: true }, { kind: "range", from: 95, to: 95 }));
+  });
+});
+

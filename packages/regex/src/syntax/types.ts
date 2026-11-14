@@ -1,4 +1,7 @@
-export type ClassItem = { kind: "range"; from: number; to: number };
+export type ClassItem =
+  | { kind: "range"; from: number; to: number }
+  | { kind: "perl"; name: "d" | "w" | "s"; negated: boolean }
+  | { kind: "property"; name: string; negated: boolean };
 
 export type Node =
   | { kind: "literal"; code: number }
@@ -15,6 +18,8 @@ export type ErrorCode =
   | "missing_bracket"
   | "empty_class"
   | "reversed_char_range"
+  | "invalid_char_range"
+  | "invalid_property"
   | "missing_repeat_argument"
   | "invalid_repeat"
   | "reversed_repeat"

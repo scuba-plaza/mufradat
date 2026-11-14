@@ -4,6 +4,7 @@ const NEWLINE = 10;
 const MAX_CODE_POINT = 0x10ffff;
 const CONTROL: Record<string, number> = { n: 10, t: 9, r: 13, f: 12, v: 11 };
 const isHex = (char: string | undefined): char is string => char !== undefined && /^[0-9a-fA-F]$/.test(char);
+const isNameChar = (char: string | undefined): char is string => char !== undefined && /^[0-9A-Za-z_]$/.test(char);
 const isPunctuation = (char: string) => char < "\u0080" && !/[0-9A-Za-z]/.test(char);
 
 export const DEFAULT_LIMITS: Limits = { maxLength: 200, maxRepeat: 100, maxDepth: 1000 };
@@ -22,9 +23,9 @@ class Refusal extends Error {
   }
 }
 
-const refuse = (code: ErrorCode, position?: number, detail?: string): never => {
+function refuse(code: ErrorCode, position?: number, detail?: string): never {
   throw new Refusal({ code, position, detail });
-};
+}
 
 class Parser {
   private at = 0;
@@ -113,19 +114,42 @@ class Parser {
     if (char === "(") return this.group(start);
     if (char === "[") return this.characterClass(start);
     if (char === ".") return { kind: "class", negated: true, items: [{ kind: "range", from: NEWLINE, to: NEWLINE }] };
-    if (char === "\\") return { kind: "literal", code: this.escape() };
+    if (char === "\\") {
+      const escaped = this.escape();
+      return typeof escaped === "number" ? { kind: "literal", code: escaped } : { kind: "class", negated: false, items: [escaped] };
+    }
     return { kind: "literal", code: char.codePointAt(0)! };
   }
 
-  private escape(): number {
+  private escape(): number | ClassItem {
     const start = this.at - 1;
     const char = this.chars[this.at++];
     if (char === undefined) return refuse("trailing_backslash", start);
     if (char in CONTROL) return CONTROL[char];
+    if (/^[dws]$/i.test(char)) return { kind: "perl", name: char.toLowerCase() as "d" | "w" | "s", negated: char < "a" };
+    if (char === "p" || char === "P") return this.property(start, char === "P");
     if (char === "x") return this.chars[this.at] === "{" ? this.bracedHex(start) : this.hexDigits(start, 2);
     if (char === "u") return this.hexDigits(start, 4);
     if (isPunctuation(char)) return char.codePointAt(0)!;
     return this.badEscape(start);
+  }
+
+  private property(start: number, negated: boolean): ClassItem {
+    if (this.chars[this.at] !== "{") {
+      if (this.at < this.chars.length) this.at++;
+      return this.badProperty(start);
+    }
+    this.at++;
+    const from = this.at;
+    while (isNameChar(this.chars[this.at])) this.at++;
+    if (this.at === from || this.chars[this.at] !== "}") return this.badProperty(start);
+    const name = this.chars.slice(from, this.at).join("");
+    this.at++;
+    return { kind: "property", name, negated };
+  }
+
+  private badProperty(start: number): never {
+    return refuse("invalid_property", start, this.chars.slice(start, this.at).join(""));
   }
 
   private hexDigits(start: number, count: number): number {
@@ -172,16 +196,18 @@ class Parser {
 
   private classItem(): ClassItem {
     const start = this.at;
-    const from = this.classCode();
+    const from = this.classMember();
+    if (typeof from !== "number") return from;
     const dash = this.chars[this.at] === "-" && this.at + 1 < this.chars.length && this.chars[this.at + 1] !== "]";
     if (!dash) return { kind: "range", from, to: from };
     this.at++;
-    const to = this.classCode();
-    if (to < from) refuse("reversed_char_range", start);
+    const to = this.classMember();
+    if (typeof to !== "number") return refuse("invalid_char_range", start);
+    if (to < from) return refuse("reversed_char_range", start);
     return { kind: "range", from, to };
   }
 
-  private classCode(): number {
+  private classMember(): number | ClassItem {
     const char = this.chars[this.at++];
     return char === "\\" ? this.escape() : char.codePointAt(0)!;
   }
