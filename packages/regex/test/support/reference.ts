@@ -63,6 +63,8 @@ export function referenceMatcher(tree: Node): (text: string) => boolean {
         return node.items.reduceRight((rest, item) => cat(lower(item), rest), EMPTY);
       case "alternate":
         return alt(...node.branches.map(lower));
+      case "repeat":
+        return rep(lower(node.body), node.min, node.max);
     }
   };
 

@@ -2,9 +2,15 @@ import type { ClassItem, ErrorCode, Limits, Node, RegexError } from "./types";
 
 const NEWLINE = 10;
 
-export const DEFAULT_LIMITS: Limits = { maxLength: 200, maxDepth: 1000 };
+export const DEFAULT_LIMITS: Limits = { maxLength: 200, maxRepeat: 100, maxDepth: 1000 };
 
 export type Parsed = { tree: Node } | { error: RegexError };
+
+interface Operator {
+  min: number;
+  max: number | null;
+  length: number;
+}
 
 class Refusal extends Error {
   constructor(readonly error: RegexError) {
@@ -42,8 +48,59 @@ class Parser {
 
   private concatenation(): Node {
     const items: Node[] = [];
-    while (this.at < this.chars.length && this.chars[this.at] !== "|" && this.chars[this.at] !== ")") items.push(this.atom());
+    while (this.at < this.chars.length && this.chars[this.at] !== "|" && this.chars[this.at] !== ")") items.push(this.repetition());
     return items.length === 1 ? items[0] : { kind: "concat", items };
+  }
+
+  private repetition(): Node {
+    this.refuseLeadingOperator();
+    const body = this.atom();
+    const start = this.at;
+    const operator = this.operator();
+    if (!operator) return body;
+    this.checkBounds(operator, start);
+    this.at += operator.length;
+    const next = this.chars[this.at];
+    if (next === "?" || next === "+") refuse("unsupported", start, this.chars.slice(start, this.at + 1).join(""));
+    if (next === "*" || (next === "{" && this.operator())) refuse("nested_repeat", start);
+    return { kind: "repeat", body, min: operator.min, max: operator.max };
+  }
+
+  private refuseLeadingOperator(): void {
+    const char = this.chars[this.at];
+    if (char === "?" || char === "*" || char === "+" || (char === "{" && this.operator())) refuse("missing_repeat_argument", this.at);
+  }
+
+  private operator(): Operator | null {
+    const char = this.chars[this.at];
+    if (char === "?") return { min: 0, max: 1, length: 1 };
+    if (char === "*") return { min: 0, max: null, length: 1 };
+    if (char === "+") return { min: 1, max: null, length: 1 };
+    if (char !== "{") return null;
+    return this.counted() ?? refuse("invalid_repeat", this.at);
+  }
+
+  private counted(): Operator | null {
+    let end = this.at + 1;
+    const number = (): number | null => {
+      const from = end;
+      while (this.chars[end] >= "0" && this.chars[end] <= "9") end++;
+      return end === from ? null : Number(this.chars.slice(from, end).join(""));
+    };
+    const min = number();
+    if (min === null) return null;
+    let max: number | null = min;
+    if (this.chars[end] === ",") {
+      end++;
+      max = number();
+    }
+    return this.chars[end] === "}" ? { min, max, length: end + 1 - this.at } : null;
+  }
+
+  private checkBounds({ min, max }: Operator, start: number): void {
+    const limit = this.limits.maxRepeat;
+    if (min > limit || (max !== null && max > limit)) refuse("repeat_too_large", start);
+    if (max !== null && max < min) refuse("reversed_repeat", start);
   }
 
   private atom(): Node {

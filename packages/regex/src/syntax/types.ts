@@ -4,7 +4,8 @@ export type Node =
   | { kind: "literal"; code: number }
   | { kind: "class"; negated: boolean; items: ClassItem[] }
   | { kind: "concat"; items: Node[] }
-  | { kind: "alternate"; branches: Node[] };
+  | { kind: "alternate"; branches: Node[] }
+  | { kind: "repeat"; body: Node; min: number; max: number | null };
 
 export type ErrorCode =
   | "too_long"
@@ -13,7 +14,13 @@ export type ErrorCode =
   | "unexpected_paren"
   | "missing_bracket"
   | "empty_class"
-  | "reversed_char_range";
+  | "reversed_char_range"
+  | "missing_repeat_argument"
+  | "invalid_repeat"
+  | "reversed_repeat"
+  | "repeat_too_large"
+  | "nested_repeat"
+  | "unsupported";
 
 export interface RegexError {
   code: ErrorCode;
@@ -23,5 +30,6 @@ export interface RegexError {
 
 export interface Limits {
   maxLength: number;
+  maxRepeat: number;
   maxDepth: number;
 }

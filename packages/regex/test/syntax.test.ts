@@ -54,3 +54,27 @@ describe("the syntax tree of the dot and character classes", () => {
   });
 });
 
+describe("the syntax tree of repeats", () => {
+  const repeat = (body: Node, min: number, max: number | null): Node => ({ kind: "repeat", body, min, max });
+
+  it("takes the three short operators as their counts", () => {
+    expect(tree("a?")).toEqual(repeat(lit("a"), 0, 1));
+    expect(tree("a*")).toEqual(repeat(lit("a"), 0, null));
+    expect(tree("a+")).toEqual(repeat(lit("a"), 1, null));
+  });
+
+  it("takes {n}, {n,} and {n,m} as their counts", () => {
+    expect(tree("a{3}")).toEqual(repeat(lit("a"), 3, 3));
+    expect(tree("a{3,}")).toEqual(repeat(lit("a"), 3, null));
+    expect(tree("a{3,5}")).toEqual(repeat(lit("a"), 3, 5));
+    expect(tree("a{0}")).toEqual(repeat(lit("a"), 0, 0));
+  });
+
+  it("binds an operator to the one atom before it, or to the whole group", () => {
+    expect(tree("ab*")).toEqual(concat(lit("a"), repeat(lit("b"), 0, null)));
+    expect(tree("(ab)*")).toEqual(repeat(concat(lit("a"), lit("b")), 0, null));
+    expect(tree("(a|b)+")).toEqual(repeat(alternate(lit("a"), lit("b")), 1, null));
+    expect(tree("(a*)*")).toEqual(repeat(repeat(lit("a"), 0, null), 0, null));
+  });
+});
+
