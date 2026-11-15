@@ -1,84 +1,12 @@
-import { contains, type Ranges } from "../program/ranges";
+import { contains } from "../program/ranges";
 import type { Inst } from "../program/types";
-import { PERL } from "../unicode";
-
-export interface Executor {
-  test(text: string): boolean;
-}
-
-const RANGES = 0;
-const SPLIT = 1;
-const JUMP = 2;
-const ASSERT = 3;
-const MATCH = 4;
-
-const START = 0;
-const END = 1;
-const BOUNDARY = 2;
-const NOT_BOUNDARY = 3;
-const ASSERTIONS = { start: START, end: END, wordBoundary: BOUNDARY, notWordBoundary: NOT_BOUNDARY };
-
-const EDGE = 0;
-const WORD = 1;
-const OTHER = 2;
+import { ASSERT, EDGE, JUMP, RANGES, SPLIT, flatten, holds, sideOf, type Executor } from "./flat";
 
 const LAST_GENERATION = 2 ** 31 - 2;
 
-const ASCII_SIDE = Uint8Array.from({ length: 128 }, (_, code) => (contains(PERL.w, code) ? WORD : OTHER));
-
-const sideOf = (code: number): number => (code < 0 ? EDGE : code < 128 ? ASCII_SIDE[code] : contains(PERL.w, code) ? WORD : OTHER);
-
-function holds(assertion: number, before: number, after: number): boolean {
-  switch (assertion) {
-    case START:
-      return before === EDGE;
-    case END:
-      return after === EDGE;
-    case BOUNDARY:
-      return (before === WORD) !== (after === WORD);
-    default:
-      return (before === WORD) === (after === WORD);
-  }
-}
-
 export function createPike(program: readonly Inst[]): Executor {
   const length = program.length;
-  const ops = new Uint8Array(length);
-  const first = new Int32Array(length);
-  const second = new Int32Array(length);
-  const sets: Ranges[] = [];
-  const setIds = new Map<Ranges, number>();
-  program.forEach((inst, at) => {
-    switch (inst.op) {
-      case "ranges": {
-        let id = setIds.get(inst.ranges);
-        if (id === undefined) {
-          id = sets.length;
-          sets.push(inst.ranges);
-          setIds.set(inst.ranges, id);
-        }
-        ops[at] = RANGES;
-        first[at] = id;
-        return;
-      }
-      case "split":
-        ops[at] = SPLIT;
-        first[at] = inst.first;
-        second[at] = inst.second;
-        return;
-      case "jump":
-        ops[at] = JUMP;
-        first[at] = inst.target;
-        return;
-      case "assert":
-        ops[at] = ASSERT;
-        first[at] = ASSERTIONS[inst.assertion];
-        return;
-      case "match":
-        ops[at] = MATCH;
-        return;
-    }
-  });
+  const { ops, first, second, sets } = flatten(program);
 
   let current = new Int32Array(length);
   let next = new Int32Array(length);
