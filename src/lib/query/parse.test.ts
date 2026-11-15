@@ -234,6 +234,20 @@ describe("what the bar says about syntax the pattern language reads or refuses",
     expect(failure("re:\\pL")).toBe("re: \\pL is not a Unicode property such as \\p{Arabic} or \\p{Lu}.");
   });
 
+  it("names an unclosed property as typed, with its capitals", () => {
+    expect(failure("re:\\p{Nope")).toBe("re: \\p{Nope is not a Unicode property such as \\p{Arabic} or \\p{Lu}.");
+    expect(failure("re:a\\P{Arabic")).toBe("re: \\P{Arabic is not a Unicode property such as \\p{Arabic} or \\p{Lu}.");
+    expect(failure("re:\\pL")).toBe("re: \\pL is not a Unicode property such as \\p{Arabic} or \\p{Lu}.");
+  });
+
+  it("names a malformed escape for a character as typed, up to the character that spoils it", () => {
+    expect(failure("re:\\u00G1")).toBe("re: \\u00G is not an escape this search knows.");
+    expect(failure("re:\\x4G")).toBe("re: \\x4G is not an escape this search knows.");
+    expect(failure("re:\\x{1100000}")).toBe("re: \\x{1100000} is not an escape this search knows.");
+    expect(failure("re:[\\x{ZZ}]")).toBe("re: \\x{Z is not an escape this search knows.");
+    expect(failure("re:\\\u00c9")).toBe("re: \\\u00c9 is not an escape this search knows.");
+  });
+
   it("names a brace that starts no repeat, a repeat of a repeat and what is not supported", () => {
     expect(failure("re:a{,3}")).toBe("re: A { has to start a repeat such as {2}, {2,} or {2,5}; write \\{ for a brace itself.");
     expect(failure("re:a{2")).toBe("re: A { has to start a repeat such as {2}, {2,} or {2,5}; write \\{ for a brace itself.");

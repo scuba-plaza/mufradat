@@ -110,12 +110,18 @@ const isPattern = (text: string) => text.slice(0, RE.length).toLowerCase() === R
 
 const freeText = (pattern: Matcher): Test => (row) => pattern.test(fold(row.lemma)) || pattern.test(fold(row.english));
 
+const MAX_CODE_POINT = 0x10ffff;
+const PIECES = /\\(?:x\{[^}]*\}?|x[^]{0,2}|u[^]{0,4}|[pP](?:\{[^}]*\}?|[^])?|[^])|[^\\]+/gu;
+const CODE_ESCAPE = /^\\(?:x\{([0-9a-f]+)\}|x([0-9a-f]{2})|u([0-9a-f]{4}))$/iu;
+
+const escapeOf = (char: string): string => `\\x{${char.codePointAt(0)!.toString(16)}}`;
+
 const foldPattern = (source: string): string =>
-  source.replace(/\\([pP](?:\{[^}]*\}|[A-Za-z])|[^])|[^\\]+/gu, (piece: string, escaped?: string) => {
-    if (escaped === undefined) return fold(piece);
-    if (/^[A-Za-z]/.test(escaped)) return piece;
-    const folded = fold(escaped);
-    return folded === "" ? "" : `\\${folded}`;
+  source.replace(PIECES, (piece: string) => {
+    if (!piece.startsWith("\\")) return fold(piece);
+    const digits = CODE_ESCAPE.exec(piece)?.slice(1).find((group) => group !== undefined);
+    const code = digits === undefined ? NaN : parseInt(digits, 16);
+    return code <= MAX_CODE_POINT ? [...fold(String.fromCodePoint(code))].map(escapeOf).join("") : piece;
   });
 
 function patternTest(key: string, def: Pick<Field, "pattern">, body: string): Test | string {

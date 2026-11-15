@@ -1,7 +1,7 @@
 import { MAX_CODE_POINT, contains, type Ranges } from "../program/ranges";
 import type { Inst } from "../program/types";
 import { PERL } from "../unicode";
-import { ASSERT, BOUNDARY, EDGE, JUMP, NOT_BOUNDARY, OTHER, RANGES, SPLIT, START, flatten, holds, sideOf, type Executor } from "./flat";
+import { ASSERT, BOUNDARY, EDGE, NOT_BOUNDARY, OTHER, PENDING, RANGES, START, createClosure, flatten, holds, sideOf, type Executor } from "./flat";
 import { createPike } from "./pike";
 
 export interface DfaOptions {
@@ -27,6 +27,7 @@ interface State {
   before: number;
   pcs: Int32Array;
   accepts: number;
+  chained: State | undefined;
 }
 
 const UNKNOWN = -1;
@@ -51,7 +52,8 @@ export function createDfa(program: readonly Inst[], options: DfaOptions = {}): D
   const bailBuilds = options.bailBuilds ?? 2_000;
   const bailRatio = options.bailRatio ?? 8;
   const length = program.length;
-  const { ops, first, second, sets } = flatten(program);
+  const flat = flatten(program);
+  const { ops, first, sets } = flat;
 
   let hasStart = false;
   let hasBoundary = false;
@@ -83,77 +85,18 @@ export function createDfa(program: readonly Inst[], options: DfaOptions = {}): D
     return table;
   };
 
-  const visited = new Int32Array(length);
-  const stack = new Int32Array(2 * length + 2);
+  const closure = createClosure(flat, length);
   const expanded = new Int32Array(length);
   const scratch = new Int32Array(length);
-  let generation = 0;
-
-  const addPending = (list: Int32Array, count: number, from: number): number => {
-    let top = 0;
-    stack[top++] = from;
-    while (top > 0) {
-      const at = stack[--top];
-      if (visited[at] === generation) continue;
-      visited[at] = generation;
-      switch (ops[at]) {
-        case RANGES:
-        case ASSERT:
-          list[count++] = at;
-          break;
-        case SPLIT:
-          stack[top++] = second[at];
-          stack[top++] = first[at];
-          break;
-        case JUMP:
-          stack[top++] = first[at];
-          break;
-        default:
-          return -1;
-      }
-    }
-    return count;
-  };
-
-  const addResolved = (list: Int32Array, count: number, from: number, before: number, after: number): number => {
-    let top = 0;
-    stack[top++] = from;
-    while (top > 0) {
-      const at = stack[--top];
-      if (visited[at] === generation) continue;
-      visited[at] = generation;
-      switch (ops[at]) {
-        case RANGES:
-          list[count++] = at;
-          break;
-        case SPLIT:
-          stack[top++] = second[at];
-          stack[top++] = first[at];
-          break;
-        case JUMP:
-          stack[top++] = first[at];
-          break;
-        case ASSERT:
-          if (holds(first[at], before, after)) stack[top++] = at + 1;
-          break;
-        default:
-          return -1;
-      }
-    }
-    return count;
-  };
 
   const expand = (state: State, after: number): number => {
-    generation++;
+    closure.begin();
     let count = 0;
     for (const at of state.pcs) {
       if (ops[at] === RANGES) {
-        if (visited[at] !== generation) {
-          visited[at] = generation;
-          expanded[count++] = at;
-        }
+        if (closure.claim(at)) expanded[count++] = at;
       } else if (holds(first[at], state.before, after)) {
-        count = addResolved(expanded, count, at + 1, state.before, after);
+        count = closure.add(expanded, count, at + 1, state.before, after);
         if (count < 0) return -1;
       }
     }
@@ -164,29 +107,43 @@ export function createDfa(program: readonly Inst[], options: DfaOptions = {}): D
   const freshTable = () => new Int32Array(16 * classCount).fill(UNKNOWN);
   let table = freshTable();
   let states: State[] = [];
-  let cache = new Map<string, State>();
+  let cache = new Map<number, State>();
   let stored = 0;
   let start: State | undefined;
 
-  const intern = (before: number, pcs: Int32Array): State => {
-    const key = `${before}|${pcs.join(",")}`;
-    const known = cache.get(key);
-    if (known) return known;
-    const created: State = { id: states.length, before, pcs, accepts: -1 };
+  const hashOf = (before: number, pcs: Int32Array): number => {
+    let hash = Math.imul(2166136261 ^ before, 16777619);
+    for (let k = 0; k < pcs.length; k++) hash = Math.imul(hash ^ pcs[k], 16777619);
+    return hash;
+  };
+
+  const sameState = (state: State, before: number, pcs: Int32Array): boolean => {
+    if (state.before !== before || state.pcs.length !== pcs.length) return false;
+    for (let k = 0; k < pcs.length; k++) if (state.pcs[k] !== pcs[k]) return false;
+    return true;
+  };
+
+  const intern = (before: number, sorted: Int32Array): State => {
+    const hash = hashOf(before, sorted);
+    const head = cache.get(hash);
+    for (let known = head; known; known = known.chained) if (sameState(known, before, sorted)) return known;
+    const pcs = sorted.slice();
+    const created: State = { id: states.length, before, pcs, accepts: -1, chained: head };
     stored += pcs.length + classCount;
     stats.builds++;
     if (stored > budget) {
       stats.flushes++;
       created.id = 0;
+      created.chained = undefined;
       states = [created];
-      cache = new Map([[key, created]]);
+      cache = new Map([[hash, created]]);
       stored = pcs.length + classCount;
       table = freshTable();
       start = undefined;
       return created;
     }
     states.push(created);
-    cache.set(key, created);
+    cache.set(hash, created);
     if ((created.id + 1) * classCount > table.length) {
       const grown = new Int32Array(2 * table.length).fill(UNKNOWN);
       grown.set(table);
@@ -195,8 +152,8 @@ export function createDfa(program: readonly Inst[], options: DfaOptions = {}): D
     return created;
   };
 
-  generation++;
-  const startSize = addPending(scratch, 0, 0);
+  closure.begin();
+  const startSize = closure.add(scratch, 0, 0, PENDING, PENDING);
   const startPcs = startSize < 0 ? null : scratch.slice(0, startSize).sort();
 
   const build = (from: State, cls: number): number => {
@@ -206,19 +163,19 @@ export function createDfa(program: readonly Inst[], options: DfaOptions = {}): D
     const after = sideOf(code);
     const count = expand(from, after);
     if (count < 0) return (table[row] = MATCHED);
-    generation++;
+    closure.begin();
     let size = 0;
     for (let k = 0; k < count; k++) {
       const at = expanded[k];
       if (contains(sets[first[at]], code)) {
-        size = addPending(scratch, size, at + 1);
+        size = closure.add(scratch, size, at + 1, PENDING, PENDING);
         if (size < 0) return (table[row] = MATCHED);
       }
     }
-    size = addPending(scratch, size, 0);
+    size = closure.add(scratch, size, 0, PENDING, PENDING);
     if (size < 0) return (table[row] = MATCHED);
     const flushes = stats.flushes;
-    const target = intern(afterChar(after), scratch.slice(0, size).sort());
+    const target = intern(afterChar(after), scratch.subarray(0, size).sort());
     if (stats.builds > bailBuilds && stats.builds * bailRatio > stats.scanned) {
       stats.bailed = true;
       return BAILED;

@@ -5,18 +5,33 @@ import type { Limits, RegexError } from "./syntax/types";
 
 export interface Matcher {
   test(text: string): boolean;
-  testMany(texts: readonly string[]): boolean[];
+}
+
+const LIMIT_NAMES = Object.keys(DEFAULT_LIMITS) as (keyof Limits)[];
+
+function effectiveLimits(limits: Partial<Limits>): Limits {
+  const effective = { ...DEFAULT_LIMITS };
+  for (const name of LIMIT_NAMES) {
+    const value = limits[name];
+    if (value !== undefined) effective[name] = value;
+  }
+  return effective;
+}
+
+function build(pattern: string, limits: Limits): Matcher | RegexError {
+  const parsed = parse(pattern, limits);
+  if ("error" in parsed) return parsed.error;
+  const compiled = compileProgram(parsed.tree, limits);
+  if ("error" in compiled) return compiled.error;
+  const executor = createDfa(compiled.program);
+  return { test: (text) => executor.test(text) };
 }
 
 export function compile(pattern: string, limits: Partial<Limits> = {}): Matcher | RegexError {
-  const effective = { ...DEFAULT_LIMITS, ...limits };
-  const parsed = parse(pattern, effective);
-  if ("error" in parsed) return parsed.error;
-  const compiled = compileProgram(parsed.tree, effective);
-  if ("error" in compiled) return compiled.error;
-  const executor = createDfa(compiled.program);
-  return {
-    test: (text) => executor.test(text),
-    testMany: (texts) => texts.map((text) => executor.test(text)),
-  };
+  try {
+    return build(pattern, effectiveLimits(limits));
+  } catch (failure) {
+    if (failure instanceof RangeError) return { code: "nesting_depth" };
+    throw failure;
+  }
 }

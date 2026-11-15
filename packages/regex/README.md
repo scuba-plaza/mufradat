@@ -10,10 +10,9 @@ import { compile } from "@mufradat/regex";
 const matcher = compile("kit(a|ā)b");
 if ("code" in matcher) throw new Error(matcher.code);
 matcher.test("al-kitab");
-matcher.testMany(["kitab", "qalam"]);
 ```
 
-`compile(pattern, limits?)` returns a matcher or an error `{ code, position?, detail? }`; it never throws on a bad pattern. `test(text)` answers whether the pattern occurs anywhere in the text; `testMany(texts)` answers a list. There are no match positions, no captures and no flags, and no folding: a text is read by code point and matched exactly as given.
+`compile(pattern, limits?)` returns a matcher or an error `{ code, position?, detail? }`; it never throws on a bad pattern. `test(text)` answers whether the pattern occurs anywhere in the text. A limit given as `undefined` keeps its default. There are no match positions, no captures and no flags, and no folding: a text is read by code point and matched exactly as given.
 
 ## The pattern language
 
@@ -29,7 +28,7 @@ matcher.testMany(["kitab", "qalam"]);
 | `a\|b` `(...)` | alternation, with empty branches allowed, and groups, which never capture |
 | `?` `*` `+` `{n}` `{n,}` `{n,m}` | greedy repeats, with a count of at most 100 |
 
-Everything else is refused with a typed error: backreferences, lookaround, every `(?...)` group, lazy and possessive repeats, POSIX classes, inline flags, `\A \z \Z \G`, `\Q...\E`, octal escapes, a repeat of a repeat, an unknown letter or digit after a backslash, a `{` that does not start a repeat, and an unclosed group or class. The codes and where each is raised are in [CHANGES.md](CHANGES.md), and the whole contract is executable: [test/contract.ts](test/contract.ts) holds 627 rows that every implementation is run through.
+Everything else is refused with a typed error: backreferences, lookaround, every `(?...)` group, lazy and possessive repeats, POSIX classes, inline flags, `\A \z \Z \G`, `\Q...\E`, octal escapes, a repeat of a repeat, an unknown letter or digit after a backslash, a `{` that does not start a repeat, and an unclosed group or class. The codes and where each is raised are in [CHANGES.md](CHANGES.md), and the whole contract is executable: [test/contract.ts](test/contract.ts) holds 635 rows that every implementation is run through.
 
 ## Time and size
 
@@ -51,7 +50,7 @@ A matcher that builds more than 2,000 DFA states, at more than one state per 8 c
 2. **Compile** (`src/program`): the tree to a program of `ranges`, `split`, `jump`, `assert` and `match`. A bounded repeat is emitted in the nested form, `x{2,5}` as `xx(x(x(x)?)?)?`, in which every optional copy leaves by one shared exit. Character sets are sorted, merged ranges; `\d`, `\w`, `\s` and `\p{...}` come from tables in `src/unicode`.
 3. **Run** (`src/exec`): a lazy DFA whose states are sets of program positions plus the side of the previous character, which is how `^ $ \b \B` are resolved; its transitions are cached per character class and shared by every text the matcher is given. A Pike NFA runs the same program with threads in preallocated typed arrays.
 
-The Unicode tables are generated from V8's own data by `pnpm --filter @mufradat/regex generate:unicode`, for the Unicode version that script names. A test fails on a Node with another Unicode version, which is the signal to regenerate them.
+The Unicode tables are generated from V8's own data by `pnpm --filter @mufradat/regex generate:unicode`, for the Unicode version that script names. The tests that compare the tables with V8 are skipped, with a warning, on a Node with another Unicode version; the tables themselves are static and stay correct for the version they name.
 
 ## Tests
 
@@ -64,7 +63,7 @@ The Unicode tables are generated from V8's own data by `pnpm --filter @mufradat/
 - the **DFA** itself, with a cache so small that nearly every build flushes it and a forced bail-out;
 - the range sets, the Unicode tables and the compiled programs, each on its own.
 
-The search chain of the app pins the pattern that took 44 seconds before this engine: `re:(.{100,100}){0,100}\u0001` over the whole lexicon is answered in about 60 ms through `view()`, and the test fails above 250 ms (`src/lib/search-time.test.ts`).
+The search chain of the app pins the pattern that took 44 seconds before this engine: `re:(.{100,100}){0,100}\u0001` over the whole lexicon is answered through `view()` in about the time of a plain pattern, and the test fails when it takes more than 10 times as long, both measured in the same run (`src/lib/search-time.test.ts`).
 
 ## Benchmarks
 

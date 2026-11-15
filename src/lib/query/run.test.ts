@@ -241,6 +241,18 @@ describe("a pattern is folded like the text it looks in", () => {
     expect(find("re:\\x{643}\\x{62A}")).toEqual(["book", "to write", "library, bookshop"]);
   });
 
+  it("folds an escape for a character as it folds the character itself", () => {
+    expect(find("re:^\\u0623\\u0646$")).toEqual(["that", "indeed"]);
+    expect(find("re:^\\x{623}\\x{646}$")).toEqual(["that", "indeed"]);
+    expect(find("re:^\\x{0623}\\x{0646}$")).toEqual(["that", "indeed"]);
+    expect(find("re:^\\x42OOK$")).toEqual(["book"]);
+    expect(find("re:^\\x{42}ook$")).toEqual(["book"]);
+    expect(find("re:\\u0643\\u0650\\u062a\\u064e\\u0627\\u0628")).toEqual(["book"]);
+    expect(find("re:\\u0643\\u064e\\u062a\\u064e\\u0628")).toEqual(["to write", "library, bookshop"]);
+    expect(find("re:^[\\x{621}-\\x{64a}]+$ ك")).toEqual(["book", "to write", "library, bookshop"]);
+    expect(find("re:^[\\u0627-\\u064a]{2}$")).toEqual(["that", "indeed"]);
+  });
+
   it("finds no capital letter, since the text is folded to small letters before it is looked in", () => {
     expect(find("re:\\p{Lu}")).toEqual([]);
     expect(find("re:^\\P{Lu}+$ school")).toEqual(["school"]);

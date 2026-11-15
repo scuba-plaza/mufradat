@@ -1,3 +1,4 @@
+import { nativeProperty } from "./categories";
 import type { Random } from "./random";
 
 export type PerlLetter = "d" | "D" | "w" | "W" | "s" | "S";
@@ -83,14 +84,13 @@ const NATIVE_PERL: Record<PerlLetter, string> = {
   S: "\\S",
 };
 
-const nativeProperty = (name: string, negated: boolean) =>
-  `\\${negated ? "P" : "p"}{${/^[A-Z][a-z]?$/.test(name) ? "" : "Script="}${name}}`;
+const nativePropertyEscape = (name: string, negated: boolean) => `\\${negated ? "P" : "p"}{${nativeProperty(name)}}`;
 
 const native: Dialect = {
   char: ({ code }) => `\\u{${hex(code)}}`,
   any: "[^\\n]",
   perl: (letter, inClass) => (inClass && letter === "w" ? NATIVE_WORD : NATIVE_PERL[letter]),
-  property: nativeProperty,
+  property: nativePropertyEscape,
   boundary: (negated) =>
     negated
       ? `(?:(?<=[${NATIVE_WORD}])(?=[${NATIVE_WORD}])|(?<![${NATIVE_WORD}])(?![${NATIVE_WORD}]))`

@@ -25,7 +25,7 @@ describe("patterns that make a backtracking engine exponential", () => {
       const compiled = compile(pattern);
       if ("code" in compiled) throw new Error(compiled.code);
       const body = "a".repeat(TEXT_LENGTH);
-      return compiled.testMany([body + "!", body + ending]);
+      return [body + "!", body + ending].map((text) => compiled.test(text));
     });
     if (answers === TIMEOUT) expect.fail(`${pattern} did not finish within ${BUDGET_MS} ms: the engine is no longer linear in the text`);
     expect(answers).toEqual([false, true]);

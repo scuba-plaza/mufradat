@@ -1,6 +1,6 @@
 import { TIMEOUT, within } from "./watchdog";
 
-const BUDGET_MS = 100;
+const BUDGET_MS = 1_000;
 
 export function nativeMatcher(source: string): (texts: readonly string[]) => (boolean | typeof TIMEOUT)[] {
   const re = new RegExp(source, "vy");

@@ -1,8 +1,8 @@
+import { MAX_CODE_POINT } from "../program/ranges";
 import { hasProperty } from "../unicode";
 import type { ClassItem, ErrorCode, Limits, Node, RegexError } from "./types";
 
 const NEWLINE = 10;
-const MAX_CODE_POINT = 0x10ffff;
 const CONTROL: Record<string, number> = { n: 10, t: 9, r: 13, f: 12, v: 11 };
 const isHex = (char: string | undefined): char is string => char !== undefined && /^[0-9a-fA-F]$/.test(char);
 const isNameChar = (char: string | undefined): char is string => char !== undefined && /^[0-9A-Za-z_]$/.test(char);
@@ -167,7 +167,7 @@ class Parser {
     let value = 0;
     for (let k = 0; k < count; k++) {
       const digit = this.chars[this.at];
-      if (!isHex(digit)) return this.badEscape(start);
+      if (!isHex(digit)) return this.badEscape(start, this.at + 1);
       value = value * 16 + parseInt(digit, 16);
       this.at++;
     }
@@ -178,17 +178,18 @@ class Parser {
     this.at++;
     let value = 0;
     let digits = 0;
-    while (isHex(this.chars[this.at]) && value <= MAX_CODE_POINT) {
-      value = value * 16 + parseInt(this.chars[this.at++], 16);
+    while (isHex(this.chars[this.at])) {
+      if (value <= MAX_CODE_POINT) value = value * 16 + parseInt(this.chars[this.at], 16);
       digits++;
+      this.at++;
     }
-    if (digits === 0 || value > MAX_CODE_POINT || this.chars[this.at] !== "}") return this.badEscape(start);
+    if (digits === 0 || value > MAX_CODE_POINT || this.chars[this.at] !== "}") return this.badEscape(start, this.at + 1);
     this.at++;
     return value;
   }
 
-  private badEscape(start: number): never {
-    return refuse("invalid_escape", start, this.chars.slice(start, this.at).join(""));
+  private badEscape(start: number, end = this.at): never {
+    return refuse("invalid_escape", start, this.chars.slice(start, end).join(""));
   }
 
   private characterClass(start: number): Node {

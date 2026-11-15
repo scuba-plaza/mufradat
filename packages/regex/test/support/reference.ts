@@ -1,4 +1,5 @@
 import type { Assertion, ClassItem, Node } from "../../src/syntax/types";
+import { nativeProperty } from "./categories";
 
 type Side = "edge" | "word" | "other";
 
@@ -19,7 +20,7 @@ const properties = new Map<string, RegExp>();
 function property(name: string): RegExp {
   let found = properties.get(name);
   if (!found) {
-    found = new RegExp(`\\p{${/^[A-Z][a-z]?$/.test(name) ? "" : "Script="}${name}}`, "u");
+    found = new RegExp(`\\p{${nativeProperty(name)}}`, "u");
     properties.set(name, found);
   }
   return found;
