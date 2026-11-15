@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { compile } from "../src";
+import { createDfa } from "../src/exec/dfa";
+import type { Executor } from "../src/exec/flat";
+import { createPike } from "../src/exec/pike";
+import type { Inst } from "../src/program/types";
 import { DEFAULT_LIMITS, parse } from "../src/syntax/parse";
 import type { Limits, RegexError } from "../src/syntax/types";
 import { AREAS } from "./contract";
-import { build } from "./support/pipeline";
+import { build, executorOf } from "./support/pipeline";
 import { referenceMatcher } from "./support/reference";
 
 interface Subject {
@@ -24,6 +28,21 @@ const reference: Subject = {
   },
 };
 
+const through = (name: string, make: (program: Inst[]) => Executor): Subject => ({
+  name,
+  answer(pattern, text) {
+    const executor = executorOf(pattern, make);
+    return "code" in executor ? executor : executor.test(text);
+  },
+  refusal(pattern, limits) {
+    const built = build(pattern, limits);
+    return "error" in built ? built.error : null;
+  },
+});
+
+const pike = through("the Pike executor", createPike);
+const dfa = through("the lazy DFA", (program) => createDfa(program));
+
 const engine: Subject = {
   name: "compile()",
   answer(pattern, text) {
@@ -38,7 +57,7 @@ const engine: Subject = {
 
 const show = (value: unknown) => JSON.stringify(value);
 
-for (const subject of [reference, engine]) {
+for (const subject of [reference, pike, dfa, engine]) {
   describe.each(AREAS)(`the contract through ${subject.name}: $name`, (area) => {
     it("answers every row as the contract says", () => {
       const failures: string[] = [];

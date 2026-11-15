@@ -12,10 +12,10 @@ export const JUMP = 2;
 export const ASSERT = 3;
 export const MATCH = 4;
 
-const START = 0;
-const END = 1;
-const BOUNDARY = 2;
-const NOT_BOUNDARY = 3;
+export const START = 0;
+export const END = 1;
+export const BOUNDARY = 2;
+export const NOT_BOUNDARY = 3;
 const ASSERTIONS = { start: START, end: END, wordBoundary: BOUNDARY, notWordBoundary: NOT_BOUNDARY };
 
 export const EDGE = 0;

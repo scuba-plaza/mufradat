@@ -1,6 +1,8 @@
+import { createPike } from "../../src/exec/pike";
 import { parse } from "../../src/syntax/parse";
 import { generate, renderEngine, renderNative, textsFor, type Expression, type Scope } from "./generator";
 import { nativeMatcher } from "./native";
+import { build } from "./pipeline";
 import { seeded } from "./random";
 import { referenceMatcher } from "./reference";
 import { TIMEOUT } from "./watchdog";
@@ -21,6 +23,13 @@ export const referenceAnswers: Answers = (source, _expression, texts) => {
   if ("error" in parsed) throw new Error(`${source} was refused with ${parsed.error.code}`);
   const matcher = referenceMatcher(parsed.tree);
   return texts.map(matcher);
+};
+
+export const pikeAnswers: Answers = (source, _expression, texts) => {
+  const built = build(source);
+  if ("error" in built) throw new Error(`${source} was refused with ${built.error.code}`);
+  const executor = createPike(built.program);
+  return texts.map((text) => executor.test(text));
 };
 
 export interface Options {

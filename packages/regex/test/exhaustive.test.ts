@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { compile } from "../src";
-import { parse } from "../src/syntax/parse";
+import { createDfa } from "../src/exec/dfa";
+import { createPike } from "../src/exec/pike";
+import { build } from "./support/pipeline";
 import { referenceMatcher } from "./support/reference";
 
 const TOKENS = ["a", "b", ".", "|", "(", ")", "*", "+", "?", "^", "$", "\\b"];
@@ -17,27 +19,31 @@ function* sequences(alphabet: readonly string[], longest: number, shortest: numb
 }
 
 describe("every pattern of up to four tokens against every text of up to three characters", () => {
-  it("is answered by compile() as the reference matcher answers it", () => {
+  it("is answered by the Pike executor, the lazy DFA and compile() as the reference matcher answers it", () => {
     const texts = [...sequences(LETTERS, MAX_LENGTH, 0)];
     const wrong: string[] = [];
     let accepted = 0;
     let compared = 0;
     let matched = 0;
     for (const pattern of sequences(TOKENS, MAX_TOKENS, 1)) {
-      const parsed = parse(pattern);
+      const built = build(pattern);
       const compiled = compile(pattern);
-      if ("error" in parsed || "code" in compiled) {
-        const same = "error" in parsed && "code" in compiled && parsed.error.code === compiled.code && parsed.error.position === compiled.position;
-        if (!same) wrong.push(`${pattern}: parse and compile do not refuse alike`);
+      if ("error" in built || "code" in compiled) {
+        const same = "error" in built && "code" in compiled && built.error.code === compiled.code && built.error.position === compiled.position;
+        if (!same) wrong.push(`${pattern}: build and compile do not refuse alike`);
         continue;
       }
       accepted++;
-      const reference = referenceMatcher(parsed.tree);
+      const reference = referenceMatcher(built.tree);
+      const pike = createPike(built.program);
+      const dfa = createDfa(built.program);
       for (const text of texts) {
         const expected = reference(text);
         compared++;
         if (expected) matched++;
-        if (compiled.test(text) !== expected) wrong.push(`${JSON.stringify(pattern)} on ${JSON.stringify(text)}: expected ${expected}`);
+        if (pike.test(text) !== expected) wrong.push(`Pike: ${JSON.stringify(pattern)} on ${JSON.stringify(text)}: expected ${expected}`);
+        if (dfa.test(text) !== expected) wrong.push(`DFA: ${JSON.stringify(pattern)} on ${JSON.stringify(text)}: expected ${expected}`);
+        if (compiled.test(text) !== expected) wrong.push(`compile(): ${JSON.stringify(pattern)} on ${JSON.stringify(text)}: expected ${expected}`);
       }
     }
     expect(wrong.slice(0, 10)).toEqual([]);
