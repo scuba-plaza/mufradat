@@ -1,6 +1,8 @@
-import { renderEngine, renderNative, generate, textsFor, type Scope } from "./generator";
+import { parse } from "../../src/syntax/parse";
+import { generate, renderEngine, renderNative, textsFor, type Expression, type Scope } from "./generator";
 import { nativeMatcher } from "./native";
 import { seeded } from "./random";
+import { referenceMatcher } from "./reference";
 import { TIMEOUT } from "./watchdog";
 
 export interface Report {
@@ -10,8 +12,20 @@ export interface Report {
   matched: number;
 }
 
+export type Answers = (source: string, expression: Expression, texts: readonly string[]) => (boolean | typeof TIMEOUT)[];
+
+export const nativeAnswers: Answers = (_source, expression, texts) => nativeMatcher(renderNative(expression))(texts);
+
+export const referenceAnswers: Answers = (source, _expression, texts) => {
+  const parsed = parse(source);
+  if ("error" in parsed) throw new Error(`${source} was refused with ${parsed.error.code}`);
+  const matcher = referenceMatcher(parsed.tree);
+  return texts.map(matcher);
+};
+
 export interface Options {
   scope: Scope;
+  answers: Answers;
   seed: number;
   patterns: number;
   textsPerPattern: number;
@@ -30,7 +44,7 @@ export function compare(compile: (source: string) => ((text: string) => boolean)
       continue;
     }
     const texts = textsFor(random, options.scope, expression, options.textsPerPattern);
-    const answers = nativeMatcher(renderNative(expression))(texts);
+    const answers = options.answers(source, expression, texts);
     for (const [index, text] of texts.entries()) {
       const expected = answers[index];
       if (expected === TIMEOUT) {
@@ -40,7 +54,7 @@ export function compare(compile: (source: string) => ((text: string) => boolean)
       report.compared++;
       if (expected) report.matched++;
       const actual = subject(text);
-      if (actual !== expected) report.disagreements.push(`${JSON.stringify(source)} on ${JSON.stringify(text)}: got ${actual}, native ${expected}`);
+      if (actual !== expected) report.disagreements.push(`${JSON.stringify(source)} on ${JSON.stringify(text)}: got ${actual}, expected ${expected}`);
     }
   }
   return report;

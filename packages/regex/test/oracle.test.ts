@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { compilePattern } from "../src";
 import { DEFAULT_LIMITS, parse } from "../src/syntax/parse";
-import { compare, type Report } from "./support/oracle";
+import { compare, nativeAnswers, type Report } from "./support/oracle";
 import { referenceMatcher } from "./support/reference";
 
 const OPTIONS = { patterns: 4_000, textsPerPattern: 16, maxLength: 200 };
@@ -21,7 +21,7 @@ describe("the current engine against native RegExp on syntax whose meaning does 
         const compiled = compilePattern(source);
         return typeof compiled === "string" ? compiled : (text) => compiled.matches(text);
       },
-      { ...OPTIONS, scope: "unchanged", seed: 20_240_611 },
+      { ...OPTIONS, scope: "unchanged", seed: 20_240_611, answers: nativeAnswers },
     );
     expectAgreement(report);
   }, 120_000);
@@ -34,7 +34,7 @@ describe("the parser and the reference matcher against native RegExp on all of t
         const parsed = parse(source, { ...DEFAULT_LIMITS, maxLength: OPTIONS.maxLength });
         return "error" in parsed ? parsed.error.code : referenceMatcher(parsed.tree);
       },
-      { ...OPTIONS, scope: "all", seed: 20_240_612 },
+      { ...OPTIONS, scope: "all", seed: 20_240_612, answers: nativeAnswers },
     );
     expectAgreement(report);
   }, 300_000);
