@@ -21,6 +21,7 @@ function classRanges(items: ClassItem[], negated: boolean): number[] {
 
 class Emitter {
   readonly program: Inst[] = [];
+  private readonly sets = new Map<Node, number[]>();
 
   emit(node: Node): void {
     switch (node.kind) {
@@ -28,7 +29,7 @@ class Emitter {
         this.program.push({ op: "ranges", ranges: [node.code, node.code] });
         return;
       case "class":
-        this.program.push({ op: "ranges", ranges: classRanges(node.items, node.negated) });
+        this.program.push({ op: "ranges", ranges: this.setOf(node) });
         return;
       case "assert":
         this.program.push({ op: "assert", assertion: node.assertion });
@@ -43,6 +44,15 @@ class Emitter {
         this.repeat(node);
         return;
     }
+  }
+
+  private setOf(node: Extract<Node, { kind: "class" }>): number[] {
+    let ranges = this.sets.get(node);
+    if (!ranges) {
+      ranges = classRanges(node.items, node.negated);
+      this.sets.set(node, ranges);
+    }
+    return ranges;
   }
 
   private patch(at: number, target: number): void {

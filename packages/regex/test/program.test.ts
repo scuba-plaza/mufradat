@@ -14,6 +14,11 @@ const program = (pattern: string): Inst[] => {
   return built.program;
 };
 
+const rangesOf = (inst: Inst): readonly number[] => {
+  if (inst.op !== "ranges") throw new Error(`${inst.op} is not a set`);
+  return inst.ranges;
+};
+
 const lit = (code: number): Inst => ({ op: "ranges", ranges: [code, code] });
 const split = (first: number, second: number): Inst => ({ op: "split", first, second });
 const jump = (target: number): Inst => ({ op: "jump", target });
@@ -65,6 +70,15 @@ describe("the program of one construct", () => {
   it("keeps an assertion as one instruction", () => {
     expect(program("^a$")).toEqual([{ op: "assert", assertion: "start" }, lit(97), { op: "assert", assertion: "end" }, MATCH]);
     expect(program("\\b\\B")).toEqual([{ op: "assert", assertion: "wordBoundary" }, { op: "assert", assertion: "notWordBoundary" }, MATCH]);
+  });
+});
+
+describe("the copies of a repeated body", () => {
+  it("share one set of ranges, so that a repeat does not compute and hold a set for every copy", () => {
+    const copies = program(".{3}").slice(0, 3);
+    expect(copies[1]).not.toBe(copies[0]);
+    expect(rangesOf(copies[1])).toBe(rangesOf(copies[0]));
+    expect(rangesOf(copies[2])).toBe(rangesOf(copies[0]));
   });
 });
 
