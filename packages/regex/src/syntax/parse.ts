@@ -1,3 +1,4 @@
+import { hasProperty } from "../unicode";
 import type { ClassItem, ErrorCode, Limits, Node, RegexError } from "./types";
 
 const NEWLINE = 10;
@@ -154,6 +155,7 @@ class Parser {
     if (this.at === from || this.chars[this.at] !== "}") return this.badProperty(start);
     const name = this.chars.slice(from, this.at).join("");
     this.at++;
+    if (!hasProperty(name)) return this.badProperty(start);
     return { kind: "property", name, negated };
   }
 

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { generate, matchRanges } from "../scripts/generate-unicode";
+import { parse } from "../src/syntax/parse";
 import { contains, negate } from "../src/program/ranges";
 import { PROPERTIES, SPACE, UNICODE_VERSION } from "../src/unicode/tables";
 
@@ -60,5 +61,13 @@ describe("the unicode tables", () => {
 
   it("give \\s exactly the white space and line terminators of ECMAScript", () => {
     expect([...SPACE]).toEqual([9, 13, 32, 32, 160, 160, 5760, 5760, 8192, 8202, 8232, 8233, 8239, 8239, 8287, 8287, 12288, 12288, 65279, 65279]);
+  });
+
+  it("are all accepted by the parser, as \\p{name} and \\P{name}", () => {
+    const refused: string[] = [];
+    for (const name of Object.keys(PROPERTIES)) {
+      for (const letter of ["p", "P"]) if ("error" in parse(`\\${letter}{${name}}`)) refused.push(`\\${letter}{${name}}`);
+    }
+    expect(refused).toEqual([]);
   });
 });
