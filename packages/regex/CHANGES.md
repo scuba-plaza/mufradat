@@ -83,3 +83,8 @@ An error is `{ code, position?, detail? }`. `position` counts code points from 0
 - `matcher.test(text)` answers whether the pattern occurs anywhere in the text. `matcher.testMany(texts)` answers a list; today it is a loop over `test`, and exists so that a backend that works on a whole list can replace it.
 - A text is read by code point, so a surrogate pair is one character and a lone surrogate is one character too.
 - The old `compilePattern` stays exported beside `compile` until the app switches to the new one.
+- `compile()` runs on the lazy DFA, which falls back to the Pike executor. Its cache is shared by every text the matcher is given, which is where most of its speed comes from.
+- The cache budget is 2,000,000 stored entries, counting the positions held by each state and one transition entry per character class per state, about 8 MB. When a new state goes over it, every state is dropped but that one. The plan gives no number for the DFA's budget, and the prototype's 400,000 counted positions only.
+- A matcher bails out to the Pike executor for the rest of its life once it has built more than 2,000 states and more than one state per 8 characters scanned, the prototype's rule. Characters are counted in UTF-16 units.
+- The character classes are the intervals between the range boundaries of the sets in the program, and also between those of `\w` when the program has `\b` or `\B`.
+

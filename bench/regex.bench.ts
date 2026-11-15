@@ -2,6 +2,9 @@ import { it } from "vitest";
 import { compile, compilePattern, type Pattern } from "@mufradat/regex";
 import { rankedWords, wiktionaryWords } from "../src/lib/lexicon";
 import { fold } from "../src/lib/query/fuzzy";
+import { createPike } from "../packages/regex/src/exec/pike";
+import { compileProgram } from "../packages/regex/src/program/compile";
+import { DEFAULT_LIMITS, parse } from "../packages/regex/src/syntax/parse";
 import { seeded } from "../packages/regex/test/support/random";
 
 interface Engine {
@@ -18,6 +21,17 @@ const ENGINES: Engine[] = [
   { name: "current", compile: compilePattern },
   {
     name: "pike",
+    compile(pattern) {
+      const parsed = parse(pattern);
+      if ("error" in parsed) return parsed.error.code;
+      const compiled = compileProgram(parsed.tree, DEFAULT_LIMITS);
+      if ("error" in compiled) return compiled.error.code;
+      const executor = createPike(compiled.program);
+      return { matches: (text) => executor.test(text) };
+    },
+  },
+  {
+    name: "dfa",
     compile(pattern) {
       const compiled = compile(pattern);
       return "code" in compiled ? compiled.code : { matches: (text) => compiled.test(text) };
@@ -95,7 +109,8 @@ it("prints one table per engine over the real lexicon", () => {
     { pattern: "a.{18,18}c", corpus: hostile },
   ];
   write(`lexicon: ${group(words.texts.length)} texts, ${group(characters)} characters`);
-  for (const engine of ENGINES) {
+  const wanted = process.env.BENCH_ENGINES?.split(",");
+  for (const engine of ENGINES.filter(({ name }) => !wanted || wanted.includes(name))) {
     write("");
     write(`engine: ${engine.name}`);
     write(`${"pattern".padEnd(28)}${"corpus".padEnd(8)}${"median ms".padStart(10)}${"min".padStart(9)}${"max".padStart(9)}${"runs".padStart(6)}${"matching".padStart(10)}`);

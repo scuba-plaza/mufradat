@@ -12,6 +12,7 @@ export interface DfaOptions {
 
 export interface DfaStats {
   builds: number;
+  transitions: number;
   flushes: number;
   bailed: boolean;
   scanned: number;
@@ -25,7 +26,6 @@ interface State {
   id: number;
   before: number;
   pcs: Int32Array;
-  next: Int32Array;
   accepts: number;
 }
 
@@ -64,7 +64,6 @@ export function createDfa(program: readonly Inst[], options: DfaOptions = {}): D
 
   const bounds = classBoundaries(sets, hasBoundary);
   const classCount = bounds.length;
-  const asciiClass = new Int32Array(128);
   const classOf = (code: number): number => {
     let low = 0;
     let high = classCount - 1;
@@ -75,8 +74,14 @@ export function createDfa(program: readonly Inst[], options: DfaOptions = {}): D
     }
     return low;
   };
-  for (let code = 0; code < 128; code++) asciiClass[code] = classOf(code);
-  const classFor = (code: number): number => (code < 128 ? asciiClass[code] : classOf(code));
+  let basic: Int32Array | undefined;
+  const basicClasses = (): Int32Array => {
+    const table = new Int32Array(0x10000);
+    for (let cls = 0; cls < classCount && bounds[cls] < 0x10000; cls++) {
+      table.fill(cls, bounds[cls], cls + 1 < classCount ? Math.min(bounds[cls + 1], 0x10000) : 0x10000);
+    }
+    return table;
+  };
 
   const visited = new Int32Array(length);
   const stack = new Int32Array(2 * length + 2);
@@ -155,18 +160,19 @@ export function createDfa(program: readonly Inst[], options: DfaOptions = {}): D
     return count;
   };
 
-  const stats: DfaStats = { builds: 0, flushes: 0, bailed: false, scanned: 0 };
+  const stats: DfaStats = { builds: 0, transitions: 0, flushes: 0, bailed: false, scanned: 0 };
+  const freshTable = () => new Int32Array(16 * classCount).fill(UNKNOWN);
+  let table = freshTable();
   let states: State[] = [];
   let cache = new Map<string, State>();
   let stored = 0;
+  let start: State | undefined;
 
   const intern = (before: number, pcs: Int32Array): State => {
     const key = `${before}|${pcs.join(",")}`;
     const known = cache.get(key);
     if (known) return known;
-    const created: State = { id: states.length, before, pcs, next: new Int32Array(classCount).fill(UNKNOWN), accepts: -1 };
-    states.push(created);
-    cache.set(key, created);
+    const created: State = { id: states.length, before, pcs, accepts: -1 };
     stored += pcs.length + classCount;
     stats.builds++;
     if (stored > budget) {
@@ -175,7 +181,16 @@ export function createDfa(program: readonly Inst[], options: DfaOptions = {}): D
       states = [created];
       cache = new Map([[key, created]]);
       stored = pcs.length + classCount;
+      table = freshTable();
       start = undefined;
+      return created;
+    }
+    states.push(created);
+    cache.set(key, created);
+    if ((created.id + 1) * classCount > table.length) {
+      const grown = new Int32Array(2 * table.length).fill(UNKNOWN);
+      grown.set(table);
+      table = grown;
     }
     return created;
   };
@@ -183,30 +198,34 @@ export function createDfa(program: readonly Inst[], options: DfaOptions = {}): D
   generation++;
   const startSize = addPending(scratch, 0, 0);
   const startPcs = startSize < 0 ? null : scratch.slice(0, startSize).sort();
-  let start: State | undefined;
 
-  const build = (state: State, cls: number): number => {
+  const build = (from: State, cls: number): number => {
+    stats.transitions++;
+    const row = from.id * classCount + cls;
     const code = bounds[cls];
     const after = sideOf(code);
-    const count = expand(state, after);
-    if (count < 0) return (state.next[cls] = MATCHED);
+    const count = expand(from, after);
+    if (count < 0) return (table[row] = MATCHED);
     generation++;
     let size = 0;
     for (let k = 0; k < count; k++) {
       const at = expanded[k];
       if (contains(sets[first[at]], code)) {
         size = addPending(scratch, size, at + 1);
-        if (size < 0) return (state.next[cls] = MATCHED);
+        if (size < 0) return (table[row] = MATCHED);
       }
     }
     size = addPending(scratch, size, 0);
-    if (size < 0) return (state.next[cls] = MATCHED);
+    if (size < 0) return (table[row] = MATCHED);
+    const flushes = stats.flushes;
     const target = intern(afterChar(after), scratch.slice(0, size).sort());
     if (stats.builds > bailBuilds && stats.builds * bailRatio > stats.scanned) {
       stats.bailed = true;
       return BAILED;
     }
-    return (state.next[cls] = target.id);
+    const offset = target.id * classCount;
+    if (flushes === stats.flushes) table[row] = offset;
+    return offset;
   };
 
   const accepts = (state: State): boolean => {
@@ -222,23 +241,34 @@ export function createDfa(program: readonly Inst[], options: DfaOptions = {}): D
     test(text) {
       if (startPcs === null) return true;
       if (stats.bailed) return fallback().test(text);
-      let state = start ?? (start = intern(EDGE, startPcs));
+      const classes = basic ?? (basic = basicClasses());
+      let offset = (start ?? (start = intern(EDGE, startPcs))).id * classCount;
+      let transitions = table;
       const end = text.length;
       let index = 0;
+      let counted = 0;
       while (index < end) {
         const code = text.codePointAt(index)!;
         index += code > 0xffff ? 2 : 1;
-        stats.scanned++;
-        const cls = classFor(code);
-        let target = state.next[cls];
-        if (target === UNKNOWN) {
-          target = build(state, cls);
-          if (target === BAILED) return fallback().test(text);
+        const cls = code < 0x10000 ? classes[code] : classOf(code);
+        let target = transitions[offset + cls];
+        if (target < 0) {
+          if (target === UNKNOWN) {
+            stats.scanned += index - counted;
+            counted = index;
+            target = build(states[offset / classCount], cls);
+            transitions = table;
+            if (target === BAILED) return fallback().test(text);
+          }
+          if (target === MATCHED) {
+            stats.scanned += index - counted;
+            return true;
+          }
         }
-        if (target === MATCHED) return true;
-        state = states[target];
+        offset = target;
       }
-      return accepts(state);
+      stats.scanned += end - counted;
+      return accepts(states[offset / classCount]);
     },
   };
 }

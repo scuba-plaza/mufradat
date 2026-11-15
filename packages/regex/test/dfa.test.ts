@@ -31,6 +31,17 @@ describe("the lazy DFA", () => {
     expect(dfa.stats.scanned).toBe(3 * text.length);
   });
 
+  it("computes each transition once and keeps it when its table grows, so that a second pass computes none", () => {
+    const dfa = createDfa(programOf("a[ab]{6}c"));
+    const text = randomText(7, 2_000, "ab");
+    expect(dfa.test(text)).toBe(false);
+    expect(dfa.stats.builds).toBeGreaterThan(64);
+    const computed = dfa.stats.transitions;
+    expect(computed).toBe(dfa.stats.builds * 2);
+    expect(dfa.test(text)).toBe(false);
+    expect(dfa.stats.transitions).toBe(computed);
+  });
+
   it("does not bail out on an ordinary pattern over a lot of text", () => {
     const dfa = createDfa(programOf("[a-z]+ing\\b"));
     const text = randomText(2, 200_000, "abcdefghijklmnopqrstuvwxyz ");

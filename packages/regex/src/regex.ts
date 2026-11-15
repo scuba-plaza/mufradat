@@ -1,4 +1,4 @@
-import { createPike } from "./exec/pike";
+import { createDfa } from "./exec/dfa";
 import { compileProgram } from "./program/compile";
 import { DEFAULT_LIMITS, parse } from "./syntax/parse";
 import type { Limits, RegexError } from "./syntax/types";
@@ -14,7 +14,7 @@ export function compile(pattern: string, limits: Partial<Limits> = {}): Matcher 
   if ("error" in parsed) return parsed.error;
   const compiled = compileProgram(parsed.tree, effective);
   if ("error" in compiled) return compiled.error;
-  const executor = createPike(compiled.program);
+  const executor = createDfa(compiled.program);
   return {
     test: (text) => executor.test(text),
     testMany: (texts) => texts.map((text) => executor.test(text)),
