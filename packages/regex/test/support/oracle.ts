@@ -1,6 +1,6 @@
 import { createPike } from "../../src/exec/pike";
 import { parse } from "../../src/syntax/parse";
-import { generate, renderEngine, renderNative, textsFor, type Expression, type Scope } from "./generator";
+import { generate, renderEngine, renderNative, textsFor, type Expression } from "./generator";
 import { nativeMatcher } from "./native";
 import { build } from "./pipeline";
 import { seeded } from "./random";
@@ -33,7 +33,6 @@ export const pikeAnswers: Answers = (source, _expression, texts) => {
 };
 
 export interface Options {
-  scope: Scope;
   answers: Answers;
   seed: number;
   patterns: number;
@@ -45,14 +44,14 @@ export function compare(compile: (source: string) => ((text: string) => boolean)
   const random = seeded(options.seed);
   const report: Report = { disagreements: [], compared: 0, skipped: 0, matched: 0 };
   for (let k = 0; k < options.patterns; k++) {
-    const expression = generate(random, options.scope, options.maxLength);
+    const expression = generate(random, options.maxLength);
     const source = renderEngine(expression);
     const subject = compile(source);
     if (typeof subject === "string") {
       report.disagreements.push(`${JSON.stringify(source)} was refused: ${subject}`);
       continue;
     }
-    const texts = textsFor(random, options.scope, expression, options.textsPerPattern);
+    const texts = textsFor(random, expression, options.textsPerPattern);
     const answers = options.answers(source, expression, texts);
     for (const [index, text] of texts.entries()) {
       const expected = answers[index];

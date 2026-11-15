@@ -21,12 +21,12 @@ function expectAgreement(report: Report) {
 
 describe("compile() on all of the contract's syntax", () => {
   it("never disagrees with native RegExp on seeded random patterns and texts", () => {
-    const options: Options = { ...OPTIONS, scope: "all", seed: 20_240_613, answers: nativeAnswers };
+    const options: Options = { ...OPTIONS, seed: 20_240_613, answers: nativeAnswers };
     expectAgreement(compare(engine, options));
   }, 300_000);
 
   it("never disagrees with the reference matcher on seeded random patterns and texts", () => {
-    const options: Options = { ...OPTIONS, scope: "all", seed: 20_240_614, answers: referenceAnswers };
+    const options: Options = { ...OPTIONS, seed: 20_240_614, answers: referenceAnswers };
     expectAgreement(compare(engine, options));
   }, 300_000);
 });
@@ -38,12 +38,12 @@ describe("the lazy DFA on all of the contract's syntax", () => {
   };
 
   it("never disagrees with the Pike executor on seeded random patterns and texts", () => {
-    const options: Options = { ...OPTIONS, scope: "all", seed: 20_240_615, answers: pikeAnswers };
+    const options: Options = { ...OPTIONS, seed: 20_240_615, answers: pikeAnswers };
     expectAgreement(compare(dfa, options));
   }, 300_000);
 
   it("never disagrees with native RegExp on seeded random patterns and texts", () => {
-    const options: Options = { ...OPTIONS, scope: "all", seed: 20_240_616, answers: nativeAnswers };
+    const options: Options = { ...OPTIONS, seed: 20_240_616, answers: nativeAnswers };
     expectAgreement(compare(dfa, options));
   }, 300_000);
 
@@ -57,7 +57,7 @@ describe("the lazy DFA on all of the contract's syntax", () => {
       });
       return "code" in executor ? executor.code : (text: string) => executor.test(text);
     };
-    const options: Options = { ...OPTIONS, patterns: 1_500, scope: "all", seed: 20_240_617, answers: pikeAnswers };
+    const options: Options = { ...OPTIONS, patterns: 1_500, seed: 20_240_617, answers: pikeAnswers };
     const report = compare(tiny, options);
     expect(report.disagreements.slice(0, 10)).toEqual([]);
     expect(report.compared).toBeGreaterThan(20_000);

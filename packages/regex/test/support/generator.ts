@@ -1,6 +1,5 @@
 import type { Random } from "./random";
 
-export type Scope = "unchanged" | "all";
 export type PerlLetter = "d" | "D" | "w" | "W" | "s" | "S";
 export type Form = "plain" | "backslash" | "control" | "hex2" | "hexBraced" | "unicode4";
 
@@ -179,13 +178,11 @@ const PERL_LETTERS: readonly PerlLetter[] = ["d", "D", "w", "W", "s", "S"];
 const PROPERTIES = ["L", "Lu", "Ll", "N", "Nd", "P", "S", "Z", "Arabic", "Latin", "Greek", "Han"];
 const SIMPLE = { "?": { min: 0, max: 1 }, "*": { min: 0, max: null }, "+": { min: 1, max: null } };
 
-const NOISE = [..."abc1٥ك_ -😀𝔸é"];
-const NOISE_WITH_CONTROLS = [...NOISE, "\n", "\t", "\r", " "];
+const NOISE = [..."abc1٥ك_ -😀𝔸é", "\n", "\t", "\r", "\u2028"];
 
 const MAX_DEPTH = 3;
 
-function char(random: Random, scope: Scope, value: number): Char {
-  if (scope === "unchanged") return { code: value, form: PUNCTUATION.includes(value) && random.chance(0.3) ? "backslash" : "plain" };
+function char(random: Random, value: number): Char {
   const forms: [number, Form][] = [[8, "plain"]];
   if (CONTROLS.includes(value)) forms.push([4, "control"]);
   else if (PUNCTUATION.includes(value)) forms.push([2, "backslash"]);
@@ -197,32 +194,28 @@ function char(random: Random, scope: Scope, value: number): Char {
   return { code: value, form: form === "plain" && !printable ? "hexBraced" : form };
 }
 
-function literalCode(random: Random, scope: Scope): number {
-  const pools = [[10, LETTERS], [4, OTHERS], [2, PUNCTUATION]] as [number, number[]][];
-  if (scope === "all") pools.push([2, CONTROLS], [1, LOW]);
-  return random.pick(random.weighted(pools));
-}
+const literalCode = (random: Random): number =>
+  random.pick(random.weighted([[10, LETTERS], [4, OTHERS], [2, PUNCTUATION], [2, CONTROLS], [1, LOW]]));
 
-function classItem(random: Random, scope: Scope): ClassItem {
+function classItem(random: Random): ClassItem {
   if (random.chance(0.35)) {
     const [from, to] = random.pick(RANGES);
-    return { kind: "range", from: char(random, scope, from), to: char(random, scope, to) };
+    return { kind: "range", from: char(random, from), to: char(random, to) };
   }
   if (random.chance(0.3)) return { kind: "perl", letter: random.pick(PERL_LETTERS) };
-  if (scope === "all" && random.chance(0.15)) return { kind: "property", name: random.pick(PROPERTIES), negated: random.chance(0.4) };
-  return { kind: "literal", char: char(random, scope, literalCode(random, scope)) };
+  if (random.chance(0.15)) return { kind: "property", name: random.pick(PROPERTIES), negated: random.chance(0.4) };
+  return { kind: "literal", char: char(random, literalCode(random)) };
 }
 
-function characterClass(random: Random, scope: Scope): Node {
+function characterClass(random: Random): Node {
   const items: ClassItem[] = [];
-  for (let k = random.between(1, 4); k > 0; k--) items.push(classItem(random, scope));
+  for (let k = random.between(1, 4); k > 0; k--) items.push(classItem(random));
   return { kind: "class", negated: random.chance(0.3), items };
 }
 
 type AtomKind = "literal" | "any" | "perl" | "class" | "start" | "end" | "group" | "property" | "boundary";
 
-function atom(random: Random, scope: Scope, depth: number): Node {
-  const all = scope === "all";
+function atom(random: Random, depth: number): Node {
   const choice = random.weighted<AtomKind>([
     [40, "literal"],
     [6, "any"],
@@ -231,18 +224,18 @@ function atom(random: Random, scope: Scope, depth: number): Node {
     [5, "start"],
     [5, "end"],
     [depth < MAX_DEPTH ? 12 : 0, "group"],
-    [all ? 5 : 0, "property"],
-    [all ? 6 : 0, "boundary"],
+    [5, "property"],
+    [6, "boundary"],
   ]);
   switch (choice) {
     case "literal":
-      return { kind: "literal", char: char(random, scope, literalCode(random, scope)) };
+      return { kind: "literal", char: char(random, literalCode(random)) };
     case "any":
       return { kind: "any" };
     case "perl":
       return { kind: "perl", letter: random.pick(PERL_LETTERS) };
     case "class":
-      return characterClass(random, scope);
+      return characterClass(random);
     case "start":
       return { kind: "start" };
     case "end":
@@ -252,7 +245,7 @@ function atom(random: Random, scope: Scope, depth: number): Node {
     case "boundary":
       return { kind: "boundary", negated: random.chance(0.4) };
     case "group":
-      return { kind: "group", body: expression(random, scope, depth + 1) };
+      return { kind: "group", body: expression(random, depth + 1) };
   }
 }
 
@@ -262,10 +255,8 @@ function bounds(random: Random, large: boolean): { min: number; max: number | nu
   return { min, max: random.chance(0.2) ? null : random.between(min, Math.min(top, min + 6)) };
 }
 
-function piece(random: Random, scope: Scope, depth: number): Node {
-  const body = atom(random, scope, depth);
-  const empty = body.kind === "start" || body.kind === "end" || body.kind === "boundary";
-  if (empty && scope === "unchanged") return body;
+function piece(random: Random, depth: number): Node {
+  const body = atom(random, depth);
   const form = random.weighted<"none" | "?" | "*" | "+" | "range">([
     [55, "none"],
     [8, "?"],
@@ -276,22 +267,22 @@ function piece(random: Random, scope: Scope, depth: number): Node {
   if (form === "none") return body;
   if (form !== "range") return { kind: "repeat", body, form, ...SIMPLE[form] };
   const { min, max } = bounds(random, depth === 0 && body.kind !== "group");
-  return { kind: "repeat", body, min, max, form: scope === "all" && max === min && random.chance(0.5) ? "exact" : "range" };
+  return { kind: "repeat", body, min, max, form: max === min && random.chance(0.5) ? "exact" : "range" };
 }
 
-function expression(random: Random, scope: Scope, depth: number): Expression {
+function expression(random: Random, depth: number): Expression {
   const branches: Expression = [];
   for (let b = random.weighted([[60, 1], [30, 2], [10, 3]]); b > 0; b--) {
     const sequence: Node[] = [];
-    for (let n = random.weighted([[10, 0], [30, 1], [30, 2], [20, 3], [10, 4]]); n > 0; n--) sequence.push(piece(random, scope, depth));
+    for (let n = random.weighted([[10, 0], [30, 1], [30, 2], [20, 3], [10, 4]]); n > 0; n--) sequence.push(piece(random, depth));
     branches.push(sequence);
   }
   return branches;
 }
 
-export function generate(random: Random, scope: Scope, maxLength: number): Expression {
+export function generate(random: Random, maxLength: number): Expression {
   for (;;) {
-    const candidate = expression(random, scope, 0);
+    const candidate = expression(random, 0);
     if (renderEngine(candidate).length <= maxLength) return candidate;
   }
 }
@@ -312,16 +303,15 @@ function charsOf(expr: Expression, found: Set<string>): void {
   }
 }
 
-export function textsFor(random: Random, scope: Scope, expr: Expression, count: number): string[] {
-  const noise = scope === "all" ? NOISE_WITH_CONTROLS : NOISE;
+export function textsFor(random: Random, expr: Expression, count: number): string[] {
   const own = new Set<string>();
   charsOf(expr, own);
-  const pool = own.size === 0 ? noise : [...own];
+  const pool = own.size === 0 ? NOISE : [...own];
   const texts = [""];
   while (texts.length < count) {
     const length = random.chance(0.85) ? random.between(0, 7) : random.between(8, 24);
     let built = "";
-    for (let k = 0; k < length; k++) built += random.chance(0.75) ? random.pick(pool) : random.pick(noise);
+    for (let k = 0; k < length; k++) built += random.chance(0.75) ? random.pick(pool) : random.pick(NOISE);
     texts.push(built);
   }
   return texts;

@@ -123,7 +123,7 @@ describe("the size of a tree, found before anything is built", () => {
     const roomy = { ...DEFAULT_LIMITS, maxLength: 1_000, maxInstructions: 10_000_000 };
     const wrong: string[] = [];
     for (let k = 0; k < 1_500; k++) {
-      const pattern = renderEngine(generate(random, "all", 200));
+      const pattern = renderEngine(generate(random, 200));
       const built = build(pattern, roomy);
       if ("error" in built) wrong.push(`${pattern} was refused with ${built.error.code}`);
       else if (size(built.tree) !== built.program.length - 1) wrong.push(`${pattern}: size ${size(built.tree)}, program ${built.program.length - 1}`);

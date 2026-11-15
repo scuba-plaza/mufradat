@@ -1,5 +1,6 @@
 import { fold } from "./fuzzy";
-import { compilePattern, type Pattern } from "@mufradat/regex";
+import { compile, type Matcher } from "@mufradat/regex";
+import { describeError } from "./errors";
 import { FIELDS, SORT_KEYS, listed, type Field, type SortKey, type Test } from "./fields";
 
 export interface Query {
@@ -107,12 +108,12 @@ const RE = "re:";
 
 const isPattern = (text: string) => text.slice(0, RE.length).toLowerCase() === RE;
 
-const freeText = (pattern: Pattern): Test => (row) => pattern.matches(fold(row.lemma)) || pattern.matches(fold(row.english));
+const freeText = (pattern: Matcher): Test => (row) => pattern.test(fold(row.lemma)) || pattern.test(fold(row.english));
 
 const foldPattern = (source: string): string =>
-  source.replace(/\\([^])|[^\\]+/gu, (piece: string, escaped?: string) => {
+  source.replace(/\\([pP](?:\{[^}]*\}|[A-Za-z])|[^])|[^\\]+/gu, (piece: string, escaped?: string) => {
     if (escaped === undefined) return fold(piece);
-    if (/[DWS]/.test(escaped)) return piece;
+    if (/^[A-Za-z]/.test(escaped)) return piece;
     const folded = fold(escaped);
     return folded === "" ? "" : `\\${folded}`;
   });
@@ -121,8 +122,8 @@ function patternTest(key: string, def: Pick<Field, "pattern">, body: string): Te
   const label = key === "re" ? RE : `${key}:${RE}`;
   if (body === "") return `${label} needs a pattern.`;
   if (!def.pattern) return `${key}: takes fixed values, not a pattern.`;
-  const found = compilePattern(foldPattern(body));
-  return typeof found === "string" ? `${label} ${found}` : def.pattern(found);
+  const found = compile(foldPattern(body));
+  return "code" in found ? `${label} ${describeError(found)}` : def.pattern(found);
 }
 
 export function withSort(text: string, sort: string | null): string {

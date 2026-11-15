@@ -1,6 +1,6 @@
-# Changes from the current engine
+# Changes from the earlier engine
 
-The rewrite keeps every behavior of the current `re:` engine except the changes below. A test enforces that: every row of the contract that no declared change covers is run through the current engine too, and must get the same answer (`test/legacy.test.ts`).
+The rewrite kept every behavior of the earlier `re:` engine except the changes below. While both engines existed, a test ran every row of the contract through the earlier one too, and any row that no declared change covered had to get the same answer from it; the earlier engine and that test were deleted when the app switched to this package.
 
 ## Breaking changes the plan lists
 
@@ -15,7 +15,7 @@ The rewrite keeps every behavior of the current `re:` engine except the changes 
 | `.` on a newline | matches | does not match |
 | Error output | English sentences | stable codes, which the app maps to text |
 
-## Further changes the comparison with the current engine found
+## Further changes the comparison with the earlier engine found
 
 These follow from the contract but are not in the plan's table.
 
@@ -82,7 +82,7 @@ An error is `{ code, position?, detail? }`. `position` counts code points from 0
 - `compile(pattern, limits?)` returns a matcher or an error object `{ code, position?, detail? }`; the two are told apart by `"code" in result`. `limits` takes any of `maxLength`, `maxRepeat`, `maxDepth` and `maxInstructions`; the rest keep their defaults.
 - `matcher.test(text)` answers whether the pattern occurs anywhere in the text. `matcher.testMany(texts)` answers a list; today it is a loop over `test`, and exists so that a backend that works on a whole list can replace it.
 - A text is read by code point, so a surrogate pair is one character and a lone surrogate is one character too.
-- The old `compilePattern` stays exported beside `compile` until the app switches to the new one.
+- The package exports `compile` and the types `Matcher`, `RegexError`, `ErrorCode` and `Limits`, and nothing else. The app maps each error code to a sentence in `src/lib/query/errors.ts`, keeping the exact text of every error the earlier engine had.
 - `compile()` runs on the lazy DFA, which falls back to the Pike executor. Its cache is shared by every text the matcher is given, which is where most of its speed comes from.
 - The cache budget is 2,000,000 stored entries, counting the positions held by each state and one transition entry per character class per state, about 8 MB. When a new state goes over it, every state is dropped but that one. The plan gives no number for the DFA's budget, and the prototype's 400,000 counted positions only.
 - A matcher bails out to the Pike executor for the rest of its life once it has built more than 2,000 states and more than one state per 8 characters scanned, the prototype's rule. Characters are counted in UTF-16 units.

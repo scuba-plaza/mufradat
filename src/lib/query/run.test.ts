@@ -233,6 +233,19 @@ describe("a pattern is folded like the text it looks in", () => {
     expect(find("re:\\D\\Dook")).toEqual(["library, bookshop"]);
   });
 
+  it("keeps the capital of an escape and the name of a property, which mean something as typed", () => {
+    expect(find("re:\\bbook\\b")).toEqual(["book"]);
+    expect(find("re:\\Book")).toEqual(["book", "library, bookshop"]);
+    expect(find("re:^\\p{Latin}+$")).toEqual(["book", "school", "that", "indeed"]);
+    expect(find("re:^\\P{Latin}+$ ك")).toEqual(["book", "to write", "library, bookshop"]);
+    expect(find("re:\\x{643}\\x{62A}")).toEqual(["book", "to write", "library, bookshop"]);
+  });
+
+  it("finds no capital letter, since the text is folded to small letters before it is looked in", () => {
+    expect(find("re:\\p{Lu}")).toEqual([]);
+    expect(find("re:^\\P{Lu}+$ school")).toEqual(["school"]);
+  });
+
   it("folds a pattern for a tag or a root the same way", () => {
     const folded = [
       row({ rank: 1, english: "eat", root: "أ ك ل", tags: ["Lesson_1"], id: "f1" }),

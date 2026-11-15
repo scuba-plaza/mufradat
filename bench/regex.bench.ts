@@ -1,5 +1,5 @@
 import { it } from "vitest";
-import { compile, compilePattern, type Pattern } from "@mufradat/regex";
+import { compile } from "@mufradat/regex";
 import { rankedWords, wiktionaryWords } from "../src/lib/lexicon";
 import { fold } from "../src/lib/query/fuzzy";
 import { createPike } from "../packages/regex/src/exec/pike";
@@ -9,7 +9,7 @@ import { seeded } from "../packages/regex/test/support/random";
 
 interface Engine {
   name: string;
-  compile(pattern: string): Pattern | string;
+  compile(pattern: string): ((text: string) => boolean) | string;
 }
 
 interface Corpus {
@@ -18,7 +18,6 @@ interface Corpus {
 }
 
 const ENGINES: Engine[] = [
-  { name: "current", compile: compilePattern },
   {
     name: "pike",
     compile(pattern) {
@@ -27,14 +26,14 @@ const ENGINES: Engine[] = [
       const compiled = compileProgram(parsed.tree, DEFAULT_LIMITS);
       if ("error" in compiled) return compiled.error.code;
       const executor = createPike(compiled.program);
-      return { matches: (text) => executor.test(text) };
+      return (text) => executor.test(text);
     },
   },
   {
     name: "dfa",
     compile(pattern) {
       const compiled = compile(pattern);
-      return "code" in compiled ? compiled.code : { matches: (text) => compiled.test(text) };
+      return "code" in compiled ? compiled.code : (text) => compiled.test(text);
     },
   },
 ];
@@ -119,7 +118,7 @@ it("prints one table per engine over the real lexicon", () => {
         const compiled = engine.compile(pattern);
         if (typeof compiled === "string") throw new Error(`${pattern}: ${compiled}`);
         let matching = 0;
-        for (const text of corpus.texts) if (compiled.matches(text)) matching++;
+        for (const text of corpus.texts) if (compiled(text)) matching++;
         return matching;
       });
       const label = corpus === words ? "lexicon" : "a/b";

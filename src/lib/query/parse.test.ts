@@ -213,3 +213,34 @@ describe("what the bar says about a pattern among other values", () => {
     expect(failure("tag:re:((a{100,100}){100,100}){100,100}")).toBe("tag:re: The pattern is too big to search with.");
   });
 });
+
+describe("what the bar says about syntax the pattern language reads or refuses", () => {
+  it("reads the escapes, properties, boundaries and counts of the pattern language", () => {
+    expect(failure("re:\\bbook\\b")).toBeNull();
+    expect(failure("re:\\p{Arabic}+")).toBeNull();
+    expect(failure("re:\\P{Lu}a{2}")).toBeNull();
+    expect(failure("tag:re:\\x{41}\\u0042\\n")).toBeNull();
+  });
+
+  it("names an escape that means nothing, as typed, so that a capital is not read as a small letter", () => {
+    expect(failure("re:\\q")).toBe("re: \\q is not an escape this search knows.");
+    expect(failure("tag:re:a\\1")).toBe("tag:re: \\1 is not an escape this search knows.");
+    expect(failure("re:\\N")).toBe("re: \\N is not an escape this search knows.");
+    expect(failure("re:\\T")).toBe("re: \\T is not an escape this search knows.");
+  });
+
+  it("names a property that is not known, keeping its capitals as typed", () => {
+    expect(failure("re:\\p{Nope}")).toBe("re: \\p{Nope} is not a Unicode property such as \\p{Arabic} or \\p{Lu}.");
+    expect(failure("re:\\pL")).toBe("re: \\pL is not a Unicode property such as \\p{Arabic} or \\p{Lu}.");
+  });
+
+  it("names a brace that starts no repeat, a repeat of a repeat and what is not supported", () => {
+    expect(failure("re:a{,3}")).toBe("re: A { has to start a repeat such as {2}, {2,} or {2,5}; write \\{ for a brace itself.");
+    expect(failure("re:a{2")).toBe("re: A { has to start a repeat such as {2}, {2,} or {2,5}; write \\{ for a brace itself.");
+    expect(failure("re:a**")).toBe("re: A quantifier cannot follow another quantifier.");
+    expect(failure("re:(?:a)")).toBe("re: (?: is not supported.");
+    expect(failure("re:a*?")).toBe("re: *? is not supported.");
+    expect(failure("re:[[:alpha:]]")).toBe("re: [:alpha:] is not supported.");
+  });
+});
+
