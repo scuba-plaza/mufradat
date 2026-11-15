@@ -71,3 +71,25 @@ describe("the time a re: search takes, from the search bar to the matched rows",
     expect(finds(Array(12).fill("root:re:(a|aa)+!$").join(" "))).toBe(true);
   }, 120_000);
 });
+
+const PINNED_MS = 250;
+const SLOW_PATTERN = "re:(.{100,100}){0,100}\\u0001";
+
+describe("the pattern that took 44 seconds before the engine was rewritten", () => {
+  it("is answered over the whole lexicon, through the search chain, in the time it was pinned at", () => {
+    const store = openStore(":memory:");
+    const now = new Date();
+    const timed = () => {
+      const start = performance.now();
+      const outcome = within(BUDGET_MS, () => view(store, SLOW_PATTERN, now));
+      if (outcome === TOO_SLOW) expect.fail(`${SLOW_PATTERN} did not finish within ${BUDGET_MS} ms: the engine is no longer linear in the text`);
+      return { ms: performance.now() - start, outcome };
+    };
+    timed();
+    const runs = [timed(), timed(), timed()];
+    const median = runs.map((run) => run.ms).sort((a, b) => a - b)[1];
+    for (const { outcome } of runs) expect(outcome).toEqual({ rows: [], error: null, sort: null });
+    expect(median, `the median of three runs was ${median.toFixed(0)} ms`).toBeLessThan(PINNED_MS);
+  }, 120_000);
+});
+
