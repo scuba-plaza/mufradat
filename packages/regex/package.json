@@ -3,5 +3,8 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate:unicode": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/generate-unicode.ts"
   }
 }
