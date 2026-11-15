@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_LIMITS, parse } from "../src/syntax/parse";
 import { AREAS } from "./contract";
+import { build } from "./support/pipeline";
 import { referenceMatcher } from "./support/reference";
 
 const show = (value: unknown) => JSON.stringify(value);
@@ -23,11 +24,11 @@ describe.each(AREAS)("the contract: $name", (area) => {
   it("refuses every refused pattern with its code, place and detail", () => {
     const failures: string[] = [];
     for (const row of area.refused) {
-      const parsed = parse(row.pattern, { ...DEFAULT_LIMITS, ...row.limits });
+      const built = build(row.pattern, { ...DEFAULT_LIMITS, ...row.limits });
       const expected = { code: row.code, position: row.position, detail: row.detail };
-      if (!("error" in parsed)) failures.push(`${show(row.pattern)} was accepted, expected ${show(expected)}`);
-      else if (show({ code: parsed.error.code, position: parsed.error.position, detail: parsed.error.detail }) !== show(expected)) {
-        failures.push(`${show(row.pattern)}: expected ${show(expected)}, got ${show(parsed.error)}`);
+      if (!("error" in built)) failures.push(`${show(row.pattern)} was accepted, expected ${show(expected)}`);
+      else if (show({ code: built.error.code, position: built.error.position, detail: built.error.detail }) !== show(expected)) {
+        failures.push(`${show(row.pattern)}: expected ${show(expected)}, got ${show(built.error)}`);
       }
     }
     expect(failures).toEqual([]);

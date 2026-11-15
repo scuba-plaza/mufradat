@@ -543,4 +543,18 @@ export const ASSERTIONS: Area = {
   ],
 };
 
-export const AREAS: Area[] = [LITERALS_AND_STRUCTURE, DOT_AND_CLASSES, REPEATS, ESCAPES, SETS, ASSERTIONS];
+const nested = (levels: number) => "(".repeat(levels) + "a" + "){2,2}".repeat(levels);
+
+export const SIZE: Area = {
+  name: "the size of the program",
+  matches: [],
+  refused: [
+    { pattern: "((a{100,100}){100,100}){100,100}", code: "too_big" },
+    { pattern: "(((a{100,100}){100,100}){100,100}){100,100}", code: "too_big" },
+    { pattern: "(a{100,100}){100,100}|(a{100,100}){100,100}", code: "too_big" },
+    { pattern: "(.{100,100}){0,100}(.{100,100}){0,100}", code: "too_big" },
+    { pattern: nested(27), code: "too_big" },
+  ],
+};
+
+export const AREAS: Area[] = [LITERALS_AND_STRUCTURE, DOT_AND_CLASSES, REPEATS, ESCAPES, SETS, ASSERTIONS, SIZE];

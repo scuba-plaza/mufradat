@@ -8,7 +8,7 @@ const isHex = (char: string | undefined): char is string => char !== undefined &
 const isNameChar = (char: string | undefined): char is string => char !== undefined && /^[0-9A-Za-z_]$/.test(char);
 const isPunctuation = (char: string) => char < "\u0080" && !/[0-9A-Za-z]/.test(char);
 
-export const DEFAULT_LIMITS: Limits = { maxLength: 200, maxRepeat: 100, maxDepth: 1000 };
+export const DEFAULT_LIMITS: Limits = { maxLength: 200, maxRepeat: 100, maxDepth: 1000, maxInstructions: 20_000 };
 
 export type Parsed = { tree: Node } | { error: RegexError };
 

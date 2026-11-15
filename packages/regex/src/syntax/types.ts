@@ -30,7 +30,8 @@ export type ErrorCode =
   | "nested_repeat"
   | "trailing_backslash"
   | "invalid_escape"
-  | "unsupported";
+  | "unsupported"
+  | "too_big";
 
 export interface RegexError {
   code: ErrorCode;
@@ -42,4 +43,5 @@ export interface Limits {
   maxLength: number;
   maxRepeat: number;
   maxDepth: number;
+  maxInstructions: number;
 }
