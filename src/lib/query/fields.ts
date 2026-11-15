@@ -1,13 +1,13 @@
 import { POS_VALUES, type WordRow } from "../types";
 import { fold } from "./fuzzy";
-import type { Pattern } from "./pattern";
+import type { Matcher } from "@mufradat/regex";
 
 export type Test = (row: WordRow, now: Date) => boolean;
 
 export interface Field {
   parse(part: string): Test | string;
   /** When set, the field also takes re: followed by a pattern. */
-  pattern?: (pattern: Pattern) => Test;
+  pattern?: (pattern: Matcher) => Test;
 }
 
 export const SORT_KEYS = {
@@ -61,7 +61,7 @@ const root: Field = {
     const wanted = rootLetters(part);
     return (row) => rootLetters(row.root) === wanted;
   },
-  pattern: (p) => (row) => p.matches(rootLetters(row.root)),
+  pattern: (p) => (row) => p.test(rootLetters(row.root)),
 };
 
 const UNITS = { h: 3_600_000, d: 86_400_000, w: 604_800_000 } as const;
@@ -83,7 +83,7 @@ const tag: Field = {
     const wanted = part.toLowerCase();
     return (row) => row.tags.some((t) => t.toLowerCase() === wanted);
   },
-  pattern: (p) => (row) => row.tags.some((t) => p.matches(fold(t))),
+  pattern: (p) => (row) => row.tags.some((t) => p.test(fold(t))),
 };
 
 export const FIELDS: Record<string, Field> = {

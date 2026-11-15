@@ -112,6 +112,7 @@ describe("the keys of a card opened from a list", () => {
     cy.visit(`/?q=${encodeURIComponent(query)}`);
     cy.wordRow(rank).click();
     cy.hydrated(by("Hint English"));
+    cy.get("html[data-keys]");
   }
 
   it("walks the list it was opened from instead of the frequency list", () => {
@@ -120,6 +121,7 @@ describe("the keys of a card opened from a list", () => {
     cy.get("body").type("{ctrl}{rightarrow}");
     cy.contains("Word 183 of 5000");
     cy.hydrated(by("Hint English"));
+    cy.get("html[data-keys]");
     cy.get("body").type("{ctrl}{leftarrow}");
     cy.contains("Word 184 of 5000");
   });

@@ -71,3 +71,33 @@ describe("the time a re: search takes, from the search bar to the matched rows",
     expect(finds(Array(12).fill("root:re:(a|aa)+!$").join(" "))).toBe(true);
   }, 120_000);
 });
+
+const PLAIN_PATTERN = "re:\\u0001";
+const SLOW_PATTERN = "re:(.{100,100}){0,100}\\u0001";
+const MAX_RATIO = 10;
+const ROUNDS = 5;
+
+describe("the pattern that took 44 seconds before the engine was rewritten", () => {
+  it("is answered over the whole lexicon, through the search chain, in the time of a plain pattern", () => {
+    const store = openStore(":memory:");
+    const now = new Date();
+    const timed = (query: string) => {
+      const start = performance.now();
+      const outcome = within(BUDGET_MS, () => view(store, query, now));
+      if (outcome === TOO_SLOW) expect.fail(`${query} did not finish within ${BUDGET_MS} ms: the engine is no longer linear in the text`);
+      expect(outcome).toEqual({ rows: [], error: null, sort: null });
+      return performance.now() - start;
+    };
+    const median = (times: number[]) => [...times].sort((a, b) => a - b)[Math.floor(times.length / 2)];
+    timed(PLAIN_PATTERN);
+    timed(SLOW_PATTERN);
+    const plain: number[] = [];
+    const slow: number[] = [];
+    for (let round = 0; round < ROUNDS; round++) {
+      plain.push(timed(PLAIN_PATTERN));
+      slow.push(timed(SLOW_PATTERN));
+    }
+    const ratio = median(slow) / median(plain);
+    expect(ratio, `the median was ${median(slow).toFixed(0)} ms against ${median(plain).toFixed(0)} ms for a plain pattern`).toBeLessThan(MAX_RATIO);
+  }, 120_000);
+});

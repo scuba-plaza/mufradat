@@ -166,6 +166,9 @@ importers:
 
   .:
     dependencies:
+      '@mufradat/regex':
+        specifier: workspace:*
+        version: link:packages/regex
       better-sqlite3:
         specifier: ^13.0.3
         version: 13.0.3
@@ -215,6 +218,8 @@ importers:
       vitest:
         specifier: ^5.1.0
         version: 5.1.0(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(jiti@1.21.7))
+
+  packages/regex: {}
 
 packages:
 
