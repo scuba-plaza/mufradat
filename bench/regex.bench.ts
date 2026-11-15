@@ -1,5 +1,5 @@
 import { it } from "vitest";
-import { compilePattern, type Pattern } from "@mufradat/regex";
+import { compile, compilePattern, type Pattern } from "@mufradat/regex";
 import { rankedWords, wiktionaryWords } from "../src/lib/lexicon";
 import { fold } from "../src/lib/query/fuzzy";
 import { seeded } from "../packages/regex/test/support/random";
@@ -14,7 +14,16 @@ interface Corpus {
   texts: string[];
 }
 
-const ENGINES: Engine[] = [{ name: "current", compile: compilePattern }];
+const ENGINES: Engine[] = [
+  { name: "current", compile: compilePattern },
+  {
+    name: "pike",
+    compile(pattern) {
+      const compiled = compile(pattern);
+      return "code" in compiled ? compiled.code : { matches: (text) => compiled.test(text) };
+    },
+  },
+];
 
 const SLOW_MS = 2_000;
 const WARMUP_MS = 1_000;

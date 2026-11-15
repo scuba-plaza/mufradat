@@ -76,3 +76,10 @@ An error is `{ code, position?, detail? }`. `position` counts code points from 0
 
 - There is no separate simplification pass. The compiler emits a bounded repeat directly in the nested form, `x{2,5}` as `xx(x(x(x)?)?)?`, in which every optional copy leaves by one shared exit; `size(tree)` counts the instructions of the result by arithmetic, and a test checks that it equals the length of the program on thousands of random patterns.
 - A program has no loop for an unanchored search: the executors start a thread at every position. The program limit counts the instructions of the pattern and its final match, so a pattern close to the old limit can be accepted or refused where the old engine, which also counted its search loop, decided differently.
+
+### API and executor
+
+- `compile(pattern, limits?)` returns a matcher or an error object `{ code, position?, detail? }`; the two are told apart by `"code" in result`. `limits` takes any of `maxLength`, `maxRepeat`, `maxDepth` and `maxInstructions`; the rest keep their defaults.
+- `matcher.test(text)` answers whether the pattern occurs anywhere in the text. `matcher.testMany(texts)` answers a list; today it is a loop over `test`, and exists so that a backend that works on a whole list can replace it.
+- A text is read by code point, so a surrogate pair is one character and a lone surrogate is one character too.
+- The old `compilePattern` stays exported beside `compile` until the app switches to the new one.
