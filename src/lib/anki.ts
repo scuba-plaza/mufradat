@@ -4,8 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { audioFileName, slotLabel, type ClipPlace } from "./audio";
 import { plainExample, splitExample } from "./validate";
-import { POS_LABELS } from "./types";
-import type { Note } from "./types";
+import { POS_LABELS, type Note } from "./types";
 import { zipStored } from "./zip";
 
 const MODEL_NAME = "Arabic MSA Word";

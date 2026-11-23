@@ -1,10 +1,10 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cardForRank } from "@/lib/lexicon";
-import { POST } from "./route";
 import { context } from "@/lib/server";
+import { tempWorkspace } from "@/lib/testing/workspace";
+import { POST } from "./route";
 
 const river = {
   sentence: "شَرِبَ الْوَلَدُ مِنْ مَاءِ النَّهْرِ الْبَارِدِ",
@@ -16,20 +16,17 @@ function askFor(id: string) {
 }
 
 describe("asking Mistral for an example", () => {
-  let home: string;
+  const home = tempWorkspace();
   let answer: unknown;
   let requests: { agent_id: string; agent_version: number; inputs: string }[];
 
   function writeConfig(content: string) {
-    const file = path.join(home, "config", "mufradat", "config.toml");
+    const file = path.join(home(), "config", "mufradat", "config.toml");
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, content, { mode: 0o600 });
   }
 
   beforeEach(() => {
-    home = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-route-"));
-    vi.stubEnv("XDG_CONFIG_HOME", path.join(home, "config"));
-    vi.stubEnv("MUFRADAT_WORKSPACE", path.join(home, "workspace"));
     vi.stubEnv("MISTRAL_API_KEY", "test-key");
     writeConfig('mistral_agent_id = "ag_test"\nmistral_agent_version = 3\n');
     answer = river;
@@ -40,7 +37,6 @@ describe("asking Mistral for an example", () => {
     });
   });
   afterEach(() => {
-    vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
 
@@ -259,5 +255,4 @@ describe("asking Mistral for an example", () => {
     const saved = (await (await askFor(note.id)).json()).note;
     expect(saved.exampleError).toMatch(/gave no answer/);
   });
-
 });

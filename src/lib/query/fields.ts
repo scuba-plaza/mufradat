@@ -38,8 +38,6 @@ function choice(allowed: readonly string[], valuesOf: (row: WordRow) => string |
   };
 }
 
-const rankHint = (part: string) => `expects a number, a range such as 1-500 or none, not "${part}".`;
-
 const rank: Field = {
   parse(part) {
     if (part.toLowerCase() === "none") return (row) => row.rank === null;
@@ -48,9 +46,9 @@ const rank: Field = {
     const range = /^(\d+)-(\d+)$/.exec(part);
     if (range) {
       const [low, high] = [Number(range[1]), Number(range[2])];
-      return low <= high ? (row) => row.rank !== null && row.rank >= low && row.rank <= high : rankHint(part);
+      if (low <= high) return (row) => row.rank !== null && row.rank >= low && row.rank <= high;
     }
-    return rankHint(part);
+    return `expects a number, a range such as 1-500 or none, not "${part}".`;
   },
 };
 

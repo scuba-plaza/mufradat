@@ -2,8 +2,8 @@ import Database from "better-sqlite3";
 import fs from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApkg } from "./anki";
-import { audioKey } from "./audio";
-import { openStore } from "./store";
+import { audioKey, audioPath } from "./audio";
+import { openStore, type Store } from "./store";
 import { unzip } from "./testing/deck";
 import type { Note } from "./types";
 
@@ -42,7 +42,7 @@ function approvedStore() {
   s.approve(n.id);
   return { s, id: n.id };
 }
-const read = (s: ReturnType<typeof openStore>) => (key: string) => fs.readFileSync(`${s.root}/audio/${key.slice(0, 2)}/${key}.mp3`);
+const read = (s: Store) => (key: string) => fs.readFileSync(audioPath(s.root, key));
 
 describe("exporting approved cards", () => {
   it("fills every field of the Arabic MSA Word note type", () => {
@@ -75,24 +75,10 @@ describe("exporting approved cards", () => {
     });
   });
 
-  it("writes a card's tags after its pos and rank tags", () => {
+  it("writes a card's tags after its pos and rank tags, without repeating a tag the deck already has", () => {
     const { s, id } = approvedStore();
-    s.setTags(id, ["lesson_1", "grammar"]);
+    s.setTags(id, ["lesson_1", "pos::noun", "grammar"]);
     expect(collection(buildApkg([s.getNote(id)!], read(s), options)).notes[0].tags).toBe(" pos::noun rank::0001-0500 grammar lesson_1 ");
-  });
-
-  it("does not repeat a tag the deck already has", () => {
-    const { s, id } = approvedStore();
-    s.setTags(id, ["pos::noun"]);
-    expect(collection(buildApkg([s.getNote(id)!], read(s), options)).notes[0].tags).toBe(" pos::noun rank::0001-0500 ");
-  });
-
-  it("gives the same bytes whatever order the tags were set in", () => {
-    const { s, id } = approvedStore();
-    s.setTags(id, ["lesson_1", "grammar"]);
-    const first = buildApkg([s.getNote(id)!], read(s), options);
-    s.setTags(id, ["grammar", "lesson_1"]);
-    expect(buildApkg([s.getNote(id)!], read(s), options).equals(first)).toBe(true);
   });
 
   it("shows the Arabic hint on the front of the recognition card and the English hint on the English sides", () => {

@@ -9,7 +9,7 @@ export const POS_LABELS: Record<POS, string> = {
   intj: "interjection", phrase: "phrase", det: "determiner",
 };
 
-export type CardStatus = "draft" | "approved";
+type CardStatus = "draft" | "approved";
 export type WordStatus = "todo" | "progress" | "ready" | "approved" | "suspended";
 export type AudioSource = "tts" | "user";
 
@@ -83,8 +83,6 @@ export interface NoteEdit {
   forms?: { id?: string; label: string; arabic: string }[];
 }
 
-export type MissingKind = "example" | "translation" | "target" | "audio";
-
 export interface WordRow {
   id: string | null;
   rank: number | null;
@@ -99,7 +97,7 @@ export interface WordRow {
   tags: string[];
 }
 
-export interface MissingAudio {
+interface MissingAudio {
   noteId: string;
   lemma: string;
   slot: Slot;

@@ -2,28 +2,10 @@ export {};
 
 const bar = '[role="toolbar"]';
 const list = '[aria-label="Word list"]';
-const mp3 = [0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4];
 const kitab = encodeURIComponent("كتاب");
 const columnRem = 58;
 
 const px = (value: string) => parseFloat(value);
-
-function openFullCard(rank: number) {
-  cy.visit(`/open?rank=${rank}`);
-  cy.location("pathname").then((path) => {
-    const id = path.split("/").pop();
-    cy.request("PUT", `/api/notes/${id}`, { example: "كَانَ [الْكِتَابُ] جَمِيلًا جِدًّا", exampleEn: "The book was very beautiful." }).then((response) => {
-      const { forms } = (response.body as { note: { forms: { id: string }[] } }).note;
-      cy.window().then(async (win) => {
-        for (const slot of ["word", "example", ...forms.map((form) => form.id)]) {
-          await win.fetch(`/api/audio/${id}/${slot}`, { method: "PUT", body: new win.Uint8Array(mp3) });
-        }
-      });
-    });
-    cy.visit(path);
-    cy.hydrated('[aria-label="Hint English"]');
-  });
-}
 
 describe("the scale of the interface", () => {
   describe("on a large screen", () => {
@@ -52,7 +34,9 @@ describe("the scale of the interface", () => {
     }
 
     it("fits a card with four forms, a marked example and its clips, with room to spare", () => {
-      openFullCard(6);
+      cy.finishCard(6);
+      cy.reload();
+      cy.hydrated('[aria-label="Hint English"]');
       cy.get('[aria-label="Audio for the example"]').should(($button) => {
         const content = $button[0].parentElement!.parentElement!.getBoundingClientRect().bottom;
         const barTop = $button[0].ownerDocument.querySelector(bar)!.getBoundingClientRect().top;

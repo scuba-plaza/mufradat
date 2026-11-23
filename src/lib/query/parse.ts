@@ -1,7 +1,7 @@
-import { fold } from "./fuzzy";
 import { compile, type Matcher } from "@mufradat/regex";
 import { describeError } from "./errors";
 import { FIELDS, SORT_KEYS, listed, type Field, type SortKey, type Test } from "./fields";
+import { fold } from "./fuzzy";
 
 export interface Query {
   texts: { term: string; phrase: boolean }[];
@@ -16,6 +16,8 @@ export type Parsed = { query: Query } | { error: string };
 
 const MAX_TERMS = 12;
 const MAX_VALUES = 12;
+const RE = "re:";
+const SORT_NAMES = Object.keys(SORT_KEYS);
 
 interface Token {
   raw: string;
@@ -46,8 +48,6 @@ function tokenize(text: string): { tokens: Token[]; unclosed: boolean } {
   return { tokens, unclosed };
 }
 
-const SORT_NAMES = Object.keys(SORT_KEYS);
-
 export function parseQuery(text: string): Parsed {
   const query: Query = { texts: [], searchesText: false, tests: [], sort: null, suspended: false };
   const { tokens, unclosed } = tokenize(text);
@@ -71,40 +71,48 @@ export function parseQuery(text: string): Parsed {
       if (typeof test === "string") return { error: test };
       query.tests.push(test);
       query.searchesText = true;
-      continue;
-    }
-    if (key === "sort") {
+    } else if (key === "sort") {
       if (minus) return { error: "sort: takes its minus inside the value, as in sort:-edited." };
       if (query.sort) return { error: "Only one sort: is allowed." };
-      const descending = value.startsWith("-");
-      const sortKey = (descending ? value.slice(1) : value).toLowerCase();
-      if (!SORT_NAMES.includes(sortKey)) {
-        return { error: `sort: expects ${listed(SORT_NAMES)}, optionally with a minus in front, not "${value.replace(/^-/, "")}".` };
-      }
-      query.sort = { key: sortKey as SortKey, descending };
-      continue;
+      const sort = parseSort(value);
+      if (typeof sort === "string") return { error: sort };
+      query.sort = sort;
+    } else {
+      const def = FIELDS[key];
+      if (!def) return { error: `Unknown field "${name}". Fields: ${[...Object.keys(FIELDS), "sort"].join(", ")}.` };
+      const tests = fieldTests(key, def, value);
+      if (typeof tests === "string") return { error: tests };
+      const anyOf: Test = (row, now) => tests.some((t) => t(row, now));
+      query.tests.push(minus ? (row, now) => !anyOf(row, now) : anyOf);
+      if (key === "status" && !minus && value.split(",").some((p) => p.trim().toLowerCase() === "suspended")) query.suspended = true;
     }
-    const def = FIELDS[key];
-    if (!def) return { error: `Unknown field "${name}". Fields: ${[...Object.keys(FIELDS), "sort"].join(", ")}.` };
-    const parts = isPattern(value) ? [value] : value.split(",");
-    if (parts.some((p) => p.trim() === "")) return { error: `${key}: needs a value.` };
-    if (parts.length > MAX_VALUES) return { error: `${key}: at most ${MAX_VALUES} values.` };
-    const tests: Test[] = [];
-    for (const part of parts) {
-      const text = part.trim();
-      const pattern = isPattern(text);
-      const test = pattern ? patternTest(key, def, text.slice(RE.length)) : def.parse(text);
-      if (typeof test === "string") return { error: pattern ? test : `${key}: ${test}` };
-      tests.push(test);
-    }
-    const anyOf: Test = (row, now) => tests.some((t) => t(row, now));
-    query.tests.push(minus ? (row, now) => !anyOf(row, now) : anyOf);
-    if (key === "status" && !minus && parts.some((p) => p.trim().toLowerCase() === "suspended")) query.suspended = true;
   }
   return { query };
 }
 
-const RE = "re:";
+function parseSort(value: string): NonNullable<Query["sort"]> | string {
+  const descending = value.startsWith("-");
+  const key = (descending ? value.slice(1) : value).toLowerCase();
+  if (!SORT_NAMES.includes(key)) {
+    return `sort: expects ${listed(SORT_NAMES)}, optionally with a minus in front, not "${value.replace(/^-/, "")}".`;
+  }
+  return { key: key as SortKey, descending };
+}
+
+function fieldTests(key: string, def: Field, value: string): Test[] | string {
+  const parts = isPattern(value) ? [value] : value.split(",");
+  if (parts.some((p) => p.trim() === "")) return `${key}: needs a value.`;
+  if (parts.length > MAX_VALUES) return `${key}: at most ${MAX_VALUES} values.`;
+  const tests: Test[] = [];
+  for (const part of parts) {
+    const text = part.trim();
+    const pattern = isPattern(text);
+    const test = pattern ? patternTest(key, def, text.slice(RE.length)) : def.parse(text);
+    if (typeof test === "string") return pattern ? test : `${key}: ${test}`;
+    tests.push(test);
+  }
+  return tests;
+}
 
 const isPattern = (text: string) => text.slice(0, RE.length).toLowerCase() === RE;
 

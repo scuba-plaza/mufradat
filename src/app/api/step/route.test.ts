@@ -1,9 +1,7 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { context } from "@/lib/server";
 import { openCard } from "@/lib/words";
+import { tempWorkspace } from "@/lib/testing/workspace";
 import { GET } from "./route";
 
 async function step(id: string, dir: string, q?: string) {
@@ -13,17 +11,7 @@ async function step(id: string, dir: string, q?: string) {
 }
 
 describe("stepping from a card to the next word of its list", () => {
-  let home: string;
-
-  beforeEach(() => {
-    home = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-step-"));
-    vi.stubEnv("XDG_CONFIG_HOME", path.join(home, "config"));
-    vi.stubEnv("MUFRADAT_WORKSPACE", path.join(home, "workspace"));
-  });
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    fs.rmSync(home, { recursive: true, force: true });
-  });
+  tempWorkspace();
 
   it("answers with the address of the next word of the frequency list when there is no query", async () => {
     const id = openCard(context().store, { rank: 10 })!;
@@ -37,11 +25,6 @@ describe("stepping from a card to the next word of its list", () => {
     const third = store.findNote("عَلَى", "prep")!;
     const { body } = await step(second, "next", "pos:prep rank:1-11");
     expect(body).toEqual({ href: `/cards/${third}?q=pos%3Aprep+rank%3A1-11` });
-  });
-
-  it("answers with no address at the end of the list", async () => {
-    const id = openCard(context().store, { rank: 5000 })!;
-    expect(await step(id, "next")).toEqual({ status: 200, body: { href: null } });
   });
 
   it("steps over a suspended card, and walks the cards of a status:suspended queue", async () => {
@@ -58,18 +41,15 @@ describe("stepping from a card to the next word of its list", () => {
     expect((await step(tenth, "next", "rank:1-13")).body).toEqual({ href: "/open?rank=12&q=rank%3A1-13" });
   });
 
-  it("refuses a direction that is neither previous nor next", async () => {
+  it("refuses a direction that is neither previous nor next, or none at all", async () => {
     const id = openCard(context().store, { rank: 10 })!;
     expect((await step(id, "sideways")).status).toBe(400);
+    expect((await GET(new Request(`http://127.0.0.1/api/step?id=${id}`))).status).toBe(400);
   });
 
-  it("refuses a request that names no direction", async () => {
-    const id = openCard(context().store, { rank: 10 })!;
-    const res = await GET(new Request(`http://127.0.0.1/api/step?id=${id}`));
-    expect(res.status).toBe(400);
-  });
-
-  it("answers with no address for a query it cannot read and for a card that does not exist", async () => {
+  it("answers with no address at the end of the list, for a query it cannot read and for a card that does not exist", async () => {
+    const last = openCard(context().store, { rank: 5000 })!;
+    expect(await step(last, "next")).toEqual({ status: 200, body: { href: null } });
     const id = openCard(context().store, { rank: 10 })!;
     expect(await step(id, "next", "pos:animal")).toEqual({ status: 200, body: { href: null } });
     expect(await step("no-such-card", "next")).toEqual({ status: 200, body: { href: null } });

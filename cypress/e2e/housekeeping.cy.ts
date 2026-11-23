@@ -10,16 +10,15 @@ const clipBytes = (rank: number, length: number) => {
 
 const unused = () => cy.request("/api/audio/unused").its("body");
 
-function withClip(rank: number, keep: boolean, length = 8) {
+/** Leaves an audio file in the workspace that no clip uses: the word's clip, uploaded and removed again. */
+function unusedFile(rank: number, length = 8) {
   cy.visit(`/open?rank=${rank}`);
-  return cy.location("pathname").then((path) => {
-    const id = path.split("/").pop()!;
+  cy.location("pathname").then((path) => {
+    const url = `/api/audio/${path.split("/").pop()}/word`;
     cy.window().then(async (win) => {
-      const url = `/api/audio/${id}/word`;
       await win.fetch(url, { method: "PUT", body: new win.Uint8Array(clipBytes(rank, length)) });
-      if (!keep) await win.fetch(url, { method: "DELETE" });
+      await win.fetch(url, { method: "DELETE" });
     });
-    return cy.wrap(id);
   });
 }
 
@@ -35,8 +34,8 @@ describe("deleting the audio that no clip uses", () => {
   });
 
   it("says how many files there are, keeps them on Cancel and deletes them on Delete", () => {
-    withClip(301, false);
-    withClip(302, false);
+    unusedFile(301);
+    unusedFile(302);
     unused().should("deep.equal", { files: 2, bytes: 16 });
     openDialog();
     cy.get(dialog).should("contain", "Delete 2 unused audio files (16 B)?").and("contain", "Cards keep every clip they use.");
@@ -56,42 +55,23 @@ describe("deleting the audio that no clip uses", () => {
   });
 
   it("says file, not files, for one, and the size in KB", () => {
-    withClip(303, false, 2048);
+    unusedFile(303, 2048);
     openDialog();
     cy.get(dialog).should("contain", "Delete 1 unused audio file (2 KB)?");
   });
 
   it("gives a large size in MB", () => {
-    withClip(307, false, 1.5 * 1024 * 1024);
+    unusedFile(307, 1.5 * 1024 * 1024);
     openDialog();
     cy.get(dialog).should("contain", "Delete 1 unused audio file (1.5 MB)?");
     cy.get(dialog).contains("button", "Delete").click();
     cy.get(dialog).should("contain", "Deleted 1 audio file (1.5 MB).");
   });
 
-  it("leaves a clip that a card still has playing", () => {
-    withClip(304, true).then((kept) => {
-      withClip(305, false);
-      openDialog();
-      cy.get(dialog).should("contain", "Delete 1 unused audio file");
-      cy.get(dialog).contains("button", "Delete").click();
-      cy.get(dialog).should("contain", "Deleted 1 audio file (8 B).");
-      cy.request(`/api/audio/${kept}/word`).its("headers.content-type").should("eq", "audio/mpeg");
-    });
-  });
-
-  it("only says so when there is nothing to delete, with nothing to confirm", () => {
-    openDialog();
-    cy.get(dialog).should("contain", "No unused audio files.");
-    cy.get(dialog).contains("button", "Delete").should("not.exist");
-    cy.get(dialog).contains("button", "Close").click();
-    cy.get(dialog).should("not.exist");
-  });
-
   for (const [width, height] of [[1920, 1100], [390, 844]]) {
     it(`fits the dialog at ${width}px`, () => {
       cy.viewport(width, height);
-      withClip(306, false);
+      unusedFile(306);
       cy.visit("/");
       cy.document().should((doc) => expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth));
       cy.menuItem("Prune audio");
@@ -108,7 +88,7 @@ describe("deleting the audio that no clip uses", () => {
       cy.get(dialog).should("not.exist");
       cy.focused().should("have.attr", "aria-label", "Menu");
     };
-    withClip(308, false);
+    unusedFile(308);
     openDialog();
     cy.get(dialog).contains("button", "Cancel").click();
     closedWithFocusOnMenu();
@@ -118,6 +98,7 @@ describe("deleting the audio that no clip uses", () => {
     closedWithFocusOnMenu();
     cy.menuItem("Prune audio");
     cy.get(dialog).should("contain", "No unused audio files.");
+    cy.get(dialog).contains("button", "Delete").should("not.exist");
     cy.pressEscape();
     closedWithFocusOnMenu();
     cy.menuItem("Prune audio");

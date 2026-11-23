@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { missingParts, wordStatus } from "@/lib/missing";
 import type { Note } from "@/lib/types";
 import StatusMark from "./StatusMark";
@@ -35,6 +35,12 @@ export default function ActionBar(props: {
   const approved = note.status === "approved";
   const suspended = note.suspended;
   const missing = missingParts(note);
+  const mainClass = "action-main col-start-2 w-full sm:w-44";
+  let main: ReactNode;
+  if (suspended) main = <button className={mainClass} onClick={props.onUnsuspend}>Unsuspend</button>;
+  else if (approved) main = <a href="/next" className={mainClass}>Next</a>;
+  else main = <button className={mainClass} disabled={props.leaving} onClick={props.onApprove}>Approve</button>;
+
   return (
     <div ref={box} className="fixed inset-x-0 bottom-0 border-t border-rule bg-paper">
       <div className="mx-auto max-w-column px-5">
@@ -49,15 +55,7 @@ export default function ActionBar(props: {
             {suspended && <span>Found only by the search status:suspended</span>}
             {!approved && !suspended && <span>{missing.length > 0 ? `Still needs ${missing.join(", ")}` : "Ready to approve"}</span>}
           </p>
-          <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto">
-            {suspended ? (
-              <button className="action-main col-start-2 w-full sm:w-44" onClick={props.onUnsuspend}>Unsuspend</button>
-            ) : approved ? (
-              <a href="/next" className="action-main col-start-2 w-full sm:w-44">Next</a>
-            ) : (
-              <button className="action-main col-start-2 w-full sm:w-44" disabled={props.leaving} onClick={props.onApprove}>Approve</button>
-            )}
-          </div>
+          <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto">{main}</div>
         </div>
       </div>
     </div>

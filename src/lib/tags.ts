@@ -1,5 +1,5 @@
-export const MAX_TAG_LENGTH = 40;
-export const MAX_TAGS = 20;
+const MAX_TAG_LENGTH = 40;
+const MAX_TAGS = 20;
 
 export function parseTags(input: unknown): { tags: string[] } | { error: string } {
   if (!Array.isArray(input) || !input.every((entry) => typeof entry === "string")) {

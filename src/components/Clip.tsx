@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import type { Note } from "@/lib/types";
+import type { Clip as ClipInfo, Note } from "@/lib/types";
 import { player } from "@/lib/player";
 import { api, post } from "./api";
 import Spinner from "./Spinner";
@@ -35,6 +35,13 @@ function RailButton(props: { icon: keyof typeof ICONS; title: string; onClick: (
       )}
     </button>
   );
+}
+
+function capsuleTone(clip: ClipInfo | undefined, message: string): string {
+  if (message) return "border-danger";
+  if (clip?.outdated) return "border-warn";
+  if (clip?.key) return "border-rule-strong";
+  return "border-dashed border-rule-strong";
 }
 
 export default function Clip(props: {
@@ -87,8 +94,6 @@ export default function Clip(props: {
     enqueue(clip.key!, () => setProblem("This clip could not be played."));
   }
 
-  const generateNow = () => run(() => post("/api/tts", { id: note.id, slot }), true);
-
   const message = problem || clip?.error || props.problem || "";
   const { onMessage } = props;
   useEffect(() => onMessage?.(message), [onMessage, message]);
@@ -110,26 +115,30 @@ export default function Clip(props: {
 
   const working = busy || Boolean(props.extra?.busy);
   const canGenerate = Boolean(text.trim());
-  const tone = message ? "border-danger" : clip?.outdated ? "border-warn" : has ? "border-rule-strong" : "border-dashed border-rule-strong";
 
   const capsule = (
     <div
       role="group"
       aria-label={`Audio for ${name}`}
-      className={`flex items-center rounded-full border bg-paper p-0.5 ${props.inline ? "" : "row-start-1 m-1 justify-self-center sm:col-start-3 sm:flex-col sm:justify-self-end"} ${tone}`}
+      className={`flex items-center rounded-full border bg-paper p-0.5 ${props.inline ? "" : "row-start-1 m-1 justify-self-center sm:col-start-3 sm:flex-col sm:justify-self-end"} ${capsuleTone(clip, message)}`}
     >
       <RailButton icon={isPlaying ? "playing" : "play"} title={playLabel} disabled={isPlaying || (!has && !working)} busy={working} active={isPlaying} onClick={() => !working && play()} />
       <RailButton
         icon={has ? "regenerate" : "generate"}
         title={clip?.outdated ? "Regenerate (the Arabic changed)" : has ? "Regenerate" : "Generate"}
         disabled={working || !canGenerate}
-        onClick={generateNow}
+        onClick={() => run(() => post("/api/tts", { id: note.id, slot }), true)}
       />
       <RailButton icon="upload" title="Upload" disabled={working || !canGenerate} onClick={() => file.current?.click()} />
-      <RailButton icon="remove" title="Remove" disabled={working || !has} onClick={() => {
-            player.forget(id);
-            run(() => api(`/api/audio/${note.id}/${slot}`, { method: "DELETE" }));
-          }} />
+      <RailButton
+        icon="remove"
+        title="Remove"
+        disabled={working || !has}
+        onClick={() => {
+          player.forget(id);
+          run(() => api(`/api/audio/${note.id}/${slot}`, { method: "DELETE" }));
+        }}
+      />
       {props.extra && (
         <>
           <span aria-hidden="true" className={`mx-px h-4 w-px bg-rule-strong/60 ${props.inline ? "" : "sm:mx-0 sm:my-px sm:h-px sm:w-4"}`} />

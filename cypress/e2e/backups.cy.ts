@@ -155,18 +155,13 @@ describe("backups", () => {
     });
   }
 
-  it("closes on Escape, gives the focus back to the menu button, and opens again", () => {
+  it("closes with Close, Escape and a click on the backdrop, each giving the focus back to the menu button and leaving it openable", () => {
     openDialog();
-    cy.pressEscape();
+    cy.contains(`${dialog} button`, "Close").click();
     cy.get(dialog).should("not.exist");
     cy.focused().should("have.attr", "aria-label", "Menu");
     cy.menuItem("Backups");
-    cy.get(dialog);
-  });
-
-  it("closes with Close and with a click on the backdrop, each giving the focus back to the menu button and leaving it openable", () => {
-    openDialog();
-    cy.contains(`${dialog} button`, "Close").click();
+    cy.pressEscape();
     cy.get(dialog).should("not.exist");
     cy.focused().should("have.attr", "aria-label", "Menu");
     cy.menuItem("Backups");
@@ -208,7 +203,7 @@ describe("a long list of backups", () => {
   });
 
   for (const [width, height] of [[1280, 800], [390, 844]]) {
-    it(`keeps Close in view with 30 backups, the list scrolling and nothing above it overflowing at ${width}x${height}`, () => {
+    it(`keeps Close in view with 30 backups, at least three of them shown, the list scrolling and nothing above it overflowing at ${width}x${height}`, () => {
       cy.viewport(width, height);
       openDialog();
       cy.get(rows).should("have.length.at.least", 30);
@@ -225,11 +220,13 @@ describe("a long list of backups", () => {
         expect(box.scrollHeight).to.be.at.most(box.clientHeight + 1);
         expect(win.getComputedStyle(list).overflowY).to.equal("auto");
         expect(list.scrollHeight).to.be.greaterThan(list.clientHeight);
+        const three = Array.from(list.children).slice(0, 3).reduce((sum, row) => sum + row.getBoundingClientRect().height, 0);
+        expect(list.clientHeight, "room for the first three rows").to.be.at.least(three - 1);
       });
     });
   }
 
-  for (const [width, height] of [[1280, 360], [1280, 500], [390, 844], [320, 568]]) {
+  for (const [width, height] of [[1280, 360], [1280, 500], [320, 568]]) {
     it(`shows at least three backups at ${width}x${height}, and the dialog scrolls itself to Close when the window is too short`, () => {
       cy.viewport(width, height);
       openDialog();

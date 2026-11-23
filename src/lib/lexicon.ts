@@ -27,6 +27,23 @@ interface Data {
 
 let cached: Data | null = null;
 
+/** The part of speech a ranked word's card has: the first one the ranking lists. */
+const rankedPos = (row: RankRow): POS => POS_FROM_WIKTIONARY[row.pos.split(",")[0]];
+
+const rankedEntry = (lexicon: Map<string, Entry[]>, row: RankRow): Entry | undefined =>
+  lexicon.get(row.id)?.find((e) => POS_FROM_WIKTIONARY[e.pos] === rankedPos(row));
+
+/** The first entry of each part of speech. */
+function firstPerPos(list: Entry[]): Entry[] {
+  const seen = new Set<POS>();
+  return list.filter((e) => {
+    const pos = POS_FROM_WIKTIONARY[e.pos];
+    if (seen.has(pos)) return false;
+    seen.add(pos);
+    return true;
+  });
+}
+
 function load(): Data {
   if (cached) return cached;
   const dir = path.join(process.cwd(), "data");
@@ -49,21 +66,11 @@ function load(): Data {
   const rankOfLemma = new Map<string, RankRow>();
   for (const r of ranking) if (!rankOfLemma.has(r.id)) rankOfLemma.set(r.id, r);
   const ranked = ranking.map((r): Word => {
-    const pos = POS_FROM_WIKTIONARY[r.pos.split(",")[0]];
-    const entry = lexicon.get(r.id)?.find((e) => POS_FROM_WIKTIONARY[e.pos] === pos);
+    const entry = rankedEntry(lexicon, r);
     const { gender, root, verbForm } = entry ? summary(r.id, entry, r) : { gender: "", root: "", verbForm: "" };
-    return { rank: r.rank, lemma: r.id, english: r.gloss, pos, gender, root, verbForm };
+    return { rank: r.rank, lemma: r.id, english: r.gloss, pos: rankedPos(r), gender, root, verbForm };
   });
-  const entries: Word[] = [];
-  for (const [id, list] of lexicon) {
-    const seen = new Set<POS>();
-    for (const e of list) {
-      const pos = POS_FROM_WIKTIONARY[e.pos];
-      if (seen.has(pos)) continue;
-      seen.add(pos);
-      entries.push(summary(id, e, rankOfLemma.get(id)));
-    }
-  }
+  const entries = [...lexicon].flatMap(([id, list]) => firstPerPos(list).map((e) => summary(id, e, rankOfLemma.get(id))));
   cached = { ranking, rankOfLemma, lexicon, bySkeleton, ranked, entries };
   return cached;
 }
@@ -101,7 +108,7 @@ function forms(e: Entry): { label: string; arabic: string }[] {
 
 function summary(id: string, e: Entry, rankRow: RankRow | undefined, gloss?: string): Word {
   const pos = POS_FROM_WIKTIONARY[e.pos];
-  const ranked = rankRow && POS_FROM_WIKTIONARY[rankRow.pos.split(",")[0]] === pos;
+  const ranked = rankRow && rankedPos(rankRow) === pos;
   return {
     lemma: e.canonical || id,
     english: gloss ?? e.senses[0].gloss,
@@ -122,8 +129,7 @@ export function cardForRank(rank: number): NewNote | null {
   const d = load();
   const row = d.ranking[rank - 1];
   if (!row) return null;
-  const want = POS_FROM_WIKTIONARY[row.pos.split(",")[0]];
-  const entry = d.lexicon.get(row.id)?.find((e) => POS_FROM_WIKTIONARY[e.pos] === want);
+  const entry = rankedEntry(d.lexicon, row);
   return entry ? bareCard(row.id, entry, row, row.gloss) : null;
 }
 
@@ -132,15 +138,5 @@ export function lookup(query: string): NewNote[] {
   const d = load();
   const q = skeleton(query.trim());
   if (q === "") return [];
-  const out: NewNote[] = [];
-  for (const id of d.bySkeleton.get(q) ?? []) {
-    const seen = new Set<POS>();
-    for (const e of d.lexicon.get(id)!) {
-      const pos = POS_FROM_WIKTIONARY[e.pos];
-      if (seen.has(pos)) continue;
-      seen.add(pos);
-      out.push(bareCard(id, e, d.rankOfLemma.get(id)));
-    }
-  }
-  return out;
+  return (d.bySkeleton.get(q) ?? []).flatMap((id) => firstPerPos(d.lexicon.get(id)!).map((e) => bareCard(id, e, d.rankOfLemma.get(id))));
 }

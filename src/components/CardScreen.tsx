@@ -4,7 +4,7 @@ import { listPath } from "@/lib/paging";
 import type { Note } from "@/lib/types";
 import { plainExample } from "@/lib/validate";
 import ActionBar from "./ActionBar";
-import { api, post } from "./api";
+import { api, post, put, type Refusal } from "./api";
 import Clip from "./Clip";
 import ExampleText from "./ExampleText";
 import FormsDialog from "./FormsDialog";
@@ -15,6 +15,15 @@ import SuspendDialog from "./SuspendDialog";
 import TagsAndDetailsDialog from "./TagsAndDetailsDialog";
 
 const SAVE_TEXT = { idle: "", saving: "Saving…", saved: "Saved", failed: "Not saved" };
+
+function formsAudio(note: Note): { tone: string; state: string } {
+  const clips = note.forms.map((f) => note.audio[f.id]);
+  if (clips.some((c) => c?.error)) return { tone: "border-danger", state: "a form has an audio error" };
+  if (clips.some((c) => c?.outdated)) return { tone: "border-warn", state: "audio of a form is out of date" };
+  if (note.forms.length === 0) return { tone: "border-dashed border-rule-strong", state: "" };
+  if (clips.some((c) => !c?.key)) return { tone: "border-dashed border-rule-strong", state: "a form has no audio" };
+  return { tone: "border-rule-strong", state: "" };
+}
 
 /** One word as its card: the text is edited where it is shown, and the actions stay in the bar below. */
 export default function CardScreen({ initial, total, q }: { initial: Note; total: number; q: string }) {
@@ -32,8 +41,6 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
   const [leaving, setLeaving] = useState(false);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const tags = useRef(initial.tags);
-  const tagsOpenRef = useRef(false);
-  tagsOpenRef.current = tagsOpen;
 
   /** Changes happen one at a time, in the order they were made, so that approving never overtakes a save. */
   const later = (work: () => Promise<void>) => {
@@ -44,9 +51,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
     setSaved("saving");
     later(async () => {
       try {
-        setNote((await api<{ note: Note }>(`/api/notes/${note.id}`, {
-          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch),
-        })).note);
+        setNote((await put<{ note: Note }>(`/api/notes/${note.id}`, patch)).note);
         setProblems([]);
         if ("example" in patch) setExampleProblem("");
         setSaved("saved");
@@ -62,9 +67,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
     return new Promise((resolve) =>
       later(async () => {
         try {
-          const next = (await api<{ note: Note }>(`/api/notes/${note.id}/tags`, {
-            method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tags: change(tags.current) }),
-          })).note;
+          const next = (await put<{ note: Note }>(`/api/notes/${note.id}/tags`, { tags: change(tags.current) })).note;
           tags.current = next.tags;
           setNote(next);
           setTagProblem("");
@@ -73,7 +76,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
         } catch (e) {
           setTagProblem((e as Error).message);
           setSaved("failed");
-          if (!tagsOpenRef.current) setTagsOpen(true);
+          setTagsOpen(true);
           resolve(false);
         }
       }),
@@ -104,7 +107,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
         window.location.assign("/next");
       } catch (e) {
         setLeaving(false);
-        setProblems((e as Error & { errors?: string[] }).errors ?? [(e as Error).message]);
+        setProblems((e as Refusal).errors ?? [(e as Error).message]);
       }
     });
   }
@@ -123,25 +126,18 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
     });
   }
 
-  function suspend() {
+  function setSuspended(request: () => Promise<{ note: Note }>) {
     later(async () => {
       try {
-        setNote((await post<{ note: Note }>(`/api/notes/${note.id}/suspend`, {})).note);
+        setNote((await request()).note);
       } catch (e) {
         setProblems([(e as Error).message]);
       }
     });
   }
 
-  function unsuspend() {
-    later(async () => {
-      try {
-        setNote((await api<{ note: Note }>(`/api/notes/${note.id}/suspend`, { method: "DELETE" })).note);
-      } catch (e) {
-        setProblems([(e as Error).message]);
-      }
-    });
-  }
+  const suspend = () => setSuspended(() => post(`/api/notes/${note.id}/suspend`, {}));
+  const unsuspend = () => setSuspended(() => api(`/api/notes/${note.id}/suspend`, { method: "DELETE" }));
 
   useEffect(() => {
     const play = (name: string) => document.querySelector<HTMLButtonElement>(`button[title="Play ${name}"], button[title="Playing ${name}"]`)?.click();
@@ -171,12 +167,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
     };
   }, [note.id, q]);
 
-  const clips = note.forms.map((f) => note.audio[f.id]);
-  const formsFailed = clips.some((c) => c?.error);
-  const formsOutdated = clips.some((c) => c?.outdated);
-  const formsUnvoiced = note.forms.length === 0 || clips.some((c) => !c?.key);
-  const formsState = formsFailed ? "a form has an audio error" : formsOutdated ? "audio of a form is out of date" : note.forms.length > 0 && formsUnvoiced ? "a form has no audio" : "";
-  const formsTone = formsFailed ? "border-danger" : formsOutdated ? "border-warn" : formsUnvoiced ? "border-dashed border-rule-strong" : "border-rule-strong";
+  const forms = formsAudio(note);
 
   return (
     <div className="pb-[var(--bar-h)]">
@@ -225,7 +216,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
           <InlineText label="Arabic headword" value={note.lemma} arabic className="text-center text-ar-xl" onSave={(lemma) => save({ lemma })} />
           <InlineText label="Hint Arabic" placeholder="Add a hint for the Arabic side" value={note.hintAr} className="mt-1.5 text-center text-[1rem] text-quiet min-[1024px]:mt-2" onSave={(hintAr) => save({ hintAr })} />
         </Clip>
-        <section aria-label="Forms" className={`panel mx-auto mt-3 flex items-center border px-2 py-2 min-[1024px]:mt-4 ${formsTone}`}>
+        <section aria-label="Forms" className={`panel mx-auto mt-3 flex items-center border px-2 py-2 min-[1024px]:mt-4 ${forms.tone}`}>
           <div className="flex flex-1 flex-wrap items-center justify-center gap-x-6 gap-y-2 pl-[var(--control-h-sm)]">
             {note.forms.length === 0 && <span className="text-sm text-quiet">No forms</span>}
             {note.forms.map((f) => (
@@ -241,7 +232,7 @@ export default function CardScreen({ initial, total, q }: { initial: Note; total
               {note.forms.length ? <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></> : <><path d="M12 5v14" /><path d="M5 12h14" /></>}
             </svg>
           </button>
-          {formsState && <span className="sr-only">{formsState}</span>}
+          {forms.state && <span className="sr-only">{forms.state}</span>}
         </section>
         <InlineText label="English meaning" placeholder="Add the English meaning" value={note.english} className="mt-2 text-center text-2xl font-medium tracking-title min-[1024px]:mt-3" onSave={(english) => save({ english })} />
         <InlineText label="Hint English" placeholder="Add a hint for the English side" value={note.hint} className="mt-0.5 text-center text-[1rem] text-quiet min-[1024px]:mt-1" onSave={(hint) => save({ hint })} />

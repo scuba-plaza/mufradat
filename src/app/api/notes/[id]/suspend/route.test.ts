@@ -1,26 +1,14 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { context } from "@/lib/server";
 import { openCard } from "@/lib/words";
+import { tempWorkspace, withParams } from "@/lib/testing/workspace";
 import { DELETE, POST } from "./route";
 
-const suspend = (id: string) => POST(new Request(`http://127.0.0.1/api/notes/${id}/suspend`, { method: "POST" }), { params: Promise.resolve({ id }) });
-const unsuspend = (id: string) => DELETE(new Request(`http://127.0.0.1/api/notes/${id}/suspend`, { method: "DELETE" }), { params: Promise.resolve({ id }) });
+const suspend = (id: string) => POST(new Request(`http://127.0.0.1/api/notes/${id}/suspend`, { method: "POST" }), withParams({ id }));
+const unsuspend = (id: string) => DELETE(new Request(`http://127.0.0.1/api/notes/${id}/suspend`, { method: "DELETE" }), withParams({ id }));
 
 describe("suspending a card through the API", () => {
-  let home: string;
-
-  beforeEach(() => {
-    home = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-suspend-"));
-    vi.stubEnv("XDG_CONFIG_HOME", path.join(home, "config"));
-    vi.stubEnv("MUFRADAT_WORKSPACE", path.join(home, "workspace"));
-  });
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    fs.rmSync(home, { recursive: true, force: true });
-  });
+  tempWorkspace();
 
   it("suspends the card and takes its approval back", async () => {
     const { store } = context();

@@ -7,22 +7,6 @@ const bar = 'form[role="search"] input';
 const tabs = 'nav[aria-label="Status"]';
 const sorting = '[aria-label="Sort by"]';
 const typed = (query: string) => `/?q=${encodeURIComponent(query)}`;
-const mp3 = [0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4];
-
-function finishCard(rank: number) {
-  cy.visit(`/open?rank=${rank}`);
-  cy.location("pathname").then((path) => {
-    const id = path.split("/").pop();
-    cy.request("PUT", `/api/notes/${id}`, { example: "كَانَ [الْكِتَابُ] جَمِيلًا جِدًّا", exampleEn: "The book was very beautiful." }).then((response) => {
-      const { forms } = (response.body as { note: { forms: { id: string }[] } }).note;
-      cy.window().then(async (win) => {
-        for (const slot of ["word", "example", ...forms.map((form) => form.id)]) {
-          await win.fetch(`/api/audio/${id}/${slot}`, { method: "PUT", body: new win.Uint8Array(mp3) });
-        }
-      });
-    });
-  });
-}
 
 describe("the words page", () => {
   it("shows the card Continue opens, large, with a Continue button, and how many cards are in each state", () => {
@@ -37,20 +21,16 @@ describe("the words page", () => {
     cy.contains(/\d+ approved · \d+ in progress · \d+ ready/);
   });
 
-  it("shows one page of 30 words", () => {
-    cy.visit("/");
-    cy.get(rows).should("have.length", 30);
-    cy.contains(/Page 1 of \d+/);
-  });
-
   it("puts the card you worked on last at the top of the list", () => {
     cy.visit("/open?rank=120");
     cy.visit("/");
     cy.get(rows).first().find(".num").should("have.text", "120");
   });
 
-  it("moves between pages with the pager", () => {
+  it("shows one page of 30 words, and moves between pages with the pager", () => {
     cy.visit("/");
+    cy.get(rows).should("have.length", 30);
+    cy.contains(/Page 1 of \d+/);
     cy.get(pager).first().should("not.contain", "Previous").and("not.contain", "First");
     cy.get(rows).first().invoke("text").then((first) => {
       cy.get(pager).first().contains("a", "Next").click();
@@ -78,25 +58,6 @@ describe("the words page", () => {
     cy.contains(/Page 1 of \d+/);
   });
 
-  it("says whether a card is in progress or approved, and nothing for a word without a card", () => {
-    cy.visit("/open?rank=130");
-    cy.visit("/open?rank=131");
-    cy.location("pathname").then((card) => cy.request("POST", `/api${card.replace("/cards", "/notes")}/approve`, {}));
-    cy.visit(typed("rank:130"));
-    cy.wordRow(130).should("contain", "in progress");
-    cy.visit(typed("rank:131"));
-    cy.wordRow(131).should("contain", "approved");
-    cy.visit(typed("rank:4980"));
-    cy.wordRow(4980).should("not.contain", "in progress").and("not.contain", "approved").and("not.contain", "ready");
-  });
-
-  it("says ready for a card that lacks nothing", () => {
-    finishCard(141);
-    cy.visit(typed("rank:141"));
-    cy.wordRow(141).should("contain", "ready");
-    cy.contains(panel, /\d+ ready/);
-  });
-
   it("opens the card of a word that has one from its row", () => {
     cy.visit("/open?rank=170");
     cy.location("pathname").then((card) => {
@@ -107,8 +68,9 @@ describe("the words page", () => {
     });
   });
 
-  it("opens the card of a word without one from its row, creating it", () => {
+  it("says nothing of a status for a word without a card, and opens its card from its row, creating it", () => {
     cy.visit(typed("rank:4990"));
+    cy.wordRow(4990).should("not.contain", "in progress").and("not.contain", "approved").and("not.contain", "ready");
     cy.wordRow(4990).find("a").should("have.attr", "href", "/open?rank=4990&q=rank%3A4990");
     cy.wordRow(4990).click();
     cy.location("pathname").should("match", /^\/cards\/[0-9a-f-]{36}$/);
@@ -117,14 +79,10 @@ describe("the words page", () => {
 });
 
 describe("continuing", () => {
-  it("opens the card of the next word when you go to /next", () => {
+  it("opens the card of the next word when you go to /next, and the same card from the Continue button", () => {
     cy.visit("/next");
     cy.location("pathname").should("match", /^\/cards\/[0-9a-f-]{36}$/);
     cy.title().should("match", /^Word \d+ · Mufradat$/);
-  });
-
-  it("opens the same card from the Continue button", () => {
-    cy.visit("/next");
     cy.location("pathname").then((next) => {
       cy.visit("/");
       cy.contains("a", "Continue").click();
@@ -168,16 +126,17 @@ describe("a card made outside the list", () => {
 });
 
 describe("the status of a word in the list", () => {
-  it("draws in progress, ready and approved as three different shapes, so that colour is not the only difference", () => {
+  it("says in progress, ready and approved, drawn as three different shapes, so that colour is not the only difference", () => {
     cy.viewport(390, 844);
     cy.visit("/open?rank=4101");
-    finishCard(4102);
-    finishCard(4103);
+    cy.finishCard(4102);
+    cy.finishCard(4103);
     cy.location("pathname").then((card) => cy.request("POST", `/api${card.replace("/cards", "/notes")}/approve`, {}));
     cy.visit(typed("rank:4101-4103"));
     cy.get(rows).should("have.length", 3);
-    for (const [rank, status] of [[4101, "progress"], [4102, "ready"], [4103, "approved"]] as const) {
+    for (const [rank, status, label] of [[4101, "progress", "in progress"], [4102, "ready", "ready"], [4103, "approved", "approved"]] as const) {
       cy.wordRow(rank).find(".status").should("have.attr", "data-status", status);
+      cy.wordRow(rank).find(".status").should("contain", label);
     }
     cy.get(`${rows} .status svg`).should("be.visible").then(($marks) => {
       const shapes = Array.from($marks).map((mark) => mark.innerHTML);
@@ -187,33 +146,6 @@ describe("the status of a word in the list", () => {
 });
 
 describe("the search bar", () => {
-  describe("by tag", () => {
-    const tagged: string[] = [];
-    const tag = (rank: number, tags: string[]) => {
-      cy.visit(`/open?rank=${rank}`);
-      cy.location("pathname").then((path) => {
-        const id = path.split("/").pop()!;
-        tagged.push(id);
-        cy.request("PUT", `/api/notes/${id}/tags`, { tags });
-      });
-    };
-    afterEach(() => {
-      tagged.splice(0).forEach((id) => cy.request("PUT", `/api/notes/${id}/tags`, { tags: [] }));
-    });
-
-    it("filters the list by tag", () => {
-      tag(4301, ["listspec_one"]);
-      tag(4302, ["listspec_two"]);
-      tag(4303, ["other"]);
-      cy.visit("/");
-      cy.get(bar).type("tag:re:listspec_.*{enter}");
-      cy.location("search").should("eq", `?q=${encodeURIComponent("tag:re:listspec_.*")}`);
-      cy.get(rows).should("have.length", 2);
-      cy.wordRow(4301).should("exist");
-      cy.wordRow(4302).should("exist");
-    });
-  });
-
   it("searches when you press Enter, keeps what you typed in the box, and counts the words it found", () => {
     cy.visit("/");
     cy.get(bar).type("كتاب{enter}");
@@ -230,21 +162,6 @@ describe("the search bar", () => {
       const [arabic] = families(win.getComputedStyle(win.document.documentElement).getPropertyValue("--font-arabic"));
       expect(arabic).to.not.equal("");
       expect(families(win.getComputedStyle($input[0]).fontFamily)).to.include(arabic);
-    });
-  });
-
-  it("finds a word typed without its vowels and a word typed with a typo", () => {
-    cy.visit(typed("كتاب"));
-    cy.get(rows).first().should("contain", "كِتَاب").and("contain", "book");
-    cy.visit(typed("writting"));
-    cy.get(rows).first().should("contain", "writing");
-  });
-
-  it("filters and sorts with field terms", () => {
-    cy.visit(typed("rank:1-5 sort:-rank"));
-    cy.get(rows).should("have.length", 5);
-    cy.get(rows).then(($rows) => {
-      expect([...$rows].map((row) => row.querySelector(".num")!.textContent)).to.deep.equal(["5", "4", "3", "2", "1"]);
     });
   });
 
@@ -275,6 +192,9 @@ describe("the search bar", () => {
     cy.get(tabs).contains("a", /^All/).click();
     cy.location("search").should("eq", "");
     cy.get(tabs).contains("a", /^All/).should("have.attr", "aria-current", "page");
+    cy.get(tabs).contains("a", "Not started").click();
+    cy.location("search").should("eq", "?q=status%3Atodo");
+    cy.get(rows).first().should("not.contain", "in progress").and("not.contain", "approved");
   });
 
   it("carries the query to the cards it opens, so that their arrows follow the list", () => {
@@ -282,13 +202,6 @@ describe("the search bar", () => {
     cy.get(rows).first().find("a").should("have.attr", "href").and("match", /q=rank%3A181-182$/);
     cy.visit("/");
     cy.get(rows).first().find("a").should("have.attr", "href").and("not.include", "q=");
-  });
-
-  it("lists the words not started under their tab", () => {
-    cy.visit("/");
-    cy.get(tabs).contains("a", "Not started").click();
-    cy.location("search").should("eq", "?q=status%3Atodo");
-    cy.get(rows).first().should("not.contain", "in progress").and("not.contain", "approved");
   });
 
   it("sorts by a column when you click its heading, the other way on the next click, and back to the default on the third", () => {

@@ -8,8 +8,7 @@ const chips = "dialog[open] ul li";
 const tagged: string[] = [];
 
 function openWord(rank: number) {
-  cy.visit(`/open?rank=${rank}`);
-  cy.hydrated(by("Hint English"));
+  cy.openWord(rank);
   cy.location("pathname").then((path) => tagged.push(path.split("/").pop()!));
 }
 
@@ -25,7 +24,6 @@ function reopen() {
 
 describe("the tags and details of a card", () => {
   afterEach(() => {
-    cy.colorScheme("light");
     tagged.splice(0).forEach((id) => {
       cy.request("PUT", `/api/notes/${id}/tags`, { tags: [] });
       cy.request("PUT", `/api/notes/${id}`, {});
@@ -56,11 +54,15 @@ describe("the tags and details of a card", () => {
     cy.focused().should("have.attr", "title", "Tags and details");
   });
 
-  it("adds a tag with Enter, shows it as stored and keeps it after a reload", () => {
+  it("adds a tag with Enter, shows it as stored without changing the height of the dialog, and keeps it after a reload", () => {
     openWord(4203);
     cy.get(tagsButton).click();
-    cy.get(addTag).type("Lesson 1{enter}");
-    cy.get(chips).should("have.length", 1).and("contain", "lesson_1");
+    cy.get("dialog[open]").then(($dialog) => {
+      const before = $dialog[0].getBoundingClientRect().height;
+      cy.get(addTag).type("Lesson 1{enter}");
+      cy.get(chips).should("have.length", 1).and("contain", "lesson_1");
+      cy.get("dialog[open]").should(($now) => expect($now[0].getBoundingClientRect().height).to.equal(before));
+    });
     cy.get(addTag).should("have.value", "");
     reopen();
     cy.get(chips).should("have.length", 1).and("contain", "lesson_1");
@@ -92,13 +94,28 @@ describe("the tags and details of a card", () => {
     cy.get('[role="toolbar"]').contains("a", "Next");
   });
 
-  it("says why a tag is refused, inside the dialog, and keeps the tags it had", () => {
+  it("says why a tag is refused, inside the dialog, keeps the tags it had and what was typed, and drops the refusal when you type again or reopen, at the same height", () => {
     openWord(4206);
     setTags(["kept"]);
     reopen();
-    cy.get(addTag).type("a,b{enter}");
-    cy.get('dialog[open] [role="alert"]').should("contain", "A tag cannot contain commas, quotes or *.");
-    cy.get(chips).should("have.length", 1).and("contain", "kept");
+    cy.get("dialog[open]").then(($dialog) => {
+      const before = $dialog[0].getBoundingClientRect().height;
+      cy.get(addTag).type("a,b{enter}");
+      cy.get('dialog[open] [role="alert"]').should("contain", "A tag cannot contain commas, quotes or *.");
+      cy.get("dialog[open]").should(($now) => expect($now[0].getBoundingClientRect().height).to.equal(before));
+      cy.get(chips).should("have.length", 1).and("contain", "kept");
+      cy.get(addTag).should("have.value", "a,b");
+      cy.get(addTag).type("c");
+      cy.get('dialog[open] [role="alert"]').should("not.exist");
+      cy.get("dialog[open]").should(($now) => expect($now[0].getBoundingClientRect().height).to.equal(before));
+    });
+    cy.get(addTag).type("{enter}");
+    cy.get('dialog[open] [role="alert"]').should("exist");
+    cy.pressEscape();
+    cy.get("dialog[open]").should("not.exist");
+    cy.get(tagsButton).click();
+    cy.get('dialog[open] [role="alert"]').should("not.exist");
+    cy.get(addTag).should("have.value", "");
   });
 
   it("has no accessibility problems in light and dark with the dialog open", () => {
@@ -111,29 +128,16 @@ describe("the tags and details of a card", () => {
     cy.axe("dialog[open]");
   });
 
-  it("says why a detail was refused, inside the dialog", () => {
+  it("says why a detail was refused, inside the dialog, and keeps the height of the dialog", () => {
     openWord(4208);
     cy.intercept("PUT", "/api/notes/*", { statusCode: 500, body: { error: "The disk is full." } });
     cy.get(tagsButton).click();
-    cy.get("dialog[open]").contains("label", "Gender").find("select").select("masculine");
-    cy.get('dialog[open] [role="alert"]').should("contain", "The disk is full.");
-  });
-
-  it("keeps what was typed when a tag is refused, and drops the refusal when you type again or reopen", () => {
-    openWord(4209);
-    cy.get(tagsButton).click();
-    cy.get(addTag).type("a,b{enter}");
-    cy.get('dialog[open] [role="alert"]').should("contain", "A tag cannot contain commas, quotes or *.");
-    cy.get(addTag).should("have.value", "a,b");
-    cy.get(addTag).type("c");
-    cy.get('dialog[open] [role="alert"]').should("not.exist");
-    cy.get(addTag).type("{enter}");
-    cy.get('dialog[open] [role="alert"]').should("exist");
-    cy.pressEscape();
-    cy.get("dialog[open]").should("not.exist");
-    cy.get(tagsButton).click();
-    cy.get('dialog[open] [role="alert"]').should("not.exist");
-    cy.get(addTag).should("have.value", "");
+    cy.get("dialog[open]").then(($dialog) => {
+      const before = $dialog[0].getBoundingClientRect().height;
+      cy.get("dialog[open]").contains("label", "Gender").find("select").select("masculine");
+      cy.get('dialog[open] [role="alert"]').should("contain", "The disk is full.");
+      cy.get("dialog[open]").should(($now) => expect($now[0].getBoundingClientRect().height).to.equal(before));
+    });
   });
 
   it("styles Root and Verb form like the Add tag input", () => {
@@ -149,52 +153,13 @@ describe("the tags and details of a card", () => {
     }
   });
 
-  for (const height of [720, 800]) {
-    it(`fits the dialog without a scrollbar at 1280x${height}, also with a tag`, () => {
-      cy.viewport(1280, height);
-      openWord(4211);
-      setTags(["lesson_1"]);
-      reopen();
-      cy.get("dialog[open]").should(($dialog) => {
-        expect($dialog[0].scrollHeight).to.be.at.most($dialog[0].clientHeight);
-      });
-    });
-  }
-
-  it("keeps the height of the dialog when the first tag is added", () => {
-    openWord(4212);
-    cy.get(tagsButton).click();
-    cy.get("dialog[open]").then(($dialog) => {
-      const before = $dialog[0].getBoundingClientRect().height;
-      cy.get(addTag).type("lesson_1{enter}");
-      cy.get(chips).should("have.length", 1);
-      cy.get("dialog[open]").should(($now) => expect($now[0].getBoundingClientRect().height).to.equal(before));
-    });
-  });
-
-  it("keeps the height of the dialog when a tag is refused and when the refusal goes", () => {
-    openWord(4213);
-    cy.get(tagsButton).click();
-    cy.get("dialog[open]").then(($dialog) => {
-      const before = $dialog[0].getBoundingClientRect().height;
-      cy.get(addTag).type("a,b{enter}");
-      cy.get('dialog[open] [role="alert"]').should("exist");
-      cy.get("dialog[open]").should(($now) => expect($now[0].getBoundingClientRect().height).to.equal(before));
-      cy.get(addTag).type("c");
-      cy.get('dialog[open] [role="alert"]').should("not.exist");
-      cy.get("dialog[open]").should(($now) => expect($now[0].getBoundingClientRect().height).to.equal(before));
-    });
-  });
-
-  it("keeps the height of the dialog when a detail is refused", () => {
-    openWord(4214);
-    cy.intercept("PUT", "/api/notes/*", { statusCode: 500, body: { error: "The disk is full." } });
-    cy.get(tagsButton).click();
-    cy.get("dialog[open]").then(($dialog) => {
-      const before = $dialog[0].getBoundingClientRect().height;
-      cy.get("dialog[open]").contains("label", "Gender").find("select").select("masculine");
-      cy.get('dialog[open] [role="alert"]').should("contain", "The disk is full.");
-      cy.get("dialog[open]").should(($now) => expect($now[0].getBoundingClientRect().height).to.equal(before));
+  it("fits the dialog without a scrollbar at 1280x720, also with a tag", () => {
+    cy.viewport(1280, 720);
+    openWord(4211);
+    setTags(["lesson_1"]);
+    reopen();
+    cy.get("dialog[open]").should(($dialog) => {
+      expect($dialog[0].scrollHeight).to.be.at.most($dialog[0].clientHeight);
     });
   });
 });

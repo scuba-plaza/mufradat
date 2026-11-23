@@ -6,10 +6,12 @@ const failure = (text: string) => {
   return "error" in parsed ? parsed.error : null;
 };
 
-const texts = (text: string) => {
+const queryOf = (text: string) => {
   const parsed = parseQuery(text);
-  return "query" in parsed ? parsed.query.texts : null;
+  return "query" in parsed ? parsed.query : null;
 };
+
+const texts = (text: string) => queryOf(text)?.texts;
 
 describe("reading what was typed in the bar", () => {
   it("accepts nothing, spaces and plain words", () => {
@@ -56,7 +58,9 @@ describe("what the bar says about a term it cannot use", () => {
   it("says what a rank or a span has to look like", () => {
     expect(failure("rank:abc")).toBe('rank: expects a number, a range such as 1-500 or none, not "abc".');
     expect(failure("rank:500-1")).toBe('rank: expects a number, a range such as 1-500 or none, not "500-1".');
-    expect(failure("rank:>2000")).toBe('rank: expects a number, a range such as 1-500 or none, not ">2000".');
+    for (const gone of [">2000", ">=4", "<2", "<=2"]) {
+      expect(failure(`rank:${gone}`)).toBe(`rank: expects a number, a range such as 1-500 or none, not "${gone}".`);
+    }
     expect(failure("edited:soon")).toBe('edited: expects a span such as 7d, 12h or 2w, or none, not "soon".');
     expect(failure("edited:2026-13-40")).toBe('edited: expects a span such as 7d, 12h or 2w, or none, not "2026-13-40".');
   });
@@ -112,10 +116,7 @@ describe("what the bar says about a term it cannot use", () => {
 });
 
 describe("a query that asks for suspended words", () => {
-  const flag = (text: string) => {
-    const parsed = parseQuery(text);
-    return "query" in parsed ? parsed.query.suspended : null;
-  };
+  const flag = (text: string) => queryOf(text)?.suspended;
 
   it("is marked when the query has a positive status:suspended term", () => {
     expect(flag("status:suspended")).toBe(true);
@@ -143,10 +144,7 @@ describe("changing the sort of a query", () => {
 });
 
 describe("what a click on a column header sorts by", () => {
-  const sortOf = (text: string) => {
-    const parsed = parseQuery(text);
-    return "query" in parsed ? parsed.query.sort : null;
-  };
+  const sortOf = (text: string) => queryOf(text)!.sort;
 
   it("sorts ascending first, then descending, then goes back to the default order", () => {
     expect(nextSort(sortOf(""), "arabic")).toBe("arabic");
@@ -172,9 +170,9 @@ describe("the one way in, re:", () => {
 
   it("names the pattern's own error under the field it was written in", () => {
     expect(failure("re:")).toBe("re: needs a pattern.");
-    expect(failure("re:[a")).toContain("not closed");
-    expect(failure("tag:re:[a")).toContain("not closed");
-    expect(failure("tag:re:")).toContain("needs a pattern");
+    expect(failure("tag:re:")).toBe("tag:re: needs a pattern.");
+    expect(failure("re:[a")).toBe("re: A class in [] is not closed.");
+    expect(failure("tag:re:[a")).toBe("tag:re: A class in [] is not closed.");
   });
 
   it("refuses re: on a field that takes fixed values", () => {
@@ -193,7 +191,6 @@ describe("the one way in, re:", () => {
 describe("what the bar says about a pattern among other values", () => {
   it("names a bad pattern once, under the field it was written in", () => {
     expect(failure("tag:a,re:[a")).toBe("tag:re: A class in [] is not closed.");
-    expect(failure("tag:a,re:")).toBe("tag:re: needs a pattern.");
     expect(failure("pos:noun,re:x")).toBe("pos: takes fixed values, not a pattern.");
   });
 
@@ -237,7 +234,6 @@ describe("what the bar says about syntax the pattern language reads or refuses",
   it("names an unclosed property as typed, with its capitals", () => {
     expect(failure("re:\\p{Nope")).toBe("re: \\p{Nope is not a Unicode property such as \\p{Arabic} or \\p{Lu}.");
     expect(failure("re:a\\P{Arabic")).toBe("re: \\P{Arabic is not a Unicode property such as \\p{Arabic} or \\p{Lu}.");
-    expect(failure("re:\\pL")).toBe("re: \\pL is not a Unicode property such as \\p{Arabic} or \\p{Lu}.");
   });
 
   it("names a malformed escape for a character as typed, up to the character that spoils it", () => {

@@ -7,13 +7,13 @@ export interface Executor {
 }
 
 export const RANGES = 0;
-export const SPLIT = 1;
-export const JUMP = 2;
+const SPLIT = 1;
+const JUMP = 2;
 export const ASSERT = 3;
-export const MATCH = 4;
+const MATCH = 4;
 
 export const START = 0;
-export const END = 1;
+const END = 1;
 export const BOUNDARY = 2;
 export const NOT_BOUNDARY = 3;
 const ASSERTIONS = { start: START, end: END, wordBoundary: BOUNDARY, notWordBoundary: NOT_BOUNDARY };
@@ -24,7 +24,11 @@ export const OTHER = 2;
 
 const ASCII_SIDE = Uint8Array.from({ length: 128 }, (_, code) => (contains(PERL.w, code) ? WORD : OTHER));
 
-export const sideOf = (code: number): number => (code < 0 ? EDGE : code < 128 ? ASCII_SIDE[code] : contains(PERL.w, code) ? WORD : OTHER);
+export function sideOf(code: number): number {
+  if (code < 0) return EDGE;
+  if (code < 128) return ASCII_SIDE[code];
+  return contains(PERL.w, code) ? WORD : OTHER;
+}
 
 export function holds(assertion: number, before: number, after: number): boolean {
   switch (assertion) {
@@ -86,7 +90,7 @@ export function flatten(program: readonly Inst[]): Flat {
   return { ops, first, second, sets };
 }
 
-export const LAST_GENERATION = 2 ** 31 - 2;
+const LAST_GENERATION = 2 ** 31 - 2;
 
 export const PENDING = -1;
 

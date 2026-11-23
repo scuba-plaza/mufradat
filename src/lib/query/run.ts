@@ -8,8 +8,10 @@ function sortedBy(rows: WordRow[], sort: NonNullable<Query["sort"]>): WordRow[] 
   const direction = sort.descending ? -1 : 1;
   return [...rows].sort((a, b) => {
     const [x, y] = [key(a), key(b)];
-    if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1;
-    return x === y ? 0 : x < y ? -direction : direction;
+    if (x === y) return 0;
+    if (x === null) return 1;
+    if (y === null) return -1;
+    return x < y ? -direction : direction;
   });
 }
 

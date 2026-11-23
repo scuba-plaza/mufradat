@@ -10,15 +10,16 @@ export const GET = (req: Request) =>
   handle(() => {
     const { cfg, store } = context();
     const q = new URL(req.url).searchParams.get("q") ?? "";
+    const blank = q.trim() === "";
     const everyCard = store.allNotes();
     let notes = everyCard.filter((n) => n.status === "approved" && !n.suspended);
-    if (q.trim() !== "") {
+    if (!blank) {
       const found = view(store, q);
       if (found.error) return fail(found.error);
       const wanted = new Set(approvedIds(found.rows));
       notes = notes.filter((n) => wanted.has(n.id));
     }
-    if (notes.length === 0) return fail(q.trim() === "" ? "There are no approved cards to export." : "No approved card matches this search.");
+    if (notes.length === 0) return fail(blank ? "There are no approved cards to export." : "No approved card matches this search.");
     const read = (key: string, place: ClipPlace) => {
       const file = audioPath(store.root, key);
       if (!fs.existsSync(file)) throw new MissingClipError(place);

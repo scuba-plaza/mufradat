@@ -1,28 +1,14 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { cardForRank } from "@/lib/lexicon";
 import { context } from "@/lib/server";
+import { mp3, tempWorkspace, withParams } from "@/lib/testing/workspace";
 import { DELETE } from "./route";
 
-const mp3 = Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]);
-
-function remove(id: string, slot: string) {
-  return DELETE(new Request(`http://127.0.0.1/api/audio/${id}/${slot}`, { method: "DELETE" }), {
-    params: Promise.resolve({ id, slot }),
-  });
-}
+const remove = (id: string, slot: string) =>
+  DELETE(new Request(`http://127.0.0.1/api/audio/${id}/${slot}`, { method: "DELETE" }), withParams({ id, slot }));
 
 describe("removing a clip", () => {
-  beforeEach(() => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-route-"));
-    vi.stubEnv("XDG_CONFIG_HOME", path.join(home, "config"));
-    vi.stubEnv("MUFRADAT_WORKSPACE", path.join(home, "workspace"));
-  });
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
+  tempWorkspace();
 
   it("answers with the card as it is without the clip", async () => {
     const { store } = context();

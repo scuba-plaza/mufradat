@@ -26,6 +26,8 @@ const COLUMNS: { key: SortKey; label: string; name: string; className: string }[
   { key: "english", label: "English", name: "English", className: "" },
 ];
 
+const GRID = "grid-cols-[2.5rem_5rem_1fr_auto] sm:grid-cols-[2.5rem_6rem_1fr_7rem]";
+
 export default async function Home({ searchParams }: { searchParams: Promise<{ q?: string | string[]; page?: string | string[] }> }) {
   const params = await searchParams;
   const q = firstParam(params.q).trim();
@@ -70,41 +72,44 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
           </a>
         ))}
       </nav>
-      {rows.length > 0 && <Pager paging={paging} q={q} total={rows.length} />}
-      {rows.length === 0 && !error && <p className="px-2 py-4">Nothing matches.</p>}
-      {rows.length > 0 && (
-        <div className="table-box">
-          <div role="group" aria-label="Sort by" className="table-head grid-cols-[2.5rem_5rem_1fr_auto] sm:grid-cols-[2.5rem_6rem_1fr_7rem]">
-            {COLUMNS.map((column) => (
-              <a
-                key={column.key}
-                href={listPath(withSort(q, nextSort(sort, column.key)))}
-                aria-label={sort?.key === column.key ? `${column.name}, sorted ${sort.descending ? "descending" : "ascending"}` : column.name}
-                aria-current={sort?.key === column.key ? "true" : undefined}
-                className={`${column.className} hover:text-ink`}
-              >
-                {column.label}
-                {sort?.key === column.key && <span aria-hidden="true"> {sort.descending ? "↓" : "↑"}</span>}
-              </a>
-            ))}
-            <span className="justify-self-end">Status</span>
-          </div>
-          {/* Plain anchors: opening a word creates its card, which a prefetching <Link> would do for every row on screen. */}
-          <ol aria-label="Word list">
-            {rows.slice(paging.start, paging.end).map((w) => (
-              <li key={rowHref(w)}>
-                <a href={rowHref(w, q)} className="entry grid-cols-[2.5rem_5rem_1fr_auto] sm:grid-cols-[2.5rem_6rem_1fr_7rem]">
-                  <span className="num text-right text-xs text-quiet">{w.rank ?? "—"}</span>
-                  <span className="ar justify-self-end text-ar-sm" lang="ar" dir="rtl">{w.lemma}</span>
-                  <span className="truncate">{w.english}</span>
-                  <span className="justify-self-end">{w.status !== "todo" && <StatusMark status={w.status} />}</span>
+      {rows.length === 0 ? (
+        !error && <p className="px-2 py-4">Nothing matches.</p>
+      ) : (
+        <>
+          <Pager paging={paging} q={q} total={rows.length} />
+          <div className="table-box">
+            <div role="group" aria-label="Sort by" className={`table-head ${GRID}`}>
+              {COLUMNS.map((column) => (
+                <a
+                  key={column.key}
+                  href={listPath(withSort(q, nextSort(sort, column.key)))}
+                  aria-label={sort?.key === column.key ? `${column.name}, sorted ${sort.descending ? "descending" : "ascending"}` : column.name}
+                  aria-current={sort?.key === column.key ? "true" : undefined}
+                  className={`${column.className} hover:text-ink`}
+                >
+                  {column.label}
+                  {sort?.key === column.key && <span aria-hidden="true"> {sort.descending ? "↓" : "↑"}</span>}
                 </a>
-              </li>
-            ))}
-          </ol>
-        </div>
+              ))}
+              <span className="justify-self-end">Status</span>
+            </div>
+            {/* Plain anchors: opening a word creates its card, which a prefetching <Link> would do for every row on screen. */}
+            <ol aria-label="Word list">
+              {rows.slice(paging.start, paging.end).map((w) => (
+                <li key={rowHref(w)}>
+                  <a href={rowHref(w, q)} className={`entry ${GRID}`}>
+                    <span className="num text-right text-xs text-quiet">{w.rank ?? "—"}</span>
+                    <span className="ar justify-self-end text-ar-sm" lang="ar" dir="rtl">{w.lemma}</span>
+                    <span className="truncate">{w.english}</span>
+                    <span className="justify-self-end">{w.status !== "todo" && <StatusMark status={w.status} />}</span>
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </div>
+          <Pager paging={paging} q={q} label="More pages" />
+        </>
       )}
-      {rows.length > 0 && <Pager paging={paging} q={q} label="More pages" />}
     </>
   );
 }

@@ -5,28 +5,11 @@ const bar = '[role="toolbar"]';
 const suspendButton = '[title="Suspend word"]';
 const unsuspendButton = '[title="Unsuspend word"]';
 const dialog = 'dialog[open]';
-const mp3 = [0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4];
 
 /** Opens the card of a word, once the page is ready to take input. */
 function openWord(rank: number) {
   cy.visit(`/open?rank=${rank}`);
   cy.hydrated(suspendButton);
-}
-
-/** Fills a card out over the API, so it has everything an approval needs. */
-function finishCard(rank: number) {
-  cy.visit(`/open?rank=${rank}`);
-  cy.location("pathname").then((path) => {
-    const id = path.split("/").pop();
-    cy.request("PUT", `/api/notes/${id}`, { example: "كَانَ [الْكِتَابُ] جَمِيلًا جِدًّا", exampleEn: "The book was very beautiful." }).then((response) => {
-      const { forms } = (response.body as { note: { forms: { id: string }[] } }).note;
-      cy.window().then(async (win) => {
-        for (const slot of ["word", "example", ...forms.map((form) => form.id)]) {
-          await win.fetch(`/api/audio/${id}/${slot}`, { method: "PUT", body: new win.Uint8Array(mp3) });
-        }
-      });
-    });
-  });
 }
 
 describe("suspending a word", () => {
@@ -45,7 +28,7 @@ describe("suspending a word", () => {
   });
 
   it("asks first when the card is approved, and takes the approval back", () => {
-    finishCard(32);
+    cy.finishCard(32);
     cy.location("pathname").then((card) => {
       cy.request("POST", `/api/notes/${card.split("/").pop()}/approve`, {});
       cy.visit(card);

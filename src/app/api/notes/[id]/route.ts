@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { context, fail, handle, readJson } from "@/lib/server";
 import { POS_VALUES, type NoteEdit, type POS } from "@/lib/types";
+import type { IdContext } from "../../route-helpers";
 
 export const dynamic = "force-dynamic";
-type Ctx = { params: Promise<{ id: string }> };
 
 const TEXT_FIELDS = ["lemma", "english", "gender", "root", "verbForm", "hint", "hintAr", "example", "exampleEn"] as const;
 
-export const PUT = (req: Request, { params }: Ctx) =>
+export const PUT = (req: Request, { params }: IdContext) =>
   handle(async () => {
     const body = await readJson(req);
     const edit: NoteEdit = {};
@@ -26,7 +26,7 @@ export const PUT = (req: Request, { params }: Ctx) =>
     return NextResponse.json({ note: context().store.updateNote((await params).id, edit) });
   });
 
-export const DELETE = (_req: Request, { params }: Ctx) =>
+export const DELETE = (_req: Request, { params }: IdContext) =>
   handle(async () => {
     context().store.deleteNote((await params).id);
     return new Response(null, { status: 204 });

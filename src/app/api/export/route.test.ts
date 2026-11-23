@@ -1,16 +1,14 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { audioKey, audioPath } from "@/lib/audio";
 import Database from "better-sqlite3";
+import { describe, expect, it, vi } from "vitest";
+import { audioKey, audioPath } from "@/lib/audio";
 import { deckGuids, unzip } from "@/lib/testing/deck";
 import { context } from "@/lib/server";
 import type { Store } from "@/lib/store";
 import { openCard } from "@/lib/words";
+import { mp3, tempWorkspace } from "@/lib/testing/workspace";
 import { GET } from "./route";
-
-const mp3 = Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]);
 
 const request = (q?: string) => new Request(`http://127.0.0.1/api/export${q === undefined ? "" : `?q=${encodeURIComponent(q)}`}`);
 
@@ -23,23 +21,11 @@ function card(store: Store, rank: number, tags: string[], approved: boolean): st
 }
 
 describe("exporting through the API", () => {
-  let home: string;
-
-  beforeEach(() => {
-    home = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-export-route-"));
-    vi.stubEnv("XDG_CONFIG_HOME", path.join(home, "config"));
-    vi.stubEnv("MUFRADAT_WORKSPACE", path.join(home, "workspace"));
-  });
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    fs.rmSync(home, { recursive: true, force: true });
-  });
+  tempWorkspace();
 
   it("names the card and the slot when a clip's file is missing", async () => {
     const { store } = context();
-    const id = openCard(store, { rank: 10 })!;
-    store.setAudio(id, "word", mp3, "tts");
-    expect(store.approve(id).ok).toBe(true);
+    const id = card(store, 10, [], true);
     fs.rmSync(audioPath(store.root, audioKey(mp3)));
     const res = await GET(request());
     expect(res.status).toBe(400);
@@ -50,9 +36,7 @@ describe("exporting through the API", () => {
 
   it("answers with the deck as a download and writes nothing to the workspace", async () => {
     const { store } = context();
-    const id = openCard(store, { rank: 10 })!;
-    store.setAudio(id, "word", mp3, "tts");
-    expect(store.approve(id).ok).toBe(true);
+    card(store, 10, [], true);
     const res = await GET(request());
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Disposition")).toMatch(/^attachment; filename="arabic-deck-\d{4}-\d{2}-\d{2}\.apkg"$/);

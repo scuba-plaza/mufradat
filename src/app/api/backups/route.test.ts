@@ -1,23 +1,21 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { audioKey, audioPath } from "@/lib/audio";
 import { openBackupZip } from "@/lib/backup-zip";
 import { context } from "@/lib/server";
 import { snapshotAudioPath } from "@/lib/snapshots";
 import type { SnapshotInfo } from "@/lib/types";
 import { openCard } from "@/lib/words";
+import { mp3, tempWorkspace, withParams } from "@/lib/testing/workspace";
 import { DELETE, GET as download } from "./[id]/route";
 import { GET, POST } from "./route";
 
-const mp3 = Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]);
-
 const removeBackup = (id: string) =>
-  DELETE(new Request(`http://127.0.0.1/api/backups/${id}`, { method: "DELETE" }), { params: Promise.resolve({ id }) });
+  DELETE(new Request(`http://127.0.0.1/api/backups/${id}`, { method: "DELETE" }), withParams({ id }));
 
 const downloadBackup = (id: string) =>
-  download(new Request(`http://127.0.0.1/api/backups/${id}`), { params: Promise.resolve({ id }) });
+  download(new Request(`http://127.0.0.1/api/backups/${id}`), withParams({ id }));
 
 const lastDownloadedAt = async () => (await (await GET()).json()).lastDownloadedAt;
 
@@ -25,17 +23,9 @@ const manuals = async () =>
   ((await (await GET()).json()).snapshots as SnapshotInfo[]).filter((s) => s.reason === "manual");
 
 describe("the backups API", () => {
-  let home: string;
-
-  beforeEach(() => {
-    home = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-backups-route-"));
-    vi.stubEnv("XDG_CONFIG_HOME", path.join(home, "config"));
-    vi.stubEnv("MUFRADAT_WORKSPACE", path.join(home, "workspace"));
-  });
+  const home = tempWorkspace();
   afterEach(() => {
     vi.useRealTimers();
-    vi.unstubAllEnvs();
-    fs.rmSync(home, { recursive: true, force: true });
   });
 
   it("lists nothing in an empty workspace and says it is healthy", async () => {
@@ -117,7 +107,7 @@ describe("the backups API", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("application/zip");
     expect(res.headers.get("content-disposition")).toBe(`attachment; filename="mufradat-backup-${snapshot.id}.zip"`);
-    const file = path.join(home, "download.zip");
+    const file = path.join(home(), "download.zip");
     fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
     const backup = openBackupZip(file);
     const clip = `audio/${audioKey(mp3).slice(0, 2)}/${audioKey(mp3)}.mp3`;
@@ -139,12 +129,15 @@ describe("the backups API", () => {
     expect(await lastDownloadedAt()).toBe("2026-11-06T10:00:00.000Z");
   });
 
-  it("answers 400 instead of a broken download when a clip is missing from the backup", async () => {
+  it.each([
+    ["missing", (clip: string) => fs.rmSync(clip)],
+    ["damaged", (clip: string) => fs.writeFileSync(clip, Buffer.from("x"))],
+  ])("answers 400 instead of a download the other end would refuse when a clip in the backup is %s", async (_what, spoil) => {
     const { store } = context();
     const id = openCard(store, { rank: 10 })!;
     store.setAudio(id, "word", mp3, "tts");
     const { snapshot } = await (await POST()).json();
-    fs.rmSync(snapshotAudioPath(store.root, audioKey(mp3)));
+    spoil(snapshotAudioPath(store.root, audioKey(mp3)));
     const res = await downloadBackup(snapshot.id);
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "The backup is missing or has damaged audio clips." });
@@ -159,22 +152,11 @@ describe("the backups API", () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await downloadBackup(snapshot.id);
     expect(res.status).toBe(200);
-    const file = path.join(home, "download.zip");
+    const file = path.join(home(), "download.zip");
     fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
     expect(openBackupZip(file).names).toContain("manifest.json");
     expect(logged).toHaveBeenCalledTimes(1);
     logged.mockRestore();
-  });
-
-  it("answers 400 instead of a download the other end would refuse when a clip in the backup is damaged", async () => {
-    const { store } = context();
-    const id = openCard(store, { rank: 10 })!;
-    store.setAudio(id, "word", mp3, "tts");
-    const { snapshot } = await (await POST()).json();
-    fs.writeFileSync(snapshotAudioPath(store.root, audioKey(mp3)), Buffer.from("x"));
-    const res = await downloadBackup(snapshot.id);
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "The backup is missing or has damaged audio clips." });
   });
 
   it("does not say a backup was downloaded when the download is cancelled part way", async () => {

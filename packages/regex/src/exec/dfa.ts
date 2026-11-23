@@ -62,7 +62,10 @@ export function createDfa(program: readonly Inst[], options: DfaOptions = {}): D
     if (first[at] === START) hasStart = true;
     else if (first[at] === BOUNDARY || first[at] === NOT_BOUNDARY) hasBoundary = true;
   }
-  const afterChar = (side: number): number => (hasBoundary ? side : hasStart ? OTHER : EDGE);
+  const afterChar = (side: number): number => {
+    if (hasBoundary) return side;
+    return hasStart ? OTHER : EDGE;
+  };
 
   const bounds = classBoundaries(sets, hasBoundary);
   const classCount = bounds.length;
@@ -198,8 +201,8 @@ export function createDfa(program: readonly Inst[], options: DfaOptions = {}): D
     test(text) {
       if (startPcs === null) return true;
       if (stats.bailed) return fallback().test(text);
-      const classes = basic ?? (basic = basicClasses());
-      let offset = (start ?? (start = intern(EDGE, startPcs))).id * classCount;
+      const classes = (basic ??= basicClasses());
+      let offset = (start ??= intern(EDGE, startPcs)).id * classCount;
       let transitions = table;
       const end = text.length;
       let index = 0;

@@ -15,14 +15,18 @@ export interface Limits {
 
 export const DEFAULT_LIMITS: Limits = { dailyKeep: 14, beforeKeep: 14, budgetBytes: 1024 ** 3 };
 
-const byId = (a: RetentionEntry, b: RetentionEntry) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+function byId(a: RetentionEntry, b: RetentionEntry): number {
+  if (a.id === b.id) return 0;
+  return a.id < b.id ? -1 : 1;
+}
 
 const AUTOMATIC: readonly SnapshotReason[] = ["daily", "before-reset", "before-restore"];
+const isAutomatic = (e: RetentionEntry) => AUTOMATIC.includes(e.reason);
 
 const groupOf = (e: RetentionEntry) => (e.reason === "daily" ? "daily" : "before");
 
 export function automaticSize(entries: RetentionEntry[]): number {
-  return sizeOf(entries.filter((e) => AUTOMATIC.includes(e.reason)));
+  return sizeOf(entries.filter(isAutomatic));
 }
 
 function sizeOf(entries: RetentionEntry[]): number {
@@ -32,7 +36,7 @@ function sizeOf(entries: RetentionEntry[]): number {
 }
 
 export function selectRemovals(entries: RetentionEntry[], limits: Limits): string[] {
-  const automatic = entries.filter((e) => AUTOMATIC.includes(e.reason)).sort(byId);
+  const automatic = entries.filter(isAutomatic).sort(byId);
   const keeps = { daily: limits.dailyKeep, before: limits.beforeKeep };
   const removed = new Set<string>();
   const newest = new Set<string>();

@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SnapshotInfo, SnapshotReason, SnapshotUsage, WorkspaceCheck } from "@/lib/types";
 import { api } from "./api";
 import { plural, size } from "./format";
+import Modal from "./Modal";
 import Spinner from "./Spinner";
 
 interface BackupsData {
@@ -28,7 +29,6 @@ interface Confirming {
 }
 
 export default function Backups({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLOListElement>(null);
   const [floor, setFloor] = useState(0);
@@ -37,13 +37,6 @@ export default function Backups({ open, onClose }: { open: boolean; onClose: () 
   const [busy, setBusy] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const el = dialog.current;
-    if (!el) return;
-    if (open && !el.open) el.showModal();
-    if (!open && el.open) el.close();
-  }, [open]);
 
   useEffect(() => {
     if (open) run(load);
@@ -112,13 +105,7 @@ export default function Backups({ open, onClose }: { open: boolean; onClose: () 
   };
 
   return (
-    <dialog
-      ref={dialog}
-      aria-labelledby="backups-title"
-      onClose={close}
-      onClick={(e) => e.target === dialog.current && close()}
-      className="text-sm open:flex open:flex-col w-[calc(100%-2.5rem)] max-w-2xl rounded-modal border border-rule bg-surface p-0 text-ink shadow-modal backdrop:bg-black/70"
-    >
+    <Modal open={open} onClose={close} labelledBy="backups-title" className="text-sm open:flex open:flex-col max-w-2xl p-0">
       <div className="flex min-h-0 flex-col p-6">
         <h2 id="backups-title" className="text-xl font-semibold tracking-title">Backups</h2>
         <p className="mt-2 text-sm text-quiet">
@@ -224,6 +211,6 @@ export default function Backups({ open, onClose }: { open: boolean; onClose: () 
           </div>
         )}
       </div>
-    </dialog>
+    </Modal>
   );
 }

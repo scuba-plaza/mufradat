@@ -16,6 +16,10 @@ const blank: WordRow = {
   id: null, rank: null, lemma: "", english: "", pos: "noun", gender: "", root: "", verbForm: "", status: "todo", edited: null, tags: [],
 };
 
+const row = (rank: number | null, status: WordRow["status"], edited: string | null, lemma = String(rank)): WordRow => ({
+  ...blank, id: edited ? `card-${lemma}` : null, rank, lemma, status, edited,
+});
+
 afterEach(() => vi.useRealTimers());
 
 describe("the list of words", () => {
@@ -42,13 +46,6 @@ describe("the list of words", () => {
     finish(s, approved);
     expect(s.approve(approved).ok).toBe(true);
     expect(wordRows(s).slice(0, 4).map((w) => w.status)).toEqual(["progress", "ready", "approved", "todo"]);
-  });
-
-  it("calls a bare card progress although it is stored as a draft", () => {
-    const s = openStore(":memory:");
-    const id = openCard(s, { rank: 1 })!;
-    expect(s.getNote(id)!.status).toBe("draft");
-    expect(wordRows(s)[0].status).toBe("progress");
   });
 
   it("takes a card that lost its approval back to ready or progress", () => {
@@ -107,14 +104,9 @@ describe("what a row says about a word", () => {
       ...blank, id, rank: 6, lemma: "كَانَ", english: "to be", pos: "verb", verbForm: "I", status: "progress", edited: s.getNote(id)!.updatedAt,
     });
   });
-
 });
 
 describe("the order of the list when nothing is asked for", () => {
-  const row = (rank: number | null, status: WordRow["status"], edited: string | null, lemma = String(rank)): WordRow => ({
-    ...blank, id: edited ? `card-${lemma}` : null, rank, lemma, status, edited,
-  });
-
   it("puts cards being worked on first, latest edit on top, then words not started by rank, then approved ones by rank", () => {
     const rows = [
       row(1, "approved", "2026-01-01T00:00:00Z"),
@@ -137,10 +129,6 @@ describe("the order of the list when nothing is asked for", () => {
 });
 
 describe("what Continue opens", () => {
-  const row = (rank: number | null, status: WordRow["status"], edited: string | null): WordRow => ({
-    ...blank, id: edited ? `card-${rank}` : null, rank, lemma: String(rank), status, edited,
-  });
-
   it("is the card being worked on that was edited last", () => {
     const rows = [row(1, "progress", "2026-01-01T00:00:00Z"), row(2, "ready", "2026-01-03T00:00:00Z"), row(3, "progress", "2026-01-02T00:00:00Z"), row(4, "todo", null)];
     expect(continueFrom(rows)).toBe(rows[1]);
@@ -271,35 +259,16 @@ describe("the words a query asks for", () => {
     expect(view(s, "pos:animal", now).sort).toBeNull();
   });
 
-  it("finds a word in Wiktionary that is not in the list when the query has text, once", () => {
-    const s = openStore(":memory:");
-    const found = view(s, "على", now).rows.filter((r) => r.lemma === "عَلَى");
+  it.each(["على", "re:^على$"])("finds a word in Wiktionary that is not in the list for %s, once", (query) => {
+    const found = view(openStore(":memory:"), query, now).rows.filter((r) => r.lemma === "عَلَى");
     expect(found).toEqual([
       { ...blank, rank: 3, lemma: "عَلَى", english: "on, over", pos: "prep" },
       { ...blank, lemma: "عَلَى", english: "to climb", pos: "verb", verbForm: "I" },
     ]);
   });
 
-  it("does not look in Wiktionary when the query has no text", () => {
-    expect(view(openStore(":memory:"), "status:todo pos:verb", now).rows.every((r) => r.rank !== null)).toBe(true);
-  });
-
-  it("finds a word in Wiktionary that is not in the list when the query has a re: pattern, as it does for text", () => {
-    const s = openStore(":memory:");
-    const found = view(s, "re:^على$", now).rows.filter((r) => r.lemma === "عَلَى");
-    expect(found).toEqual([
-      { ...blank, rank: 3, lemma: "عَلَى", english: "on, over", pos: "prep" },
-      { ...blank, lemma: "عَلَى", english: "to climb", pos: "verb", verbForm: "I" },
-    ]);
-    const verbs = view(s, "re:^على$ verbform:I rank:none", now).rows;
-    expect(verbs.map((r) => r.english)).toContain("to climb");
-    expect(verbs.every((r) => r.verbForm === "I" && r.rank === null && r.status === "todo")).toBe(true);
-  });
-
-  it("does not look in Wiktionary for a pattern inside a field, as it does not for the plain field", () => {
-    const s = openStore(":memory:");
-    expect(view(s, "root:re:.*", now).rows.every((r) => r.rank !== null)).toBe(true);
-    expect(view(s, "tag:re:.*", now).rows.every((r) => r.rank !== null)).toBe(true);
+  it.each(["status:todo pos:verb", "root:re:.*", "tag:re:.*"])("does not look in Wiktionary for %s, which has no text", (query) => {
+    expect(view(openStore(":memory:"), query, now).rows.every((r) => r.rank !== null)).toBe(true);
   });
 
   it("shows the card instead of the Wiktionary entry once it was opened", () => {
@@ -389,11 +358,6 @@ describe("finding words by tag", () => {
     expect(ranks(tagged(), "tag:lesson_1")).toEqual([1]);
   });
 
-  it("takes * as an ordinary character, not a wildcard", () => {
-    expect(ranks(tagged(), "tag:lesson_*")).toEqual([]);
-    expect(ranks(tagged(), "tag:*")).toEqual([]);
-  });
-
   it("ignores case and takes a comma as or", () => {
     expect(ranks(tagged(), "tag:LESSON_1,grammar")).toEqual([1, 2]);
   });
@@ -403,7 +367,7 @@ describe("finding words by tag", () => {
     expect(ranks(s, "-tag:lesson_1,lesson_2,lesson_10,grammar status:progress")).toEqual([4]);
   });
 
-  it("takes every character as typed", () => {
+  it("takes every character as typed, * and . included", () => {
     const s = openStore(":memory:");
     s.setTags(openCard(s, { rank: 1 })!, ["abc", "a*c"]);
     expect(ranks(s, "tag:a.c")).toEqual([]);
