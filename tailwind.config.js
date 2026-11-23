@@ -10,10 +10,10 @@ module.exports = {
     spacing: { px: "1px", 0: "0px", ...spacing },
     extend: {
       colors: Object.fromEntries(
-        [
-          "paper", "surface", "hover", "ink", "quiet", "rule", "rule-strong", "accent", "focus", "primary", "on-primary",
-          "highlight", "warn", "danger", "progress", "ok-bg", "ok-ink", "wip-bg", "wip-ink",
-        ].map((name) => [name, token(name)]),
+        ["paper", "surface", "hover", "ink", "quiet", "rule", "rule-strong", "on-primary", "warn", "danger", "progress"].map((name) => [
+          name,
+          token(name),
+        ]),
       ),
       fontFamily: {
         sans: [
@@ -22,17 +22,9 @@ module.exports = {
         ],
       },
       letterSpacing: { title: "-0.01em" },
-      borderRadius: {
-        control: "var(--radius-control)",
-        surface: "var(--radius-surface)",
-        modal: "var(--radius-modal)",
-      },
+      borderRadius: { control: "var(--radius-control)", modal: "var(--radius-modal)" },
       boxShadow: { modal: "var(--shadow-modal)" },
-      maxWidth: {
-        column: "var(--column)",
-        sm: "calc(24rem * var(--space))",
-        lg: "calc(32rem * var(--space))",
-      },
+      maxWidth: { column: "var(--column)", lg: "calc(32rem * var(--space))" },
       minHeight: { control: "var(--control-h)", "control-sm": "var(--control-h-sm)" },
       minWidth: { control: "var(--control-h)", "control-sm": "var(--control-h-sm)" },
       // Arabic with its vowel marks needs more line height than Latin text of the same size, so every

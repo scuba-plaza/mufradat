@@ -6,6 +6,10 @@ declare global {
     interface Chainable {
       /** Waits until React has attached its handlers to the element, so that an event sent to it is not lost. */
       hydrated(selector: string): Chainable<JQuery<HTMLElement>>;
+      /** Opens the card of a word, once the page is ready to take input. */
+      openWord(rank: number): Chainable<void>;
+      /** Fills the card of a word out over the API, so it has everything an approval needs. */
+      finishCard(rank: number): Chainable<void>;
       wordRow(rank: number): Chainable<JQuery<HTMLElement>>;
       pressEscape(): Chainable<void>;
       pressEnter(): Chainable<void>;
@@ -21,6 +25,28 @@ declare global {
 Cypress.Commands.add("hydrated", (selector: string) =>
   cy.get(selector).first().should(($el) => expect(Object.keys($el[0]).some((key) => key.startsWith("__reactProps$"))).to.equal(true)),
 );
+
+Cypress.Commands.add("openWord", (rank: number) => {
+  cy.visit(`/open?rank=${rank}`);
+  cy.hydrated('[aria-label="Hint English"]');
+});
+
+const mp3 = [0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4];
+
+Cypress.Commands.add("finishCard", (rank: number) => {
+  cy.visit(`/open?rank=${rank}`);
+  cy.location("pathname").then((path) => {
+    const id = path.split("/").pop();
+    cy.request("PUT", `/api/notes/${id}`, { example: "كَانَ [الْكِتَابُ] جَمِيلًا جِدًّا", exampleEn: "The book was very beautiful." }).then((response) => {
+      const { forms } = (response.body as { note: { forms: { id: string }[] } }).note;
+      cy.window().then(async (win) => {
+        for (const slot of ["word", "example", ...forms.map((form) => form.id)]) {
+          await win.fetch(`/api/audio/${id}/${slot}`, { method: "PUT", body: new win.Uint8Array(mp3) });
+        }
+      });
+    });
+  });
+});
 
 Cypress.Commands.add("wordRow", (rank: number) =>
   cy.get('[aria-label="Word list"] > li').filter((_, row) => row.querySelector(".num")?.textContent === String(rank)),
@@ -38,13 +64,19 @@ function pressKey(key: string, code: string, windowsVirtualKeyCode: number, text
 Cypress.Commands.add("pressEscape", () => pressKey("Escape", "Escape", 27));
 Cypress.Commands.add("pressEnter", () => pressKey("Enter", "Enter", 13, "\r"));
 
-Cypress.Commands.add("colorScheme", (scheme: "light" | "dark") => {
+function emulateColorScheme(scheme: "light" | "dark") {
   cy.then(() => Cypress.automation("remote:debugger:protocol", {
     command: "Emulation.setEmulatedMedia",
     params: { features: [{ name: "prefers-color-scheme", value: scheme }] },
   }));
+}
+
+Cypress.Commands.add("colorScheme", (scheme: "light" | "dark") => {
+  emulateColorScheme(scheme);
   cy.wait(200);
 });
+
+afterEach(() => emulateColorScheme("light"));
 
 Cypress.Commands.add("clickBackdrop", () => {
   cy.get("dialog[open]").then(($dialog) => {

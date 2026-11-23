@@ -13,7 +13,7 @@ interface Engine {
 }
 
 interface Corpus {
-  name: string;
+  label: string;
   texts: string[];
 }
 
@@ -50,14 +50,14 @@ const group = (n: number) => n.toLocaleString("en-US");
 
 function lexicon(): Corpus {
   const rows = [...rankedWords(), ...wiktionaryWords().filter((word) => word.rank === 0)];
-  return { name: "lexicon", texts: rows.flatMap((row) => [fold(row.lemma), fold(row.english)]) };
+  return { label: "lexicon", texts: rows.flatMap((row) => [fold(row.lemma), fold(row.english)]) };
 }
 
 function randomAB(length: number): Corpus {
   const random = seeded(1);
   let text = "";
   for (let k = 0; k < length; k++) text += random.chance(0.5) ? "a" : "b";
-  return { name: `random a/b, ${group(length)} characters`, texts: [text] };
+  return { label: "a/b", texts: [text] };
 }
 
 const median = (samples: number[]): number => {
@@ -121,8 +121,7 @@ it("prints one table per engine over the real lexicon", () => {
         for (const text of corpus.texts) if (compiled(text)) matching++;
         return matching;
       });
-      const label = corpus === words ? "lexicon" : "a/b";
-      write(`${pattern.padEnd(28)}${label.padEnd(8)}${ms(result.median)} ${ms(result.min)}${ms(result.max)}${String(result.runs).padStart(6)}${String(result.matching).padStart(10)}`);
+      write(`${pattern.padEnd(28)}${corpus.label.padEnd(8)}${ms(result.median)} ${ms(result.min)}${ms(result.max)}${String(result.runs).padStart(6)}${String(result.matching).padStart(10)}`);
     }
   }
 });

@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import type { Note } from "@/lib/types";
 import Details from "./Details";
+import Modal from "./Modal";
 import Tags from "./Tags";
 
 export default function TagsAndDetailsDialog(props: {
@@ -15,26 +16,19 @@ export default function TagsAndDetailsDialog(props: {
   problems: string[];
 }) {
   const { note } = props;
-  const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const el = dialog.current;
-    if (!el) return;
-    if (props.open && !el.open) {
-      el.showModal();
-      if (window.matchMedia("(pointer: fine)").matches) input.current?.focus();
-    }
-    if (!props.open && el.open) el.close();
-  }, [props.open]);
+  function focusTagInput() {
+    if (window.matchMedia("(pointer: fine)").matches) input.current?.focus();
+  }
 
   return (
-    <dialog
-      ref={dialog}
-      aria-labelledby="tags-and-details-title"
+    <Modal
+      open={props.open}
       onClose={props.onClose}
-      onClick={(e) => e.target === dialog.current && props.onClose()}
-      className="max-h-[90vh] w-[calc(100%-2.5rem)] max-w-lg overflow-y-auto rounded-modal border border-rule bg-surface p-0 text-ink shadow-modal backdrop:bg-black/70"
+      onOpen={focusTagInput}
+      labelledBy="tags-and-details-title"
+      className="max-h-[90vh] max-w-lg overflow-y-auto p-0"
     >
       <div className="p-6">
         <h2 id="tags-and-details-title" className="flex items-baseline gap-3 text-xl font-semibold tracking-title">
@@ -64,6 +58,6 @@ export default function TagsAndDetailsDialog(props: {
           <button className="action-main" onClick={props.onClose}>Done</button>
         </div>
       </div>
-    </dialog>
+    </Modal>
   );
 }

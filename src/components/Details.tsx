@@ -1,17 +1,13 @@
 "use client";
-import { POS_LABELS, POS_VALUES, type Note, type POS } from "@/lib/types";
+import { POS_LABELS, POS_VALUES, type Note } from "@/lib/types";
 import InlineText from "./InlineText";
 
-export default function Details(props: {
-  note: Note;
-  save: (patch: Record<string, unknown>) => void;
-}) {
-  const { note, save } = props;
+export default function Details({ note, save }: { note: Note; save: (patch: Record<string, unknown>) => void }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <label className="grid gap-1">
         <span className="text-sm text-quiet">Part of speech</span>
-        <select className="field" value={note.pos} onChange={(e) => save({ pos: e.target.value as POS })}>
+        <select className="field" value={note.pos} onChange={(e) => save({ pos: e.target.value })}>
           {POS_VALUES.map((p) => <option key={p} value={p}>{POS_LABELS[p]}</option>)}
         </select>
       </label>

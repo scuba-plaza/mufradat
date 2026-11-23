@@ -4,25 +4,18 @@ const by = (label: string) => `[aria-label="${label}"]`;
 const unplayable = { contents: Cypress.Buffer.from([0xff, 0xfb, 0x90, 0x00, 1, 2, 3, 4]), fileName: "clip.mp3", mimeType: "audio/mpeg" };
 
 function openWord(rank: number) {
-  cy.visit(`/open?rank=${rank}`);
-  cy.hydrated(by("Hint English"));
+  cy.openWord(rank);
   cy.get("html[data-keys]");
 }
 
 describe("the keys of a card", () => {
-  it("goes to the next word with Ctrl+→", () => {
-    openWord(90);
-    cy.get("body").type("{ctrl}{rightarrow}");
-    cy.contains("Word 91 of 5000");
-  });
-
   it("goes to the previous word with Ctrl+←", () => {
     openWord(92);
     cy.get("body").type("{ctrl}{leftarrow}");
     cy.contains("Word 91 of 5000");
   });
 
-  it("leaves the card it goes from as it was", () => {
+  it("goes to the next word with Ctrl+→, leaving the card it goes from as it was", () => {
     openWord(93);
     cy.location("pathname").then((card) => {
       cy.get("body").type("{ctrl}{rightarrow}");

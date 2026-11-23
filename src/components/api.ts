@@ -1,4 +1,6 @@
-export async function refusal(res: Response): Promise<Error> {
+export type Refusal = Error & { errors?: string[] };
+
+export async function refusal(res: Response): Promise<Refusal> {
   const body = await res.json().catch(() => ({}));
   const message = body.error ?? (Array.isArray(body.errors) ? body.errors.join(" ") : `Request failed (${res.status}).`);
   return Object.assign(new Error(message), { errors: body.errors as string[] | undefined });
@@ -11,5 +13,9 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return (await res.json().catch(() => ({}))) as T;
 }
 
-export const post = <T,>(url: string, body: unknown) =>
-  api<T>(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+const sendJson = <T,>(method: "POST" | "PUT", url: string, body: unknown) =>
+  api<T>(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+export const post = <T,>(url: string, body: unknown) => sendJson<T>("POST", url, body);
+
+export const put = <T,>(url: string, body: unknown) => sendJson<T>("PUT", url, body);

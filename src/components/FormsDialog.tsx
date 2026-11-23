@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useRef } from "react";
 import type { Note } from "@/lib/types";
 import Clip from "./Clip";
 import InlineText from "./InlineText";
+import Modal from "./Modal";
 
 export default function FormsDialog(props: {
   note: Note;
@@ -12,26 +12,12 @@ export default function FormsDialog(props: {
   onNote: (n: Note) => void;
 }) {
   const { note, save } = props;
-  const dialog = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const el = dialog.current;
-    if (!el) return;
-    if (props.open && !el.open) el.showModal();
-    if (!props.open && el.open) el.close();
-  }, [props.open]);
 
   const setForm = (i: number, change: Partial<{ label: string; arabic: string }>) =>
     save({ forms: note.forms.map((f, j) => (j === i ? { ...f, ...change } : f)) });
 
   return (
-    <dialog
-      ref={dialog}
-      aria-labelledby="forms-title"
-      onClose={props.onClose}
-      onClick={(e) => e.target === dialog.current && props.onClose()}
-      className="max-h-[90vh] w-[calc(100%-2.5rem)] max-w-column overflow-y-auto rounded-modal border border-rule bg-surface p-0 text-ink shadow-modal backdrop:bg-black/70"
-    >
+    <Modal open={props.open} onClose={props.onClose} labelledBy="forms-title" className="max-h-[90vh] max-w-column overflow-y-auto p-0">
       <div className="p-6">
         <h2 id="forms-title" className="flex items-baseline gap-3 text-xl font-semibold tracking-title">
           Forms of <span className="ar text-ar-sm" lang="ar" dir="rtl">{note.lemma}</span>
@@ -59,6 +45,6 @@ export default function FormsDialog(props: {
           <button className="action-main" onClick={props.onClose}>Done</button>
         </div>
       </div>
-    </dialog>
+    </Modal>
   );
 }

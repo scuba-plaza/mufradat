@@ -30,7 +30,6 @@ function visit(path: string) {
 
 describe("the export icon", () => {
   afterEach(() => {
-    cy.colorScheme("light");
     tagged.splice(0).forEach((id) => {
       cy.request("PUT", `/api/notes/${id}/tags`, { tags: [] });
       cy.request("PUT", `/api/notes/${id}`, {});
@@ -96,10 +95,10 @@ describe("the export icon", () => {
     });
   });
 
-  it("shows a spinner in place of the icon while the deck is built, and moves nothing", () => {
+  it("shows a spinner in place of the icon while the deck is built, moves nothing, and asks for the deck once however often it is clicked", () => {
     approvedCard(4403);
     visit("/");
-    cy.intercept("GET", "/api/export*", { delay: 1500, headers: deckHeaders, body: "x" });
+    cy.intercept("GET", "/api/export*", { delay: 1500, headers: deckHeaders, body: "x" }).as("export");
     cy.get(exportButton).then(($icon) => {
       cy.get(searchBar).then(($input) => {
         const page = $icon[0].ownerDocument;
@@ -108,7 +107,7 @@ describe("the export icon", () => {
           return [box.left, box.top + page.defaultView!.scrollY, box.width, box.height];
         };
         const before = [$icon[0], $input[0], page.querySelector("main")!].map(place);
-        cy.wrap($icon).click();
+        cy.wrap($icon).dblclick();
         cy.get(exportButton).should("have.attr", "aria-busy", "true");
         cy.get(`${exportButton} path[d="M12 15V3"]`).should("not.exist");
         cy.get(exportButton).should(($now) => {
@@ -122,48 +121,23 @@ describe("the export icon", () => {
         cy.get(status).should("have.text", "");
       });
     });
-  });
-
-  it("asks for the deck once however often it is clicked while it is built", () => {
-    approvedCard(4403);
-    visit("/");
-    cy.intercept("GET", "/api/export*", { delay: 1500, headers: deckHeaders, body: "x" }).as("export");
-    cy.get(exportButton).dblclick();
-    cy.get(status).should("have.text", "Preparing the deck…");
-    cy.get(status).should("have.text", "");
     cy.get("@export.all").should("have.length", 1);
   });
 
-  it("says why when the export is refused and saves nothing", () => {
+  it("says why when the export is refused, saves nothing, keeps the tabs where they are, and closes the message with Escape", () => {
     approvedCard(4403);
     visit("/");
+    const placed = ($tabs: JQuery<HTMLElement>) => $tabs[0].getBoundingClientRect().top + $tabs[0].ownerDocument.defaultView!.scrollY;
     cy.task<string[]>("downloads").then((before) => {
       cy.intercept("GET", "/api/export*", { statusCode: 400, body: { error: "The card of the word X has no audio file." } });
-      cy.get(exportButton).click();
-      cy.get(notice).should("be.visible").and("have.text", "The card of the word X has no audio file.");
+      cy.get('nav[aria-label="Status"]').then(($tabs) => {
+        const top = placed($tabs);
+        cy.get(exportButton).click();
+        cy.get(notice).should("be.visible").and("have.text", "The card of the word X has no audio file.");
+        cy.get('nav[aria-label="Status"]').should(($now) => expect(placed($now)).to.equal(top));
+      });
       cy.task<string[]>("downloads").should("deep.equal", before);
     });
-  });
-
-  it("keeps the tabs where they are when the export is refused", () => {
-    approvedCard(4403);
-    visit("/");
-    cy.intercept("GET", "/api/export*", { statusCode: 400, body: { error: "The card of the word X has no audio file." } });
-    const placed = ($tabs: JQuery<HTMLElement>) => $tabs[0].getBoundingClientRect().top + $tabs[0].ownerDocument.defaultView!.scrollY;
-    cy.get('nav[aria-label="Status"]').then(($tabs) => {
-      const before = placed($tabs);
-      cy.get(exportButton).click();
-      cy.get(notice).should("be.visible").and("have.text", "The card of the word X has no audio file.");
-      cy.get('nav[aria-label="Status"]').should(($now) => expect(placed($now)).to.equal(before));
-    });
-  });
-
-  it("closes the message with Escape", () => {
-    approvedCard(4403);
-    visit("/");
-    cy.intercept("GET", "/api/export*", { statusCode: 400, body: { error: "The card of the word X has no audio file." } });
-    cy.get(exportButton).click();
-    cy.get(notice).should("be.visible");
     cy.pressEscape();
     cy.get(notice).should("not.be.visible");
   });

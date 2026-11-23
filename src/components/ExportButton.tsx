@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
 import { refusal } from "./api";
+import { plural } from "./format";
 import Spinner from "./Spinner";
 
 export default function ExportButton({ q, count }: { q: string; count: number }) {
@@ -31,7 +32,6 @@ export default function ExportButton({ q, count }: { q: string; count: number })
       link.download = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? "arabic-deck.apkg";
       link.click();
       setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
-      setMessage("");
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
@@ -45,7 +45,7 @@ export default function ExportButton({ q, count }: { q: string; count: number })
       <button
         type="button"
         className="action min-h-control min-w-control px-0"
-        title={`Export ${count} approved ${count === 1 ? "card" : "cards"}`}
+        title={`Export ${count} approved ${plural(count, "card")}`}
         disabled={count === 0}
         aria-busy={preparing || undefined}
         style={{ anchorName: anchor }}
