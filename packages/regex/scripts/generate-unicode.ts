@@ -1,9 +1,9 @@
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-export const UNICODE_VERSION = "17.0";
+const UNICODE_VERSION = "17.0";
 
-const CATEGORIES = [
+export const CATEGORIES: readonly string[] = [
   "C", "Cc", "Cf", "Co", "Cs", "L", "Ll", "Lm", "Lo", "Lt", "Lu", "M", "Mc", "Me", "Mn", "N", "Nd", "Nl", "No",
   "P", "Pc", "Pd", "Pe", "Pf", "Pi", "Po", "Ps", "S", "Sc", "Sk", "Sm", "So", "Z", "Zl", "Zp", "Zs",
 ];

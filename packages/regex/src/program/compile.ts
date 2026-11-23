@@ -63,18 +63,16 @@ class Emitter {
 
   private alternate(branches: Node[]): void {
     const exits: number[] = [];
-    for (const [index, branch] of branches.entries()) {
-      if (index === branches.length - 1) {
-        this.emit(branch);
-        break;
-      }
+    const last = branches.length - 1;
+    for (let index = 0; index < last; index++) {
       const choice = this.program.length;
       this.program.push({ op: "split", first: choice + 1, second: PLACEHOLDER });
-      this.emit(branch);
+      this.emit(branches[index]);
       exits.push(this.program.length);
       this.program.push({ op: "jump", target: PLACEHOLDER });
       this.patch(choice, this.program.length);
     }
+    this.emit(branches[last]);
     for (const at of exits) this.patch(at, this.program.length);
   }
 
