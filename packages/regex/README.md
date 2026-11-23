@@ -57,10 +57,10 @@ The Unicode tables are generated from V8's own data by `pnpm --filter @mufradat/
 `pnpm test` at the root runs them all.
 
 - the **contract**, through the parser and a derivative matcher written for the tests alone, through the Pike executor, the DFA and `compile()`;
-- the **oracles**: seeded random patterns and texts against native `RegExp` and against the reference matcher, 64,000 cases each, with native runs under a `vm` timeout;
+- the **oracle**: 64,000 seeded random patterns and texts, each answered by the reference matcher, the Pike executor and `compile()` and checked against native `RegExp`, which runs under a `vm` timeout;
 - an **exhaustive** run of every pattern of up to four tokens against every text of up to three characters;
 - the **complexity pins**: eight patterns that make a backtracking engine exponential, and size bombs, each under a 10 second watchdog;
-- the **DFA** itself, with a cache so small that nearly every build flushes it and a forced bail-out;
+- the **DFA** itself, with a forced bail-out, and against the Pike executor on random patterns with a cache so small that nearly every build flushes it;
 - the range sets, the Unicode tables and the compiled programs, each on its own.
 
 The search chain of the app pins the pattern that took 44 seconds before this engine: `re:(.{100,100}){0,100}\u0001` over the whole lexicon is answered through `view()` in about the time of a plain pattern, and the test fails when it takes more than 10 times as long, both measured in the same run (`src/lib/search-time.test.ts`).
