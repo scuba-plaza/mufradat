@@ -1,10 +1,10 @@
 import { ApiError } from "./api-error";
 import type { Config } from "./config";
-import type { Note } from "./types";
-import { POS_LABELS } from "./types";
+import { POS_LABELS, type Note } from "./types";
 import { autoMark, plainExample, sentenceProblems, translationProblems } from "./validate";
 
 const ENDPOINT = "https://api.mistral.ai/v1/conversations";
+const NOT_JSON = "Mistral's answer was not the expected JSON. Try again.";
 // The agent holds the model, the instructions and the sampling settings; the app sends only the card.
 
 /**
@@ -52,19 +52,18 @@ export async function generateExample(
   if (!cfg.mistralApiKey) throw new ApiError("There is no Mistral API key. Set mistral_api_key in config.toml or MISTRAL_API_KEY.");
   if (!cfg.mistralAgentId) throw new ApiError("There is no Mistral agent id. Set mistral_agent_id in config.toml.");
   if (cfg.mistralAgentVersion === null) throw new ApiError("There is no Mistral agent version. Set mistral_agent_version in config.toml.");
-  const body = JSON.stringify({
-    agent_id: cfg.mistralAgentId,
-    agent_version: cfg.mistralAgentVersion,
-    store: false,
-    inputs: userPrompt(note),
-  });
   if (note.english.trim() === "") throw new ApiError("The card has no English meaning. Add one before generating an example.");
   let res: Response;
   try {
     res = await fetchImpl(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.mistralApiKey}` },
-      body,
+      body: JSON.stringify({
+        agent_id: cfg.mistralAgentId,
+        agent_version: cfg.mistralAgentVersion,
+        store: false,
+        inputs: userPrompt(note),
+      }),
     });
   } catch {
     throw new ApiError("Could not reach Mistral. Check the network connection and try again.");
@@ -74,7 +73,7 @@ export async function generateExample(
   try {
     text = messageText(await res.json());
   } catch {
-    throw new ApiError("Mistral's answer was not the expected JSON. Try again.");
+    throw new ApiError(NOT_JSON);
   }
   // The agent thinks before it answers: when it runs out of tokens while thinking, the output has no text at all.
   if (text.trim() === "") throw new ApiError("Mistral's agent gave no answer; it may have run out of tokens while thinking. Try again.");
@@ -82,7 +81,7 @@ export async function generateExample(
   try {
     answer = JSON.parse(text);
   } catch {
-    throw new ApiError("Mistral's answer was not the expected JSON. Try again.");
+    throw new ApiError(NOT_JSON);
   }
   const { sentence, translation } = answerParts(answer);
   const problems = [

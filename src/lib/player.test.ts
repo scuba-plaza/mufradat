@@ -16,9 +16,9 @@ class FakeAudio {
   }
 }
 
-const setup = () => {
+const setup = (Sound: typeof FakeAudio = FakeAudio) => {
   FakeAudio.all = [];
-  const player = createPlayer((url) => new FakeAudio(url));
+  const player = createPlayer((url) => new Sound(url));
   return { player, audio: FakeAudio.all };
 };
 
@@ -63,13 +63,13 @@ describe("playing clips one after another", () => {
   });
 
   it("treats a refused play like a clip that cannot be played", async () => {
-    FakeAudio.all = [];
-    const refuse = class extends FakeAudio {
-      play() {
-        return Promise.reject(new Error("blocked"));
-      }
-    };
-    const player = createPlayer((url) => new refuse(url));
+    const { player } = setup(
+      class extends FakeAudio {
+        play() {
+          return Promise.reject(new Error("blocked"));
+        }
+      },
+    );
     const failed = vi.fn();
     player.enqueue({ id: "a/word", url: "/a", onError: failed });
     await Promise.resolve();

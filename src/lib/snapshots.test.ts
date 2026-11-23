@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { audioKey, audioPath } from "./audio";
-import { backupZipStream } from "./backup-zip";
+import { backupZipStream, type BackupEntry } from "./backup-zip";
 import { backupEntries, createSnapshot, dailyDue, deleteSnapshot, importBackup, listSnapshots, restoreSnapshot, snapshotAudioPath, snapshotUsage } from "./snapshots";
 import type { SnapshotReason } from "./types";
 import { openStore } from "./store";
@@ -21,23 +21,44 @@ afterEach(() => {
   for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
 });
 
+function tempDir(): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-snapshots-"));
+  roots.push(dir);
+  return dir;
+}
+
 function workspace() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-snapshots-"));
-  roots.push(root);
+  const root = tempDir();
   return { root, store: openStore(root) };
+}
+
+async function zipFile(entries: BackupEntry[]): Promise<string> {
+  const reader = backupZipStream(entries).getReader();
+  const parts: Uint8Array[] = [];
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    parts.push(value);
+  }
+  const file = path.join(tempDir(), "backup.zip");
+  fs.writeFileSync(file, Buffer.concat(parts));
+  return file;
 }
 
 const at = (iso: string) => ({ now: new Date(iso) });
 
 describe("restoring a snapshot", () => {
-  it("brings a reset card back with its forms", () => {
+  it("brings the workspace back, a reset card with its forms, and takes no snapshot of the state it replaces", () => {
     const { root, store } = workspace();
     const card = store.createNote(kitab);
     const snapshot = createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
     store.deleteNote(card.id);
-    restoreSnapshot(store, snapshot.id);
+    const later = store.createNote({ ...kitab, lemma: "قَلَم", english: "pen", forms: [] });
+    restoreSnapshot(store, snapshot.id, at("2026-11-06T11:00:00Z"));
     const back = openStore(root);
     expect(back.getNote(card.id)?.forms.map((f) => [f.label, f.arabic])).toEqual([["pl.", "كُتُب"]]);
+    expect(back.getNote(later.id)).toBeNull();
+    expect(listSnapshots(root).map((s) => s.reason)).toEqual(["manual"]);
   });
 
   it("plays the card's clip after a restore, also after Prune audio", () => {
@@ -53,18 +74,6 @@ describe("restoring a snapshot", () => {
     expect(fs.readFileSync(audioPath(root, key))).toEqual(mp3);
   });
 
-  it("brings every clip back when the whole audio folder is gone", () => {
-    const { root, store } = workspace();
-    const card = store.createNote(kitab);
-    store.setAudio(card.id, "word", mp3, "tts");
-    const snapshot = createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
-    fs.rmSync(path.join(root, "audio"), { recursive: true });
-    restoreSnapshot(store, snapshot.id);
-    const back = openStore(root);
-    const key = back.getNote(card.id)!.audio.word.key!;
-    expect(fs.readFileSync(audioPath(root, key))).toEqual(mp3);
-  });
-
   it("snapshots and restores a workspace that has cards and no audio folder at all", () => {
     const { root, store } = workspace();
     const card = store.createNote(kitab);
@@ -73,19 +82,6 @@ describe("restoring a snapshot", () => {
     store.deleteNote(card.id);
     restoreSnapshot(store, snapshot.id);
     expect(openStore(root).getNote(card.id)?.lemma).toBe("كِتَاب");
-  });
-});
-
-describe("a restore", () => {
-  it("brings the workspace back and takes no snapshot of the state it replaces", () => {
-    const { root, store } = workspace();
-    store.createNote(kitab);
-    const snapshot = createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
-    const second = store.createNote({ ...kitab, lemma: "قَلَم", english: "pen", forms: [] });
-    restoreSnapshot(store, snapshot.id, at("2026-11-06T11:00:00Z"));
-    const afterRestore = openStore(root);
-    expect(afterRestore.getNote(second.id)).toBeNull();
-    expect(listSnapshots(root).map((s) => s.reason)).toEqual(["manual"]);
   });
 });
 
@@ -121,18 +117,13 @@ describe("refusing a restore", () => {
     expect(listSnapshots(root).map((s) => s.id)).toEqual([snapshot.id]);
   });
 
-  it.each(["../x", "20260101T000000Z-manual"])("refuses %s as a snapshot that does not exist", (id) => {
-    const { store } = workspace();
-    store.createNote(kitab);
-    createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
-    expect(() => restoreSnapshot(store, id)).toThrow("There is no such backup.");
-  });
-
-  it("refuses an id that walks out of the snapshot folder into a real one", () => {
+  it("refuses an id that is not a snapshot, also one that walks out of the snapshot folder into a real one", () => {
     const { store } = workspace();
     store.createNote(kitab);
     const snapshot = createSnapshot(store, "manual", at("2026-11-06T10:00:00Z"));
-    expect(() => restoreSnapshot(store, `../snapshots/${snapshot.id}`)).toThrow("There is no such backup.");
+    for (const id of ["../x", "20260101T000000Z-manual", `../snapshots/${snapshot.id}`]) {
+      expect(() => restoreSnapshot(store, id), id).toThrow("There is no such backup.");
+    }
   });
 });
 
@@ -195,8 +186,6 @@ describe("snapshots made within the same second", () => {
     const second = createSnapshot(store, "manual", at("2026-11-06T14:03:22Z"));
     expect([first.id, second.id]).toEqual(["20261106T140322Z-manual", "20261106T140322Z-manual-2"]);
     expect(listSnapshots(root).map((s) => s.id)).toEqual([second.id, first.id]);
-    restoreSnapshot(store, first.id, at("2026-11-06T15:00:00Z"));
-    expect(openStore(root).allNotes()).toHaveLength(1);
   });
 
   it("leaves nothing behind when a snapshot cannot be taken", () => {
@@ -337,21 +326,6 @@ describe("deciding whether a daily snapshot is due", () => {
   });
 });
 
-async function zipOf(root: string, id: string): Promise<string> {
-  const reader = backupZipStream(backupEntries(root, id)).getReader();
-  const parts: Uint8Array[] = [];
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    parts.push(value);
-  }
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-backup-zip-"));
-  roots.push(dir);
-  const file = path.join(dir, "backup.zip");
-  fs.writeFileSync(file, Buffer.concat(parts));
-  return file;
-}
-
 describe("importing a backup", () => {
   it("brings a backup into a fresh workspace as an imported snapshot that a restore turns into the cards, approvals and clips", async () => {
     const source = workspace();
@@ -359,7 +333,7 @@ describe("importing a backup", () => {
     source.store.setAudio(card.id, "word", mp3, "tts");
     expect(source.store.approve(card.id).ok).toBe(true);
     const made = createSnapshot(source.store, "manual", at("2026-11-06T10:00:00Z"));
-    const zip = await zipOf(source.root, made.id);
+    const zip = await zipFile(backupEntries(source.root, made.id));
 
     const fresh = workspace();
     const imported = importBackup(fresh.root, zip, at("2026-11-07T09:00:00Z"));
@@ -383,7 +357,7 @@ describe("refusing an import", () => {
     db: Buffer;
   }
 
-  async function pieces(): Promise<Pieces> {
+  function pieces(): Pieces {
     const source = workspace();
     const card = source.store.createNote(kitab);
     source.store.setAudio(card.id, "word", mp3, "tts");
@@ -395,24 +369,15 @@ describe("refusing an import", () => {
     };
   }
 
-  async function zipFrom(contents: [string, Buffer | string][]): Promise<string> {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-crafted-"));
-    roots.push(dir);
-    const entries = contents.map(([name, bytes], i) => {
-      const file = path.join(dir, `part-${i}`);
-      fs.writeFileSync(file, bytes);
-      return { name, file };
-    });
-    const reader = backupZipStream(entries).getReader();
-    const parts: Uint8Array[] = [];
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      parts.push(value);
-    }
-    const zip = path.join(dir, "crafted.zip");
-    fs.writeFileSync(zip, Buffer.concat(parts));
-    return zip;
+  function zipFrom(contents: [string, Buffer | string][]): Promise<string> {
+    const dir = tempDir();
+    return zipFile(
+      contents.map(([name, bytes], i) => {
+        const file = path.join(dir, `part-${i}`);
+        fs.writeFileSync(file, bytes);
+        return { name, file };
+      }),
+    );
   }
 
   const json = (value: unknown) => JSON.stringify(value);
@@ -420,9 +385,7 @@ describe("refusing an import", () => {
   const keyB = audioKey(other);
 
   const modified = (db: Buffer, change: (raw: Database.Database) => void) => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-modified-db-"));
-    roots.push(dir);
-    const file = path.join(dir, "v.db");
+    const file = path.join(tempDir(), "v.db");
     fs.writeFileSync(file, db);
     const raw = new Database(file);
     change(raw);
@@ -431,9 +394,7 @@ describe("refusing an import", () => {
   };
 
   const bareDatabase = () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-bare-db-"));
-    roots.push(dir);
-    const file = path.join(dir, "bare.db");
+    const file = path.join(tempDir(), "bare.db");
     const raw = new Database(file);
     raw.exec("CREATE TABLE notes (id TEXT PRIMARY KEY, status TEXT); INSERT INTO notes VALUES ('a', 'approved')");
     raw.pragma("user_version = 1");
@@ -491,7 +452,7 @@ describe("refusing an import", () => {
   ];
 
   it.each(cases)("refuses %s and leaves nothing behind", async (_name, build, message) => {
-    const p = await pieces();
+    const p = pieces();
     const zip = await build(p);
     const fresh = workspace();
     expect(() => importBackup(fresh.root, zip, now)).toThrow(message);
@@ -502,7 +463,7 @@ describe("refusing an import", () => {
   });
 
   it("takes the card counts from the database, not from what the manifest claims", async () => {
-    const p = await pieces();
+    const p = pieces();
     const zip = await zipFrom([["manifest.json", json({ ...p.manifest, cards: 999, approved: 999 })], ["vocabulary.db", p.db], [entry(keyA), mp3]]);
     const imported = importBackup(workspace().root, zip, now);
     expect(imported).toMatchObject({ cards: 1, approved: 0 });

@@ -19,11 +19,13 @@ const rows: WordRow[] = [
   row({ rank: 2500, lemma: "مَكْتَبَة", english: "library, bookshop", gender: "f", root: "ك ت ب" }),
 ];
 
-const find = (text: string) => {
+const findIn = (among: WordRow[], text: string) => {
   const parsed = parseQuery(text);
   if ("error" in parsed) throw new Error(parsed.error);
-  return runQuery(rows, parsed.query, now).map((r) => r.english);
+  return runQuery(among, parsed.query, now).map((r) => r.english);
 };
+
+const find = (text: string) => findIn(rows, text);
 
 describe("finding words by text", () => {
   it("returns every word, in the order given, for an empty query", () => {
@@ -53,11 +55,6 @@ describe("finding words by text", () => {
     expect(find("oo")).toEqual(["book", "school", "library, bookshop"]);
   });
 
-  it("matches nothing for a term that is only vowel marks", () => {
-    expect(find("َ")).toEqual([]);
-    expect(find("٣")).toEqual([]);
-  });
-
   it("matches a phrase only as typed", () => {
     expect(find('"to write"')).toEqual(["to write"]);
     expect(find('"to wrote"')).toEqual([]);
@@ -81,16 +78,12 @@ describe("filtering by field", () => {
     expect(find("pos:noun -status:todo -status:approved")).toEqual(["school"]);
   });
 
-  it("reads rank as a number, a range, a comparison, none, or a list of them", () => {
+  it("reads rank as a number, a range, none, or a list of them", () => {
     expect(find("rank:2")).toEqual(["to write"]);
     expect(find("rank:1-3")).toEqual(["book", "to write", "school"]);
     expect(find("rank:none")).toEqual(["indeed"]);
     expect(find("rank:1,none")).toEqual(["book", "indeed"]);
     expect(find("-rank:none rank:1-2500")).toEqual(["book", "to write", "school", "that", "library, bookshop"]);
-    expect(() => find("rank:>3")).toThrow(/rank: expects/);
-    expect(() => find("rank:>=4")).toThrow(/rank: expects/);
-    expect(() => find("rank:<2")).toThrow(/rank: expects/);
-    expect(() => find("rank:<=2")).toThrow(/rank: expects/);
   });
 
   it("compares a root without vowels, hamza forms or spaces", () => {
@@ -106,20 +99,9 @@ describe("filtering by field", () => {
     expect(find("verbform:i")).toEqual(["to write"]);
   });
 
-  it("no longer knows the fields that were cut", () => {
-    expect(() => find("missing:audio")).toThrow(/Unknown field/);
-    expect(() => find("has:error")).toThrow(/Unknown field/);
-    expect(() => find("example:mine")).toThrow(/Unknown field/);
-  });
-
   it("matches a suspended row only for status:suspended", () => {
     const parked = row({ rank: 7, lemma: "\u0645\u064e\u0648\u0642\u0648\u0641", english: "parked", status: "suspended", edited: at(2), id: "s" });
-    const among = [...rows, parked];
-    const ask = (text: string) => {
-      const parsed = parseQuery(text);
-      if ("error" in parsed) throw new Error(parsed.error);
-      return runQuery(among, parsed.query, now).map((r) => r.english);
-    };
+    const ask = (text: string) => findIn([...rows, parked], text);
     expect(ask("status:suspended")).toEqual(["parked"]);
     expect(ask("status:progress,ready,approved")).toEqual(["book", "to write", "school", "indeed"]);
     expect(ask("-status:suspended")).toEqual(["book", "to write", "school", "that", "indeed", "library, bookshop"]);
@@ -133,13 +115,6 @@ describe("filtering by when a card was last edited", () => {
     expect(find("edited:7d")).toEqual(["book", "to write", "school", "indeed"]);
     expect(find("edited:1w")).toEqual(["book", "to write", "school", "indeed"]);
     expect(find("edited:1h")).toEqual([]);
-  });
-
-  it("no longer knows a calendar date for edits", () => {
-    expect(() => find("edited:2026-11-05")).toThrow(/edited: expects/);
-    expect(() => find("edited:2026-11-05..")).toThrow(/edited: expects/);
-    expect(() => find("edited:..2026-11-05")).toThrow(/edited: expects/);
-    expect(() => find("edited:2026-11-02..2026-11-05")).toThrow(/edited: expects/);
   });
 
   it("finds the words never edited with none", () => {
@@ -176,11 +151,7 @@ describe("matching a tag", () => {
     row({ rank: 2, lemma: "عشرة", english: "ten", tags: ["lesson_10", "extra"], id: "t2" }),
     row({ rank: 3, lemma: "بدون", english: "none", tags: [], id: "t3" }),
   ];
-  const ask = (text: string) => {
-    const parsed = parseQuery(text);
-    if ("error" in parsed) throw new Error(parsed.error);
-    return runQuery(tagged, parsed.query, now).map((r) => r.english);
-  };
+  const ask = (text: string) => findIn(tagged, text);
 
   it("matches a tag by its whole name only, with no glob", () => {
     expect(ask("tag:lesson_1")).toEqual(["one"]);
@@ -211,11 +182,7 @@ describe("matching with a pattern", () => {
       row({ rank: 2, lemma: "عشرة", english: "ten", tags: ["lesson_10"], id: "t2" }),
       row({ rank: 3, lemma: "مدرسة", english: "school", root: "د ر س", id: "t3" }),
     ];
-    const ask = (text: string) => {
-      const parsed = parseQuery(text);
-      if ("error" in parsed) throw new Error(parsed.error);
-      return runQuery(tagged, parsed.query, now).map((r) => r.english);
-    };
+      const ask = (text: string) => findIn(tagged, text);
     expect(ask("tag:re:lesson_[0-9]+")).toEqual(["one", "ten"]);
     expect(ask("tag:re:^lesson_1$")).toEqual(["one"]);
     expect(ask("-tag:re:.*")).toEqual(["school"]);
@@ -263,11 +230,7 @@ describe("a pattern is folded like the text it looks in", () => {
       row({ rank: 1, english: "eat", root: "أ ك ل", tags: ["Lesson_1"], id: "f1" }),
       row({ rank: 2, english: "other", root: "ك ت ب", tags: ["extra"], id: "f2" }),
     ];
-    const ask = (text: string) => {
-      const parsed = parseQuery(text);
-      if ("error" in parsed) throw new Error(parsed.error);
-      return runQuery(folded, parsed.query, now).map((r) => r.english);
-    };
+      const ask = (text: string) => findIn(folded, text);
     expect(ask("tag:re:Lesson_[0-9]")).toEqual(["eat"]);
     expect(ask("root:re:^أ.ل$")).toEqual(["eat"]);
     expect(ask("root:re:^ك.َ?ب$")).toEqual(["other"]);

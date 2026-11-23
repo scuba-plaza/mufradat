@@ -1,28 +1,18 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { context } from "@/lib/server";
 import { openCard } from "@/lib/words";
+import { tempWorkspace, withParams } from "@/lib/testing/workspace";
 import { POST as createBackup } from "../../route";
 import { POST } from "./route";
 
 const restore = (id: string) =>
-  POST(new Request(`http://127.0.0.1/api/backups/${id}/restore`, { method: "POST" }), { params: Promise.resolve({ id }) });
+  POST(new Request(`http://127.0.0.1/api/backups/${id}/restore`, { method: "POST" }), withParams({ id }));
 
 describe("restoring a backup through the API", () => {
-  let home: string;
-
-  beforeEach(() => {
-    home = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-restore-route-"));
-    vi.stubEnv("XDG_CONFIG_HOME", path.join(home, "config"));
-    vi.stubEnv("MUFRADAT_WORKSPACE", path.join(home, "workspace"));
-  });
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    fs.rmSync(home, { recursive: true, force: true });
-  });
+  tempWorkspace();
 
   it("restores and leaves the app showing the restored cards", async () => {
     const { store } = context();

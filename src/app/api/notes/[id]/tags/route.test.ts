@@ -1,9 +1,7 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { context } from "@/lib/server";
 import { openCard } from "@/lib/words";
+import { tempWorkspace, withParams } from "@/lib/testing/workspace";
 import { PUT } from "./route";
 
 const put = (id: string, body: unknown) =>
@@ -13,21 +11,11 @@ const put = (id: string, body: unknown) =>
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     }),
-    { params: Promise.resolve({ id }) },
+    withParams({ id }),
   );
 
 describe("setting a card's tags through the API", () => {
-  let home: string;
-
-  beforeEach(() => {
-    home = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-tags-"));
-    vi.stubEnv("XDG_CONFIG_HOME", path.join(home, "config"));
-    vi.stubEnv("MUFRADAT_WORKSPACE", path.join(home, "workspace"));
-  });
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    fs.rmSync(home, { recursive: true, force: true });
-  });
+  tempWorkspace();
 
   it("saves the tags as stored", async () => {
     const { store } = context();
@@ -38,6 +26,7 @@ describe("setting a card's tags through the API", () => {
     expect(note.tags).toEqual(["grammar", "lesson_1", "lesson_2"]);
     expect(store.getNote(id)!.tags).toEqual(["grammar", "lesson_1", "lesson_2"]);
   });
+
   it("turns every kind of space into _, including the next-line character", async () => {
     const { store } = context();
     const id = openCard(store, { rank: 10 })!;

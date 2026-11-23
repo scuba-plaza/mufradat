@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { context, fail, handle, readJson } from "@/lib/server";
 import { parseTags } from "@/lib/tags";
+import type { IdContext } from "../../../route-helpers";
 
 export const dynamic = "force-dynamic";
-type Ctx = { params: Promise<{ id: string }> };
 
-export const PUT = (req: Request, { params }: Ctx) =>
+export const PUT = (req: Request, { params }: IdContext) =>
   handle(async () => {
     const parsed = parseTags((await readJson(req)).tags);
     if ("error" in parsed) return fail(parsed.error);

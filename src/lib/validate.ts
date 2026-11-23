@@ -1,5 +1,4 @@
-import type { Note } from "./types";
-import { POS_VALUES } from "./types";
+import { POS_VALUES, type Note } from "./types";
 
 const ARABIC = /[؀-ۿݐ-ݿ]/;
 const LATIN = /[A-Za-z]/;
@@ -72,7 +71,6 @@ const letters = (s: string) => skeleton(s).replace(/^ال/, "");
 type Found = { start: number; end: number } | "many" | null;
 
 const wrap = (s: string, start: number, end: number) => `${s.slice(0, start)}[${s.slice(start, end)}]${s.slice(end)}`;
-const marked = (s: string, found: Found) => (found && found !== "many" ? wrap(s, found.start, found.end) : null);
 
 function findTarget(sentence: string, named: string): Found {
   const target = named.replace(/ـ/g, "").trim();
@@ -129,7 +127,7 @@ export function autoMark(sentence: string, words: string[]): string | null {
   for (const word of words) {
     const found = findTarget(sentence, word) ?? findStem(sentence, word);
     if (found === "many") return null;
-    if (found) return marked(sentence, found);
+    if (found) return wrap(sentence, found.start, found.end);
   }
   return null;
 }

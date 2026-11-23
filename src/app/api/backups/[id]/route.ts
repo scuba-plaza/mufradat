@@ -1,15 +1,15 @@
 import { backupZipStream, type BackupEntry } from "@/lib/backup-zip";
 import { context, fail, handle } from "@/lib/server";
-import { backupEntries, deleteSnapshot, listSnapshots, recordDownload } from "@/lib/snapshots";
+import { backupEntries, deleteSnapshot, recordDownload } from "@/lib/snapshots";
+import { hasBackup, noSuchBackup, type IdContext } from "../../route-helpers";
 
 export const dynamic = "force-dynamic";
-type Ctx = { params: Promise<{ id: string }> };
 
-export const GET = (_req: Request, { params }: Ctx) =>
+export const GET = (_req: Request, { params }: IdContext) =>
   handle(async () => {
     const { id } = await params;
     const { store } = context();
-    if (!listSnapshots(store.root).some((s) => s.id === id)) return fail("There is no such backup.", 404);
+    if (!hasBackup(store.root, id)) return noSuchBackup();
     let entries: BackupEntry[];
     try {
       entries = backupEntries(store.root, id);
@@ -28,11 +28,11 @@ export const GET = (_req: Request, { params }: Ctx) =>
     });
   });
 
-export const DELETE = (_req: Request, { params }: Ctx) =>
+export const DELETE = (_req: Request, { params }: IdContext) =>
   handle(async () => {
     const { id } = await params;
     const { store } = context();
-    if (!listSnapshots(store.root).some((s) => s.id === id)) return fail("There is no such backup.", 404);
+    if (!hasBackup(store.root, id)) return noSuchBackup();
     deleteSnapshot(store.root, id);
     return new Response(null, { status: 204 });
   });

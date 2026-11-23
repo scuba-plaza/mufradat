@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { crc32 } from "node:zlib";
 import { MAX_AUDIO_BYTES } from "./audio";
-import { DOS_DATE, DOS_TIME } from "./zip";
+import { CENTRAL_SIGNATURE, centralHeader, DOS_DATE, DOS_TIME, END_SIGNATURE, endOfDirectory, LOCAL_SIGNATURE } from "./zip";
 
 export interface BackupEntry {
   name: string;
@@ -15,16 +15,13 @@ export interface BackupZip {
   close(): void;
 }
 
-const LOCAL = 0x04034b50;
-const CENTRAL = 0x02014b50;
-const END = 0x06054b50;
 const DESCRIPTOR = 0x08074b50;
 const FLAGS = 0x0808;
 const LIMIT = 0xffffffff;
 
 function localHeader(nameBytes: Buffer): Buffer {
   const header = Buffer.alloc(30);
-  header.writeUInt32LE(LOCAL, 0);
+  header.writeUInt32LE(LOCAL_SIGNATURE, 0);
   header.writeUInt16LE(20, 4);
   header.writeUInt16LE(FLAGS, 6);
   header.writeUInt16LE(DOS_TIME, 10);
@@ -40,22 +37,6 @@ function descriptor(crc: number, size: number): Buffer {
   record.writeUInt32LE(size, 8);
   record.writeUInt32LE(size, 12);
   return record;
-}
-
-function centralHeader(nameBytes: Buffer, crc: number, size: number, offset: number): Buffer {
-  const header = Buffer.alloc(46);
-  header.writeUInt32LE(CENTRAL, 0);
-  header.writeUInt16LE(20, 4);
-  header.writeUInt16LE(20, 6);
-  header.writeUInt16LE(FLAGS, 8);
-  header.writeUInt16LE(DOS_TIME, 12);
-  header.writeUInt16LE(DOS_DATE, 14);
-  header.writeUInt32LE(crc, 16);
-  header.writeUInt32LE(size, 20);
-  header.writeUInt32LE(size, 24);
-  header.writeUInt16LE(nameBytes.length, 28);
-  header.writeUInt32LE(offset, 42);
-  return header;
 }
 
 async function* chunks(entries: BackupEntry[]): AsyncGenerator<Uint8Array> {
@@ -76,19 +57,13 @@ async function* chunks(entries: BackupEntry[]): AsyncGenerator<Uint8Array> {
     }
     if (size > LIMIT) throw new Error(`${name} is too large for a backup file.`);
     yield descriptor(crc, size);
-    central.push(centralHeader(nameBytes, crc, size, offset), nameBytes);
+    central.push(centralHeader(nameBytes, FLAGS, crc, size, offset), nameBytes);
     offset += 30 + nameBytes.length + size + 16;
     if (offset > LIMIT) throw new Error("The backup is too large for one file.");
   }
   const directory = Buffer.concat(central);
   yield directory;
-  const end = Buffer.alloc(22);
-  end.writeUInt32LE(END, 0);
-  end.writeUInt16LE(entries.length, 8);
-  end.writeUInt16LE(entries.length, 10);
-  end.writeUInt32LE(directory.length, 12);
-  end.writeUInt32LE(offset, 16);
-  yield end;
+  yield endOfDirectory(entries.length, directory.length, offset);
 }
 
 export function backupZipStream(entries: BackupEntry[], onEnd?: () => void): ReadableStream<Uint8Array> {
@@ -130,7 +105,7 @@ function parse(fd: number): BackupZip {
     return buffer;
   };
   const end = readAt(22, total - 22);
-  if (end.readUInt32LE(0) !== END || end.readUInt16LE(4) !== 0 || end.readUInt16LE(6) !== 0 || end.readUInt16LE(20) !== 0) refuse();
+  if (end.readUInt32LE(0) !== END_SIGNATURE || end.readUInt16LE(4) !== 0 || end.readUInt16LE(6) !== 0 || end.readUInt16LE(20) !== 0) refuse();
   const count = end.readUInt16LE(10);
   if (end.readUInt16LE(8) !== count || count === 0xffff) refuse();
   const directorySize = end.readUInt32LE(12);
@@ -140,7 +115,7 @@ function parse(fd: number): BackupZip {
   const found = new Map<string, Found>();
   let at = 0;
   for (let i = 0; i < count; i++) {
-    if (at + 46 > directory.length || directory.readUInt32LE(at) !== CENTRAL) refuse();
+    if (at + 46 > directory.length || directory.readUInt32LE(at) !== CENTRAL_SIGNATURE) refuse();
     const flags = directory.readUInt16LE(at + 8);
     const size = directory.readUInt32LE(at + 24);
     const nameLength = directory.readUInt16LE(at + 28);
@@ -159,7 +134,7 @@ function parse(fd: number): BackupZip {
     if (!entry) return refuse();
     const local = readAt(30, entry.offset);
     const nameLength = local.readUInt16LE(26);
-    if (local.readUInt32LE(0) !== LOCAL || readAt(nameLength, entry.offset + 30).toString("utf8") !== name) return refuse();
+    if (local.readUInt32LE(0) !== LOCAL_SIGNATURE || readAt(nameLength, entry.offset + 30).toString("utf8") !== name) return refuse();
     const start = entry.offset + 30 + nameLength + local.readUInt16LE(28);
     if (start + entry.size > directoryAt) return refuse();
     return { entry, start };

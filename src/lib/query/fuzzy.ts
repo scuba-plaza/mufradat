@@ -4,7 +4,10 @@ export const fold = (text: string): string => skeleton(text.toLowerCase()).repla
 
 const wordsOf = (text: string) => text.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 
-const typoBudget = (length: number) => (length <= 3 ? 0 : length <= 6 ? 1 : 2);
+function typoBudget(length: number): number {
+  if (length <= 3) return 0;
+  return length <= 6 ? 1 : 2;
+}
 
 function distance(a: string, b: string): number {
   const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)]);

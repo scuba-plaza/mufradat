@@ -70,6 +70,18 @@ interface ClipRow {
   slot: string; key: string | null; source: AudioSource | null; text: string; error: string | null;
 }
 
+const EDITED_COLUMNS = [
+  ["english", "english"], ["pos", "pos"], ["gender", "gender"], ["root", "root"], ["verbForm", "verb_form"],
+  ["hint", "hint"], ["hintAr", "hint_ar"], ["example", "example"], ["exampleEn", "example_en"],
+] as const;
+
+/** The Arabic a clip in the slot speaks, or undefined when the slot does not belong to the card. */
+function slotText(n: Pick<Note, "lemma" | "example" | "forms">, slot: Slot): string | undefined {
+  if (slot === "word") return n.lemma;
+  if (slot === "example") return plainExample(n.example);
+  return n.forms.find((f) => f.id === slot)?.arabic;
+}
+
 export function openStore(dir: string) {
   const memory = dir === ":memory:";
   const root = memory ? fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-")) : dir;
@@ -90,12 +102,12 @@ export function openStore(dir: string) {
   const now = () => new Date().toISOString();
 
   function build(row: NoteRow, forms: Form[], clips: ClipRow[], tags: string[]): Note {
-    const text: Record<Slot, string> = { word: row.lemma, example: plainExample(row.example) };
-    for (const f of forms) text[f.id] = f.arabic;
+    const card = { lemma: row.lemma, example: row.example, forms };
     const audio: Record<Slot, Clip> = {};
     for (const c of clips) {
-      if (!(c.slot in text)) continue;
-      audio[c.slot] = { key: c.key, source: c.source, text: c.text, error: c.error, outdated: c.key !== null && c.text !== text[c.slot] };
+      const text = slotText(card, c.slot);
+      if (text === undefined) continue;
+      audio[c.slot] = { key: c.key, source: c.source, text: c.text, error: c.error, outdated: c.key !== null && c.text !== text };
     }
     return {
       id: row.id, lemma: row.lemma, english: row.english, pos: row.pos, gender: row.gender,
@@ -174,28 +186,20 @@ export function openStore(dir: string) {
   function updateNote(id: string, edit: NoteEdit): Note {
     const before = need(id);
     db.transaction(() => {
-      const set = (column: string, value: string) =>
+      const set = (column: string, value: string | null) =>
         db.prepare(`UPDATE notes SET ${column} = ? WHERE id = ?`).run(value, id);
       if (edit.lemma !== undefined && edit.lemma !== before.lemma) {
         set("lemma", edit.lemma);
         set("lemma_source", "user");
       }
-      if (edit.english !== undefined) set("english", edit.english);
-      if (edit.pos !== undefined) set("pos", edit.pos);
-      if (edit.gender !== undefined) set("gender", edit.gender);
-      if (edit.root !== undefined) set("root", edit.root);
-      if (edit.verbForm !== undefined) set("verb_form", edit.verbForm);
-      if (edit.hint !== undefined) set("hint", edit.hint);
-      if (edit.hintAr !== undefined) set("hint_ar", edit.hintAr);
-      const exampleChanged =
-        (edit.example !== undefined && edit.example !== before.example) ||
-        (edit.exampleEn !== undefined && edit.exampleEn !== before.exampleEn);
-      if (edit.example !== undefined) set("example", edit.example);
-      if (edit.example !== undefined && edit.example !== before.example) {
-        db.prepare("UPDATE notes SET example_error = NULL WHERE id = ?").run(id);
+      for (const [field, column] of EDITED_COLUMNS) {
+        const value = edit[field];
+        if (value !== undefined) set(column, value);
       }
-      if (edit.exampleEn !== undefined) set("example_en", edit.exampleEn);
-      if (exampleChanged) set("example_source", "user");
+      const exampleChanged = edit.example !== undefined && edit.example !== before.example;
+      const translationChanged = edit.exampleEn !== undefined && edit.exampleEn !== before.exampleEn;
+      if (exampleChanged) set("example_error", null);
+      if (exampleChanged || translationChanged) set("example_source", "user");
       if (edit.forms) {
         const keep = new Set(edit.forms.map((f) => f.id).filter(Boolean));
         for (const f of before.forms) {
@@ -226,23 +230,21 @@ export function openStore(dir: string) {
     return getNote(id)!;
   }
 
-  function needSlot(n: Note, slot: Slot): void {
-    if (!(slot === "word" || slot === "example" || n.forms.some((f) => f.id === slot))) {
-      throw new Error("That audio slot does not belong to this card.");
-    }
+  function needSlot(n: Note, slot: Slot): string {
+    const text = slotText(n, slot);
+    if (text === undefined) throw new Error("That audio slot does not belong to this card.");
+    return text;
   }
 
   /** Stores a clip for the word, the example or one form. Failures leave the previous clip alone. */
   function setAudio(id: string, slot: Slot, bytes: Uint8Array, source: AudioSource): Note {
-    const n = need(id);
-    needSlot(n, slot);
+    const text = needSlot(need(id), slot);
     const problem = mp3Problem(bytes);
     if (problem) throw new Error(problem);
     const key = audioKey(bytes);
     const file = audioPath(root, key);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     if (!fs.existsSync(file)) fs.writeFileSync(file, bytes);
-    const text = slot === "word" ? n.lemma : slot === "example" ? plainExample(n.example) : n.forms.find((f) => f.id === slot)!.arabic;
     db.prepare(
       `INSERT INTO audio (note_id, slot, key, source, text, error) VALUES (?, ?, ?, ?, ?, NULL)
        ON CONFLICT (note_id, slot) DO UPDATE SET key = excluded.key, source = excluded.source, text = excluded.text, error = NULL`,
@@ -308,9 +310,12 @@ export function openStore(dir: string) {
     db.prepare("DELETE FROM notes WHERE id = ?").run(id);
   }
 
+  function audioKeys(): string[] {
+    return (db.prepare("SELECT DISTINCT key FROM audio WHERE key IS NOT NULL").all() as { key: string }[]).map((r) => r.key);
+  }
+
   function findUnusedAudio(): AudioFile[] {
-    const rows = db.prepare("SELECT DISTINCT key FROM audio WHERE key IS NOT NULL").all() as { key: string }[];
-    const used = new Set(rows.map((r) => r.key));
+    const used = new Set(audioKeys());
     return audioFiles(root).filter((file) => !used.has(file.key));
   }
 
@@ -329,10 +334,6 @@ export function openStore(dir: string) {
   function findNote(lemma: string, pos: POS): string | null {
     const row = db.prepare("SELECT id FROM notes WHERE lemma = ? AND pos = ?").get(lemma, pos) as { id: string } | undefined;
     return row?.id ?? null;
-  }
-
-  function audioKeys(): string[] {
-    return (db.prepare("SELECT DISTINCT key FROM audio WHERE key IS NOT NULL").all() as { key: string }[]).map((r) => r.key);
   }
 
   function exportDatabase(dest: string): void {

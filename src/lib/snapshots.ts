@@ -8,7 +8,7 @@ import { automaticSize, DEFAULT_LIMITS, selectRemovals, type Limits, type Retent
 import { openStore, SCHEMA_VERSION, type Store } from "./store";
 import { SNAPSHOT_REASONS, type SnapshotInfo, type SnapshotReason, type SnapshotUsage } from "./types";
 
-export interface SnapshotOptions {
+interface SnapshotOptions {
   now?: Date;
   limits?: Limits;
 }
@@ -24,6 +24,8 @@ interface Manifest {
 }
 
 const snapshotsDir = (root: string) => path.join(root, "snapshots");
+const snapshotDir = (root: string, id: string) => path.join(snapshotsDir(root), id);
+const partialDir = (root: string, id: string) => path.join(snapshotsDir(root), `.partial-${id}`);
 
 export const snapshotAudioPath = (root: string, key: string) => audioPath(snapshotsDir(root), key);
 
@@ -47,11 +49,11 @@ const entryName = (key: string) => `audio/${key.slice(0, 2)}/${key}.mp3`;
 
 const ID_PATTERN = new RegExp(`^\\d{8}T\\d{6}Z-(${SNAPSHOT_REASONS.join("|")})(-\\d+)?$`);
 
-export const isSnapshotId = (id: string): boolean => ID_PATTERN.test(id);
+const isSnapshotId = (id: string): boolean => ID_PATTERN.test(id);
 
 function readManifest(root: string, id: string): Manifest | null {
   try {
-    return JSON.parse(fs.readFileSync(path.join(snapshotsDir(root), id, "manifest.json"), "utf8")) as Manifest;
+    return JSON.parse(fs.readFileSync(path.join(snapshotDir(root, id), "manifest.json"), "utf8")) as Manifest;
   } catch {
     return null;
   }
@@ -73,22 +75,33 @@ function infoOf(id: string, manifest: Manifest, dbBytes: number): SnapshotInfo {
 
 function freeId(root: string, now: Date, reason: SnapshotReason): string {
   const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-  const taken = (id: string) =>
-    fs.existsSync(path.join(snapshotsDir(root), id)) || fs.existsSync(path.join(snapshotsDir(root), `.partial-${id}`));
+  const taken = (id: string) => fs.existsSync(snapshotDir(root, id)) || fs.existsSync(partialDir(root, id));
   let id = `${stamp}-${reason}`;
   for (let n = 2; taken(id); n++) id = `${stamp}-${reason}-${n}`;
   return id;
 }
 
-function writeSnapshot(store: Store, reason: SnapshotReason, now: Date, id: string): SnapshotInfo {
-  const dir = path.join(snapshotsDir(store.root), id);
-  const partial = path.join(snapshotsDir(store.root), `.partial-${id}`);
+/** Fills a partial folder, then gives it its id with the manifest `fill` returns; a failure leaves no folder behind. */
+function writeAtomically(root: string, id: string, fill: (partial: string) => Manifest): SnapshotInfo {
+  const partial = partialDir(root, id);
   fs.mkdirSync(partial, { recursive: true });
   try {
+    const manifest = fill(partial);
+    fs.writeFileSync(path.join(partial, "manifest.json"), JSON.stringify(manifest));
+    fs.renameSync(partial, snapshotDir(root, id));
+    return infoOf(id, manifest, fs.statSync(path.join(snapshotDir(root, id), "vocabulary.db")).size);
+  } catch (error) {
+    fs.rmSync(partial, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+function writeSnapshot(store: Store, reason: SnapshotReason, now: Date, id: string): SnapshotInfo {
+  return writeAtomically(store.root, id, (partial) => {
     store.exportDatabase(path.join(partial, "vocabulary.db"));
     const keys = store.audioKeys();
     const present = keys.filter((key) => copyClip(audioPath(store.root, key), snapshotAudioPath(store.root, key), key));
-    const manifest: Manifest = {
+    return {
       schema: SCHEMA_VERSION,
       createdAt: now.toISOString(),
       reason,
@@ -96,13 +109,7 @@ function writeSnapshot(store: Store, reason: SnapshotReason, now: Date, id: stri
       audioKeys: present,
       unavailable: keys.length - present.length,
     };
-    fs.writeFileSync(path.join(partial, "manifest.json"), JSON.stringify(manifest));
-    fs.renameSync(partial, dir);
-    return infoOf(id, manifest, fs.statSync(path.join(dir, "vocabulary.db")).size);
-  } catch (error) {
-    fs.rmSync(partial, { recursive: true, force: true });
-    throw error;
-  }
+  });
 }
 
 export function localDay(date: Date): string {
@@ -163,11 +170,15 @@ function knownManifest(root: string, id: string): Manifest {
   return manifest;
 }
 
+function needSoundClips(root: string, manifest: Manifest): void {
+  if (!manifest.audioKeys.every((key) => clipIsSound(snapshotAudioPath(root, key), key))) throw new Error(CLIPS_GONE);
+}
+
 function verifiedManifest(root: string, id: string): Manifest {
   const manifest = knownManifest(root, id);
   if (manifest.schema > SCHEMA_VERSION) throw new Error(NEWER);
-  if (!inspectDatabase(path.join(snapshotsDir(root), id, "vocabulary.db"))) throw new Error(DAMAGED);
-  if (!manifest.audioKeys.every((key) => clipIsSound(snapshotAudioPath(root, key), key))) throw new Error(CLIPS_GONE);
+  if (!inspectDatabase(path.join(snapshotDir(root, id), "vocabulary.db"))) throw new Error(DAMAGED);
+  needSoundClips(root, manifest);
   return manifest;
 }
 
@@ -190,7 +201,7 @@ function readAll(root: string): { info: SnapshotInfo; manifest: Manifest }[] {
     .filter((entry) => entry.isDirectory() && isSnapshotId(entry.name))
     .flatMap((entry) => {
       const manifest = readManifest(root, entry.name);
-      const dbBytes = fileBytes(path.join(snapshotsDir(root), entry.name, "vocabulary.db"));
+      const dbBytes = fileBytes(path.join(snapshotDir(root, entry.name), "vocabulary.db"));
       return manifest && dbBytes !== null ? [{ info: infoOf(entry.name, manifest, dbBytes), manifest }] : [];
     })
     .sort((a, b) => (a.info.id < b.info.id ? 1 : -1));
@@ -207,7 +218,7 @@ function dropUnheldClips(root: string): void {
 
 export function deleteSnapshot(root: string, id: string): void {
   knownManifest(root, id);
-  fs.rmSync(path.join(snapshotsDir(root), id), { recursive: true, force: true });
+  fs.rmSync(snapshotDir(root, id), { recursive: true, force: true });
   dropUnheldClips(root);
 }
 
@@ -220,11 +231,9 @@ function entriesOf(root: string): RetentionEntry[] {
   }));
 }
 
-export function applyRetention(root: string, limits: Limits = DEFAULT_LIMITS): string[] {
-  const removed = selectRemovals(entriesOf(root), limits);
-  for (const id of removed) fs.rmSync(path.join(snapshotsDir(root), id), { recursive: true, force: true });
+function applyRetention(root: string, limits: Limits = DEFAULT_LIMITS): void {
+  for (const id of selectRemovals(entriesOf(root), limits)) fs.rmSync(snapshotDir(root, id), { recursive: true, force: true });
   dropUnheldClips(root);
-  return removed;
 }
 
 export function snapshotUsage(root: string, limits: Limits = DEFAULT_LIMITS): SnapshotUsage {
@@ -252,8 +261,8 @@ export function lastDownload(root: string): string | null {
 
 export function backupEntries(root: string, id: string): BackupEntry[] {
   const manifest = knownManifest(root, id);
-  if (!manifest.audioKeys.every((key) => clipIsSound(snapshotAudioPath(root, key), key))) throw new Error(CLIPS_GONE);
-  const dir = path.join(snapshotsDir(root), id);
+  needSoundClips(root, manifest);
+  const dir = snapshotDir(root, id);
   return [
     { name: "manifest.json", file: path.join(dir, "manifest.json") },
     { name: "vocabulary.db", file: path.join(dir, "vocabulary.db") },
@@ -304,35 +313,30 @@ function importFrom(root: string, backup: BackupZip, options: SnapshotOptions): 
   if (held.length !== wanted.size || !held.every((name) => wanted.has(name))) return refuse();
 
   const now = options.now ?? new Date();
-  const id = freeId(root, now, "imported");
-  const partial = path.join(snapshotsDir(root), `.partial-${id}`);
-  fs.mkdirSync(partial, { recursive: true });
   try {
-    const database = path.join(partial, "vocabulary.db");
-    backup.copyTo("vocabulary.db", database);
-    const inspected = inspectDatabase(database);
-    if (!inspected) throw new Error(DAMAGED);
-    if (inspected.version > SCHEMA_VERSION) throw new Error(NEWER);
-    if (!openable(partial)) throw new Error(DAMAGED);
-    for (const key of incoming.audioKeys) {
-      const bytes = backup.read(entryName(key));
-      if (audioKey(bytes) !== key) return refuse();
-      storeClip(bytes, snapshotAudioPath(root, key));
-    }
-    const manifest: Manifest = {
-      schema: incoming.schema,
-      createdAt: now.toISOString(),
-      reason: "imported",
-      cards: inspected.cards,
-      approved: inspected.approved,
-      audioKeys: incoming.audioKeys,
-      unavailable: incoming.unavailable,
-    };
-    fs.writeFileSync(path.join(partial, "manifest.json"), JSON.stringify(manifest));
-    fs.renameSync(partial, path.join(snapshotsDir(root), id));
-    return infoOf(id, manifest, fs.statSync(path.join(snapshotsDir(root), id, "vocabulary.db")).size);
+    return writeAtomically(root, freeId(root, now, "imported"), (partial) => {
+      const database = path.join(partial, "vocabulary.db");
+      backup.copyTo("vocabulary.db", database);
+      const inspected = inspectDatabase(database);
+      if (!inspected) throw new Error(DAMAGED);
+      if (inspected.version > SCHEMA_VERSION) throw new Error(NEWER);
+      if (!openable(partial)) throw new Error(DAMAGED);
+      for (const key of incoming.audioKeys) {
+        const bytes = backup.read(entryName(key));
+        if (audioKey(bytes) !== key) refuse();
+        storeClip(bytes, snapshotAudioPath(root, key));
+      }
+      return {
+        schema: incoming.schema,
+        createdAt: now.toISOString(),
+        reason: "imported",
+        cards: inspected.cards,
+        approved: inspected.approved,
+        audioKeys: incoming.audioKeys,
+        unavailable: incoming.unavailable,
+      };
+    });
   } catch (error) {
-    fs.rmSync(partial, { recursive: true, force: true });
     dropUnheldClips(root);
     throw error;
   }
@@ -353,7 +357,7 @@ export function restoreSnapshot(store: Store, id: string, options: SnapshotOptio
     copyClip(snapshotAudioPath(store.root, key), audioPath(store.root, key), key);
   }
   const staged = path.join(store.root, "vocabulary.db.restoring");
-  fs.copyFileSync(path.join(snapshotsDir(store.root), id, "vocabulary.db"), staged);
+  fs.copyFileSync(path.join(snapshotDir(store.root, id), "vocabulary.db"), staged);
   store.close();
   fs.renameSync(staged, path.join(store.root, "vocabulary.db"));
   pruneQuietly(store.root, options.limits);

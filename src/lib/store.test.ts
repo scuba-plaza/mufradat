@@ -13,6 +13,20 @@ const kitab = {
   forms: [{ label: "pl.", arabic: "كُتُب" }],
 };
 
+const withExample = (s: Store) => {
+  const n = s.createNote(kitab);
+  return s.updateNote(n.id, { example: "هٰذَا [كِتَابٌ] جَمِيلٌ", exampleEn: "this is a nice book" });
+};
+
+function inTempDir(run: (dir: string) => void) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-store-"));
+  try {
+    run(dir);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 describe("creating a bare card", () => {
   it("stores the Wiktionary data as a draft with its forms", () => {
     const s = openStore(":memory:");
@@ -92,11 +106,6 @@ describe("editing a card", () => {
 });
 
 describe("approving a card", () => {
-  const withExample = (s: ReturnType<typeof openStore>) => {
-    const n = s.createNote(kitab);
-    return s.updateNote(n.id, { example: "هٰذَا [كِتَابٌ] جَمِيلٌ", exampleEn: "this is a nice book" });
-  };
-
   it("approves a valid card", () => {
     const s = openStore(":memory:");
     const n = withExample(s);
@@ -148,8 +157,7 @@ describe("tagging a card", () => {
       vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(new Date("2026-11-01T10:00:00.000Z"));
       const s = openStore(":memory:");
-      const n = s.createNote(kitab);
-      s.updateNote(n.id, { example: "هٰذَا [كِتَابٌ] جَمِيلٌ", exampleEn: "this is a nice book" });
+      const n = withExample(s);
       s.approve(n.id);
       vi.setSystemTime(new Date("2026-11-02T10:00:00.000Z"));
       const tagged = s.setTags(n.id, ["lesson_1"]);
@@ -160,19 +168,6 @@ describe("tagging a card", () => {
 
   it("refuses an unknown card", () => {
     expect(() => openStore(":memory:").setTags("no-such-card", ["a"])).toThrow("There is no such card.");
-  });
-
-  it("resets a tagged card", () => {
-    const s = openStore(":memory:");
-    const n = s.createNote(kitab);
-    s.setTags(n.id, ["a"]);
-    s.deleteNote(n.id);
-    expect(s.getNote(n.id)).toBeNull();
-    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-tags-")), "copy.db");
-    s.exportDatabase(file);
-    const raw = new Database(file, { readonly: true });
-    expect(raw.prepare("SELECT count(*) AS n FROM note_tags").get()).toEqual({ n: 0 });
-    raw.close();
   });
 });
 
@@ -314,22 +309,20 @@ describe("deleting a card", () => {
     expect(s.getNote(kept.id)!.audio.word.key).not.toBeNull();
   });
 
-  it("leaves no form or clip of the card behind in the workspace", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-delete-"));
-    try {
+  it("leaves no form, clip or tag of the card behind in the workspace", () => {
+    inTempDir((dir) => {
       const s = openStore(dir);
       const n = s.createNote(kitab);
       s.setAudio(n.id, "word", mp3, "tts");
       s.setAudioError(n.id, n.forms[0].id, "Google rejected the credentials (401).");
+      s.setTags(n.id, ["a"]);
       s.deleteNote(n.id);
       s.close();
       const db = new Database(path.join(dir, "vocabulary.db"), { readonly: true });
       const count = (table: string) => (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
-      expect([count("notes"), count("forms"), count("audio")]).toEqual([0, 0, 0]);
+      expect([count("notes"), count("forms"), count("audio"), count("note_tags")]).toEqual([0, 0, 0, 0]);
       db.close();
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+    });
   });
 
   it("lets the same word be started again from nothing", () => {
@@ -357,14 +350,11 @@ describe("audio files that no clip uses", () => {
   const fileOf = (dir: string, content: Buffer) => audioPath(dir, audioKey(content));
 
   function inWorkspace(run: (s: Store, dir: string) => void) {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-unused-"));
-    try {
+    inTempDir((dir) => {
       const s = openStore(dir);
       run(s, dir);
       s.close();
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+    });
   }
 
   it("reports the file a removed clip left behind, deletes it, and then finds nothing", () => {
@@ -459,11 +449,6 @@ describe("audio files that no clip uses", () => {
 });
 
 describe("suspending a card", () => {
-  const withExample = (s: ReturnType<typeof openStore>) => {
-    const n = s.createNote(kitab);
-    return s.updateNote(n.id, { example: "\u0647\u0670\u0630\u064e\u0627 [\u0643\u0650\u062a\u064e\u0627\u0628\u064c] \u062c\u064e\u0645\u0650\u064a\u0644\u064c", exampleEn: "this is a nice book" });
-  };
-
   it("marks the card suspended and takes its approval back", () => {
     const s = openStore(":memory:");
     const n = withExample(s);
@@ -507,91 +492,55 @@ describe("suspending a card", () => {
     expect(s.updateNote(n.id, { english: "a book" }).suspended).toBe(true);
     expect(s.setTags(n.id, ["a"]).suspended).toBe(true);
   });
+});
 
-  it("gives a database made before suspension cards that are not suspended", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-suspend-"));
-    try {
+describe("the workspace version", () => {
+  function reopenedAfter(change: string, version: number, use: (again: Store, id: string) => void) {
+    inTempDir((dir) => {
       const first = openStore(dir);
       const card = first.createNote(kitab);
       first.close();
       const raw = new Database(path.join(dir, "vocabulary.db"));
-      raw.exec("ALTER TABLE notes DROP COLUMN suspended");
-      raw.pragma("user_version = 2");
+      raw.exec(change);
+      raw.pragma(`user_version = ${version}`);
       raw.close();
       const again = openStore(dir);
-      expect(again.getNote(card.id)!.suspended).toBe(false);
-      expect(again.suspend(card.id).suspended).toBe(true);
+      use(again, card.id);
       again.close();
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-});
-
-describe("the workspace version", () => {
-  function inDir(run: (dir: string) => void) {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mufradat-version-"));
-    try {
-      run(dir);
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+    });
   }
 
-  const setVersion = (dir: string, version: number) => {
-    const raw = new Database(path.join(dir, "vocabulary.db"));
-    raw.pragma(`user_version = ${version}`);
-    raw.close();
-  };
-
   it("refuses a workspace written by a newer version", () => {
-    inDir((dir) => {
-      setVersion(dir, 99);
+    inTempDir((dir) => {
+      const raw = new Database(path.join(dir, "vocabulary.db"));
+      raw.pragma("user_version = 99");
+      raw.close();
       expect(() => openStore(dir)).toThrow("This workspace was written by a newer Mufradat.");
     });
   });
 
   it("opens a workspace from before the version existed and keeps its cards", () => {
-    inDir((dir) => {
-      const first = openStore(dir);
-      const card = first.createNote(kitab);
-      first.close();
-      setVersion(dir, 0);
-      const again = openStore(dir);
-      expect(again.getNote(card.id)?.lemma).toBe("كِتَاب");
-      again.close();
-    });
+    reopenedAfter("", 0, (again, id) => expect(again.getNote(id)?.lemma).toBe("كِتَاب"));
   });
 
   it("opens a database made before the Arabic hint and gives its cards an empty one", () => {
-    inDir((dir) => {
-      const first = openStore(dir);
-      const card = first.createNote(kitab);
-      first.close();
-      const raw = new Database(path.join(dir, "vocabulary.db"));
-      raw.exec("ALTER TABLE notes DROP COLUMN hint_ar");
-      raw.pragma("user_version = 2");
-      raw.close();
-      const again = openStore(dir);
-      expect(again.getNote(card.id)!.hintAr).toBe("");
-      expect(again.updateNote(card.id, { hintAr: "ليس كَتَب" }).hintAr).toBe("ليس كَتَب");
-      again.close();
+    reopenedAfter("ALTER TABLE notes DROP COLUMN hint_ar", 2, (again, id) => {
+      expect(again.getNote(id)!.hintAr).toBe("");
+      expect(again.updateNote(id, { hintAr: "ليس كَتَب" }).hintAr).toBe("ليس كَتَب");
+    });
+  });
+
+  it("opens a database made before suspension and gives it cards that are not suspended", () => {
+    reopenedAfter("ALTER TABLE notes DROP COLUMN suspended", 2, (again, id) => {
+      expect(again.getNote(id)!.suspended).toBe(false);
+      expect(again.suspend(id).suspended).toBe(true);
     });
   });
 
   it("opens a database made before tags and gives its cards no tags", () => {
-    inDir((dir) => {
-      const first = openStore(dir);
-      const card = first.createNote(kitab);
-      first.close();
-      const raw = new Database(path.join(dir, "vocabulary.db"));
-      raw.exec("DROP TABLE note_tags");
-      raw.pragma("user_version = 1");
-      raw.close();
-      const again = openStore(dir);
-      expect(again.getNote(card.id)!.tags).toEqual([]);
-      expect(again.setTags(card.id, ["a"]).tags).toEqual(["a"]);
-      again.close();
+    reopenedAfter("DROP TABLE note_tags", 1, (again, id) => {
+      expect(again.getNote(id)!.tags).toEqual([]);
+      expect(again.setTags(id, ["a"]).tags).toEqual(["a"]);
     });
   });
 });

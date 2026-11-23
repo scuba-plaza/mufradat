@@ -1,18 +1,19 @@
-import type { MissingKind, Note, WordStatus } from "./types";
+import type { Note, WordStatus } from "./types";
 import { splitExample } from "./validate";
 
 export function wordStatus(n: Note): Exclude<WordStatus, "todo"> {
   if (n.suspended) return "suspended";
   if (n.status === "approved") return "approved";
-  return gaps(n).length === 0 ? "ready" : "progress";
+  return missingParts(n).length === 0 ? "ready" : "progress";
 }
 
-function gaps(n: Note): { kind: MissingKind; text: string }[] {
-  const missing: { kind: MissingKind; text: string }[] = [];
-  if (n.example.trim() === "") missing.push({ kind: "example", text: "an example" });
+/** What a card still lacks, in words for the person making it; empty once it has all of it. */
+export function missingParts(n: Note): string[] {
+  const missing: string[] = [];
+  if (n.example.trim() === "") missing.push("an example");
   else {
-    if (n.exampleEn.trim() === "") missing.push({ kind: "translation", text: "a translation of the example" });
-    if (!splitExample(n.example)) missing.push({ kind: "target", text: "the target word marked in the example" });
+    if (n.exampleEn.trim() === "") missing.push("a translation of the example");
+    if (!splitExample(n.example)) missing.push("the target word marked in the example");
   }
 
   const clips = [
@@ -22,11 +23,8 @@ function gaps(n: Note): { kind: MissingKind; text: string }[] {
   ];
   for (const { slot, name } of clips) {
     const clip = n.audio[slot];
-    if (!clip?.key) missing.push({ kind: "audio", text: `audio for ${name}` });
-    else if (clip.outdated) missing.push({ kind: "audio", text: `new audio for ${name}` });
+    if (!clip?.key) missing.push(`audio for ${name}`);
+    else if (clip.outdated) missing.push(`new audio for ${name}`);
   }
   return missing;
 }
-
-/** What a card still lacks, in words for the person making it; empty once it has all of it. */
-export const missingParts = (n: Note): string[] => gaps(n).map((g) => g.text);

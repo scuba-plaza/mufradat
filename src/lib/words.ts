@@ -3,7 +3,7 @@ import { wordStatus } from "./missing";
 import { parseQuery, type Query } from "./query/parse";
 import { runQuery } from "./query/run";
 import type { Store } from "./store";
-import { POS_VALUES, type Note, type POS, type WordRow } from "./types";
+import { POS_VALUES, type NewNote, type Note, type POS, type WordRow } from "./types";
 
 const fromCard = (n: Note): WordRow => ({
   id: n.id,
@@ -54,8 +54,12 @@ const notSuspended = (r: WordRow) => r.status !== "suspended";
 
 export const wordRows = (store: Store): WordRow[] => listRows(store.allNotes(), false).filter(notSuspended);
 
-const working = (r: WordRow) => r.status === "progress" || r.status === "ready";
-const group = (r: WordRow) => (working(r) ? 0 : r.status === "todo" ? 1 : 2);
+/** Cards being worked on come first, then words not started, then approved cards. */
+function group(r: WordRow): number {
+  if (r.status === "progress" || r.status === "ready") return 0;
+  if (r.status === "todo") return 1;
+  return 2;
+}
 
 function byRank(a: WordRow, b: WordRow): number {
   if (a.rank === b.rank) return 0;
@@ -66,13 +70,19 @@ function byRank(a: WordRow, b: WordRow): number {
 
 function latestFirst(a: WordRow, b: WordRow): number {
   const [x, y] = [a.edited ?? "", b.edited ?? ""];
-  return x === y ? 0 : x < y ? 1 : -1;
+  if (x === y) return 0;
+  return x < y ? 1 : -1;
+}
+
+function defaultCompare(a: WordRow, b: WordRow): number {
+  const byGroup = group(a) - group(b);
+  if (byGroup !== 0) return byGroup;
+  if (group(a) === 0) return latestFirst(a, b) || byRank(a, b);
+  return byRank(a, b) || latestFirst(a, b);
 }
 
 export function defaultOrder(rows: WordRow[]): WordRow[] {
-  return [...rows].sort(
-    (a, b) => group(a) - group(b) || (group(a) === 0 ? latestFirst(a, b) || byRank(a, b) : byRank(a, b) || latestFirst(a, b)),
-  );
+  return [...rows].sort(defaultCompare);
 }
 
 export function continueFrom(rows: WordRow[]): WordRow | null {
@@ -84,7 +94,7 @@ export const continueTarget = (store: Store): WordRow | null => continueFrom(wor
 export const approvedIds = (rows: WordRow[]): string[] =>
   rows.flatMap((r) => (r.status === "approved" && r.id !== null ? [r.id] : []));
 
-export interface View {
+interface View {
   rows: WordRow[];
   error: string | null;
   sort: Query["sort"];
@@ -104,14 +114,15 @@ export function view(store: Store, text: string, now: Date = new Date()): View {
   return "error" in found ? { rows: [], error: found.error, sort: null } : { rows: found.rows, error: null, sort: found.query.sort };
 }
 
+function bareCard(target: { rank: number } | { lemma: string; pos: string }): NewNote | null {
+  if ("rank" in target) return cardForRank(target.rank);
+  if (!POS_VALUES.includes(target.pos as POS)) return null;
+  return lookup(target.lemma).find((c) => c.lemma === target.lemma && c.pos === target.pos) ?? null;
+}
+
 /** The id of the card for a ranked word or a Wiktionary entry, creating the bare card if there is none. */
 export function openCard(store: Store, target: { rank: number } | { lemma: string; pos: string }): string | null {
-  const card =
-    "rank" in target
-      ? cardForRank(target.rank)
-      : POS_VALUES.includes(target.pos as POS)
-        ? lookup(target.lemma).find((c) => c.lemma === target.lemma && c.pos === target.pos)
-        : undefined;
+  const card = bareCard(target);
   if (!card) return null;
   return store.findNote(card.lemma, card.pos) ?? store.createNote(card).id;
 }

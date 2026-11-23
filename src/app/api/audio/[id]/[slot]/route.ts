@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { NextResponse } from "next/server";
 import { audioPath } from "@/lib/audio";
 import { context, fail, handle } from "@/lib/server";
+import { noSuchCard, refusal } from "../../../route-helpers";
 
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string; slot: string }> };
@@ -19,11 +20,11 @@ export const DELETE = (_req: Request, { params }: Ctx) =>
   handle(async () => {
     const { id, slot } = await params;
     const { store } = context();
-    if (!store.getNote(id)) return fail("There is no such card.", 404);
+    if (!store.getNote(id)) return noSuchCard();
     try {
       return NextResponse.json({ note: store.removeAudio(id, slot) });
     } catch (e) {
-      return fail(e instanceof Error ? e.message : "The audio was not removed.");
+      return refusal(e, "The audio was not removed.");
     }
   });
 
@@ -35,6 +36,6 @@ export const PUT = (req: Request, { params }: Ctx) =>
     try {
       return NextResponse.json({ note: context().store.setAudio(id, slot, bytes, "user") });
     } catch (e) {
-      return fail(e instanceof Error ? e.message : "The audio was not saved.");
+      return refusal(e, "The audio was not saved.");
     }
   });

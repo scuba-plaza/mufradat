@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
-import { context, fail, handle } from "@/lib/server";
-import { listSnapshots, restoreSnapshot } from "@/lib/snapshots";
+import { context, handle } from "@/lib/server";
+import { restoreSnapshot } from "@/lib/snapshots";
+import { hasBackup, noSuchBackup, refusal, type IdContext } from "../../../route-helpers";
 
 export const dynamic = "force-dynamic";
-type Ctx = { params: Promise<{ id: string }> };
 
-export const POST = (_req: Request, { params }: Ctx) =>
+export const POST = (_req: Request, { params }: IdContext) =>
   handle(async () => {
     const { id } = await params;
     const { store } = context();
-    if (!listSnapshots(store.root).some((s) => s.id === id)) return fail("There is no such backup.", 404);
+    if (!hasBackup(store.root, id)) return noSuchBackup();
     try {
       restoreSnapshot(store, id);
     } catch (e) {
-      return fail(e instanceof Error ? e.message : "The backup was not restored.");
+      return refusal(e, "The backup was not restored.");
     }
     return NextResponse.json({ ok: true });
   });
